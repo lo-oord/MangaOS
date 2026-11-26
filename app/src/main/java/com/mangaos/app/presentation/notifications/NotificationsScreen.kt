@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,13 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DoneAll
-import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.Downloading
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,6 +51,7 @@ import com.mangaos.app.core.designsystem.BrandColors
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
+import com.mangaos.app.core.ui.components.CoverImage
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.util.relativeTime
 import com.mangaos.app.domain.model.AppNotification
@@ -57,7 +59,10 @@ import com.mangaos.app.domain.model.NotificationType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(modifier: Modifier = Modifier) {
+fun NotificationsScreen(
+    onOpenWork: (AppNotification) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val viewModel: NotificationsViewModel = viewModel()
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     var confirmDeleteAll by remember { mutableStateOf(false) }
@@ -128,7 +133,12 @@ fun NotificationsScreen(modifier: Modifier = Modifier) {
                     ) {
                         NotificationRow(
                             notification = notification,
-                            onClick = { viewModel.markRead(notification.id) },
+                            onClick = {
+                                viewModel.markRead(notification.id)
+                                if (notification.sourceId != null && notification.mangaId != null) {
+                                    onOpenWork(notification)
+                                }
+                            },
                         )
                     }
                 }
@@ -168,19 +178,30 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.md),
             verticalAlignment = Alignment.Top,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = notificationIcon(notification.type),
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(18.dp),
+            if (notification.coverModel != null) {
+                CoverImage(
+                    title = notification.title,
+                    coverUrl = notification.coverModel,
+                    modifier = Modifier
+                        .width(38.dp)
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(7.dp)),
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = notificationIcon(notification.type),
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
@@ -192,6 +213,8 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (notification.message.isNotBlank()) {
                     Spacer(Modifier.height(2.dp))
@@ -224,16 +247,12 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
 }
 
 private fun notificationIcon(type: NotificationType) = when (type) {
-    NotificationType.DOWNLOAD_COMPLETED -> Icons.Outlined.DownloadDone
-    NotificationType.DOWNLOAD_FAILED -> Icons.Outlined.ErrorOutline
-    NotificationType.DOWNLOAD_STATUS -> Icons.Outlined.Downloading
+    NotificationType.NEW_CHAPTER -> Icons.Outlined.NewReleases
     NotificationType.SYSTEM -> Icons.Outlined.Info
 }
 
 @Composable
 private fun notificationAccent(type: NotificationType): Color = when (type) {
-    NotificationType.DOWNLOAD_COMPLETED -> BrandColors.Ongoing
-    NotificationType.DOWNLOAD_FAILED -> MaterialTheme.colorScheme.error
-    NotificationType.DOWNLOAD_STATUS -> MaterialTheme.colorScheme.primary
+    NotificationType.NEW_CHAPTER -> BrandColors.Ongoing
     NotificationType.SYSTEM -> MaterialTheme.colorScheme.onSurfaceVariant
 }

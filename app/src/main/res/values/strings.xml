@@ -424,4 +424,77 @@
     <string name="profile_username_rule">3–20 characters. Letters, numbers, dots and underscores only.</string>
     <string name="profile_value_private">Private</string>
     <string name="error_display_name_length">Display name must be 40 characters or fewer</string>
+
+    <!-- Download tasks (Android notifications) -->
+    <string name="notif_channel_downloads">Chapter downloads</string>
+    <string name="notif_channel_downloads_desc">Progress of chapter downloads. Quiet updates, no sound.</string>
+    <string name="notif_channel_chapters">New chapters</string>
+    <string name="notif_channel_chapters_desc">Alerts when a work in your library gets a new chapter</string>
+    <string name="notif_download_progress_single">Chapter %1$s · %2$d%%</string>
+    <string name="notif_download_progress_multi">%1$d / %2$d chapters · %3$d%%</string>
+    <string name="notif_download_completed_single">Chapter %1$s downloaded</string>
+    <string name="notif_download_completed_multi">%1$d chapters downloaded</string>
+    <string name="notif_download_chapter_state">Chapter %1$s · %2$s</string>
+    <string name="notif_download_task_state">%1$d / %2$d chapters · %3$s</string>
+    <string name="notif_action_pause">Pause</string>
+    <string name="notif_action_resume">Resume</string>
+    <string name="notif_action_cancel">Cancel</string>
+    <string name="notif_action_retry">Retry</string>
+
+    <!-- New chapter notifications -->
+    <string name="notif_new_chapter_available">New chapter available</string>
+    <string name="notif_new_chapter_line">Chapter %1$s is available now 🎉</string>
+    <string name="notif_new_chapter_more">+%1$d more chapters</string>
+    <string name="notif_new_chapter_group_text">New chapters in your library</string>
+
+    <!-- Downloads tab -->
+    <string name="downloads_filter_all">All</string>
+    <string name="downloads_filter_active">Active</string>
+    <string name="downloads_filter_queued">Waiting</string>
+    <string name="downloads_filter_completed">Completed</string>
+    <string name="downloads_filter_failed">Failed</string>
+    <string name="downloads_no_matching">No downloads in this filter</string>
+    <string name="downloads_task_chapters">Downloading %1$d chapters</string>
+    <string name="downloads_task_chapter">Chapter %1$s</string>
+    <string name="downloads_chapter_progress">%1$d / %2$d chapters</string>
+    <string name="downloads_chapters_header">Chapters</string>
+    <string name="downloads_open_work">Open work</string>
+    <string name="downloads_remove_record">Remove from downloads</string>
+    <string name="downloads_delete_files">Delete downloaded files</string>
+    <string name="downloads_remove_title">Remove task record?</string>
+    <string name="downloads_remove_message">Downloaded chapters stay in your local library. Only the task is removed.</string>
+    <string name="downloads_delete_files_title">Delete downloaded files?</string>
+    <string name="downloads_delete_files_message">The chapter files for %1$s will be removed from this device, together with their local library entries.</string>
+    <string name="downloads_completed_hint">Available in local storage</string>
+    <string name="downloads_delete_chapter_title">Delete this chapter's files?</string>
+    <string name="download_status_partial">Needs retry</string>
+    <string name="download_partial_message">Some chapters could not be downloaded. Completed ones are kept.</string>
+    <string name="download_error_wifi">Waiting for a Wi-Fi connection</string>
+    <string name="download_error_no_pages">The source returned no pages</string>
+    <string name="download_error_storage">Not enough free storage for this chapter</string>
+    <string name="download_error_folder">Could not create the chapter folder</string>
+    <string name="download_error_verify">The downloaded pages failed verification</string>
+    <string name="download_error_record">Could not save the chapter in the local library</string>
+
+    <!-- Local library and offline reading -->
+    <string name="storage_summary">%1$d works · %2$s</string>
+    <string name="storage_badge_offline">Offline</string>
+    <string name="storage_delete_blocked">This work is open in the reader. Close it before deleting.</string>
+    <string name="local_detail_chapters">Downloaded chapters (%1$d)</string>
+    <string name="local_detail_missing_info">Not available offline</string>
+    <string name="local_detail_source">Source: %1$s</string>
+    <string name="local_detail_not_found">This work is no longer in local storage</string>
+    <string name="local_detail_size">%1$s on this device</string>
+    <string name="local_detail_empty_chapters">No complete chapters are stored for this work</string>
+    <string name="reader_chapter_not_downloaded">This chapter is not downloaded. Download it or connect to the internet.</string>
+
+    <!-- Chapter long-press actions -->
+    <string name="chapter_action_download">Download</string>
+    <string name="chapter_action_select">Select</string>
+    <string name="chapter_action_pause">Pause download</string>
+    <string name="chapter_action_resume">Resume download</string>
+    <string name="chapter_action_cancel">Cancel download</string>
+    <string name="chapter_action_retry">Retry download</string>
+    <string name="chapter_action_open">Open chapter</string>
+    <string name="chapter_action_delete_local">Delete local download</string>
 </resources>

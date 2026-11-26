@@ -27,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkRemove
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Download
@@ -80,6 +82,7 @@ import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalSnackbarHostState
+import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.AppIconButton
 import com.mangaos.app.core.ui.components.CoverImage
 import com.mangaos.app.core.ui.components.EmptyState
@@ -89,7 +92,9 @@ import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.ChapterSort
 import com.mangaos.app.domain.model.Download
-import com.mangaos.app.domain.model.DownloadStatus
+import com.mangaos.app.domain.model.DownloadChapter
+import com.mangaos.app.domain.model.DownloadChapterState
+import com.mangaos.app.domain.model.findChapter
 import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
@@ -163,6 +168,7 @@ private fun DetailContent(
     var descriptionExpanded by remember { mutableStateOf(false) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var actionChapter by remember { mutableStateOf<Chapter?>(null) }
     val resumeChapter = progress?.let { saved ->
         state.chapters.firstOrNull { it.id == saved.chapterId }
             ?: state.chapters.firstOrNull { it.number == saved.chapterNumber }
@@ -408,10 +414,10 @@ private fun DetailContent(
                                 }
                             },
                             onDelete = {
-                                downloads
-                                    .filter { it.chapterId in selectedIds }
-                                    .forEach { ServiceLocator.downloads.remove(it.id) }
-                                ServiceLocator.localStorage.deleteChapters(manga.id, selectedIds)
+                                val chosen = state.chapters.filter { it.id in selectedIds }
+                                chosen.forEach { chapter ->
+                                    ServiceLocator.downloads.deleteLocalChapter(manga.key, chapter.id)
+                                }
                                 selectionMode = false
                                 selectedIds = emptySet()
                                 scope.launch {
@@ -423,13 +429,11 @@ private fun DetailContent(
                 }
 
                 items(state.chapters, key = { it.id }) { chapter ->
-                    val download = downloads.firstOrNull {
-                        it.mangaId == manga.key && it.chapterId == chapter.id
-                    }
+                    val pair = downloads.findChapter(manga.key, chapter.id)
                     ChapterRow(
                         chapter = chapter,
                         isRead = readChapterKey(manga.key, chapter.id) in readChapters,
-                        download = download,
+                        downloadChapter = pair?.second,
                         selectionMode = selectionMode,
                         selected = chapter.id in selectedIds,
                         onClick = {
@@ -443,21 +447,27 @@ private fun DetailContent(
                                 onOpenChapter(chapter)
                             }
                         },
-                        onLongClick = {
-                            selectionMode = true
-                            selectedIds = selectedIds + chapter.id
-                        },
+                        onLongClick = { actionChapter = chapter },
                         onDownloadClick = {
-                            when (download?.status) {
-                                DownloadStatus.FAILED,
-                                DownloadStatus.PAUSED,
-                                DownloadStatus.CANCELLED -> ServiceLocator.downloads.retry(download.id)
-                                DownloadStatus.COMPLETED,
-                                DownloadStatus.DOWNLOADING,
-                                DownloadStatus.QUEUED,
-                                DownloadStatus.CANCELLING,
-                                -> Unit
-                                null -> ServiceLocator.downloads.enqueue(manga, chapter)
+                            val task = pair?.first
+                            val state = pair?.second?.state
+                            when (state) {
+                                DownloadChapterState.FAILED,
+                                DownloadChapterState.CANCELLED -> task?.let {
+                                    ServiceLocator.downloads.retry(it.id)
+                                }
+                                DownloadChapterState.PAUSED -> task?.let {
+                                    ServiceLocator.downloads.resume(it.id)
+                                }
+                                DownloadChapterState.QUEUED,
+                                DownloadChapterState.DOWNLOADING -> task?.let {
+                                    ServiceLocator.downloads.pause(it.id)
+                                }
+                                DownloadChapterState.COMPLETED, null -> {
+                                    if (task == null) {
+                                        ServiceLocator.downloads.enqueue(manga, chapter)
+                                    }
+                                }
                             }
                         },
                     )
@@ -466,6 +476,36 @@ private fun DetailContent(
         }
 
         item { Spacer(Modifier.height(Spacing.xxl)) }
+    }
+
+    actionChapter?.let { chapter ->
+        val pair = downloads.findChapter(manga.key, chapter.id)
+        ChapterActionsSheet(
+            chapter = chapter,
+            task = pair?.first,
+            downloadChapter = pair?.second,
+            onDismiss = { actionChapter = null },
+            onOpen = {
+                actionChapter = null
+                onOpenChapter(chapter)
+            },
+            onSelect = {
+                actionChapter = null
+                selectionMode = true
+                selectedIds = selectedIds + chapter.id
+            },
+            onDownload = {
+                actionChapter = null
+                ServiceLocator.downloads.enqueue(manga, chapter)
+            },
+            onDeleteLocal = {
+                actionChapter = null
+                ServiceLocator.downloads.deleteLocalChapter(manga.key, chapter.id)
+                scope.launch {
+                    snackbar.showSnackbar(context.getString(R.string.storage_deleted))
+                }
+            },
+        )
     }
 }
 
@@ -732,7 +772,7 @@ private fun SelectionActions(
 private fun ChapterRow(
     chapter: Chapter,
     isRead: Boolean,
-    download: Download?,
+    downloadChapter: DownloadChapter?,
     selectionMode: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
@@ -752,7 +792,7 @@ private fun ChapterRow(
         }
         val chapterLabel = stringResource(R.string.chapter_number, chapter.number)
         val downloadedLabel = stringResource(R.string.detail_downloaded)
-        val percent = download?.progress?.times(100f)?.roundToInt()
+        val percent = (downloadChapter?.progress ?: 0f).times(100f).roundToInt()
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = buildString {
@@ -766,13 +806,15 @@ private fun ChapterRow(
             )
             val details = buildList {
                 chapter.publishedAt?.let { add(formatDate(it)) }
-                when (download?.status) {
-                    DownloadStatus.DOWNLOADING -> percent?.takeIf { it in 1..99 }?.let { add("$it%") }
-                    DownloadStatus.COMPLETED -> add(downloadedLabel)
-                    DownloadStatus.FAILED -> add(stringResource(R.string.state_error_retry))
-                    DownloadStatus.PAUSED -> add(stringResource(R.string.download_status_paused))
-                    DownloadStatus.QUEUED -> add(stringResource(R.string.download_status_queued))
-                    else -> chapter.sizeBytes?.let { add(com.mangaos.app.core.util.formatBytes(it)) }
+                when (downloadChapter?.state) {
+                    DownloadChapterState.DOWNLOADING ->
+                        if (percent in 1..99) add("$percent%")
+                    DownloadChapterState.COMPLETED -> add(downloadedLabel)
+                    DownloadChapterState.FAILED -> add(stringResource(R.string.state_error_retry))
+                    DownloadChapterState.PAUSED -> add(stringResource(R.string.download_status_paused))
+                    DownloadChapterState.QUEUED -> add(stringResource(R.string.download_status_queued))
+                    DownloadChapterState.CANCELLED -> add(stringResource(R.string.download_status_cancelled))
+                    null -> chapter.sizeBytes?.let { add(com.mangaos.app.core.util.formatBytes(it)) }
                 }
             }
             if (details.isNotEmpty()) {
@@ -793,46 +835,52 @@ private fun ChapterRow(
         )
         Spacer(Modifier.width(Spacing.xxs))
         Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-            when (download?.status) {
-                DownloadStatus.QUEUED -> Icon(
-                    Icons.Outlined.Schedule,
-                    contentDescription = stringResource(R.string.download_status_queued),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-                DownloadStatus.DOWNLOADING -> CircularProgressIndicator(
-                    progress = { download.progress },
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                )
-                DownloadStatus.COMPLETED -> Icon(
+            when (downloadChapter?.state) {
+                DownloadChapterState.QUEUED, DownloadChapterState.PAUSED -> IconButton(
+                    onClick = onDownloadClick,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        if (downloadChapter!!.state == DownloadChapterState.PAUSED) {
+                            Icons.Outlined.PlayArrow
+                        } else {
+                            Icons.Outlined.Pause
+                        },
+                        contentDescription = stringResource(
+                            if (downloadChapter!!.state == DownloadChapterState.PAUSED) {
+                                R.string.action_resume
+                            } else {
+                                R.string.action_pause
+                            },
+                        ),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                DownloadChapterState.DOWNLOADING -> IconButton(
+                    onClick = onDownloadClick,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    CircularProgressIndicator(
+                        progress = { downloadChapter?.progress ?: 0f },
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                DownloadChapterState.COMPLETED -> Icon(
                     Icons.Outlined.Done,
                     contentDescription = stringResource(R.string.detail_downloaded),
                     tint = ReadGreen,
                     modifier = Modifier.size(19.dp),
                 )
-                DownloadStatus.FAILED -> IconButton(onClick = onDownloadClick, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Outlined.Refresh,
-                        contentDescription = stringResource(R.string.state_error_retry),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                DownloadStatus.PAUSED, DownloadStatus.CANCELLED -> IconButton(
-                    onClick = onDownloadClick,
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        Icons.Outlined.PlayArrow,
-                        contentDescription = stringResource(R.string.action_resume),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                DownloadStatus.CANCELLING -> CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
+                DownloadChapterState.FAILED, DownloadChapterState.CANCELLED ->
+                    IconButton(onClick = onDownloadClick, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = stringResource(R.string.state_error_retry),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 null -> IconButton(onClick = onDownloadClick, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Outlined.Download,
@@ -842,6 +890,90 @@ private fun ChapterRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ChapterActionsSheet(
+    chapter: Chapter,
+    task: Download?,
+    downloadChapter: DownloadChapter?,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+    onDeleteLocal: () -> Unit,
+) {
+    AppBottomSheet(onDismiss = onDismiss) {
+        Text(
+            text = stringResource(R.string.chapter_number, chapter.number),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = Spacing.xs),
+        )
+        when (downloadChapter?.state) {
+            null -> {
+                ChapterActionRow(Icons.Outlined.Download, R.string.chapter_action_download, onDownload)
+                ChapterActionRow(Icons.Outlined.CheckCircle, R.string.chapter_action_select, onSelect)
+            }
+            DownloadChapterState.QUEUED, DownloadChapterState.DOWNLOADING -> {
+                ChapterActionRow(Icons.Outlined.Pause, R.string.chapter_action_pause) {
+                    task?.let { ServiceLocator.downloads.pause(it.id) }
+                    onDismiss()
+                }
+                ChapterActionRow(Icons.Outlined.Close, R.string.chapter_action_cancel) {
+                    task?.let { ServiceLocator.downloads.cancel(it.id) }
+                    onDismiss()
+                }
+                ChapterActionRow(Icons.Outlined.CheckCircle, R.string.chapter_action_select, onSelect)
+            }
+            DownloadChapterState.PAUSED -> {
+                ChapterActionRow(Icons.Outlined.PlayArrow, R.string.chapter_action_resume) {
+                    task?.let { ServiceLocator.downloads.resume(it.id) }
+                    onDismiss()
+                }
+                ChapterActionRow(Icons.Outlined.Close, R.string.chapter_action_cancel) {
+                    task?.let { ServiceLocator.downloads.cancel(it.id) }
+                    onDismiss()
+                }
+            }
+            DownloadChapterState.FAILED, DownloadChapterState.CANCELLED -> {
+                ChapterActionRow(Icons.Outlined.Refresh, R.string.chapter_action_retry) {
+                    task?.let { ServiceLocator.downloads.retry(it.id) }
+                    onDismiss()
+                }
+                ChapterActionRow(Icons.Outlined.CheckCircle, R.string.chapter_action_select, onSelect)
+            }
+            DownloadChapterState.COMPLETED -> {
+                ChapterActionRow(Icons.Outlined.PlayArrow, R.string.chapter_action_open, onOpen)
+                ChapterActionRow(Icons.Outlined.DeleteOutline, R.string.chapter_action_delete_local, onDeleteLocal)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChapterActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    labelRes: Int,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = null)
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

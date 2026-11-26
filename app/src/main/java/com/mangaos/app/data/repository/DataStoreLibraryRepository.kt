@@ -11,6 +11,7 @@ import com.mangaos.app.domain.repository.LibraryRepository
 import com.mangaos.app.domain.repository.readChapterKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -49,6 +50,9 @@ class DataStoreLibraryRepository(
     override val readChapters: StateFlow<Set<String>> = dataStore.data
         .map { preferences -> decodeReadChapters(preferences[Keys.readChapters]) }
         .stateIn(scope, SharingStarted.Eagerly, emptySet())
+
+    override suspend fun worksSnapshot(): List<Manga> =
+        decodeMangas(dataStore.data.first()[Keys.items])
 
     override fun toggle(manga: Manga) {
         scope.launch {

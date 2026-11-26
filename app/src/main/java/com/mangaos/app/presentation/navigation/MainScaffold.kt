@@ -77,6 +77,20 @@ fun MainScaffold(
     var showExitDialog by remember { mutableStateOf(false) }
     var restoredDestination by remember { mutableStateOf(false) }
     val activity = LocalContext.current as? Activity
+    val pendingTarget by NavigationRequests.pending.collectAsStateWithLifecycle()
+
+    // A notification tap that started the app is applied once the main graph exists.
+    LaunchedEffect(pendingTarget) {
+        val target = pendingTarget ?: return@LaunchedEffect
+        NavigationRequests.consume()
+        target.notificationId?.let { ServiceLocator.notifications.markRead(it) }
+        val route = if (target.local) {
+            Routes.localDetail(target.sourceId, target.mangaId)
+        } else {
+            Routes.mangaDetail(target.sourceId, target.mangaId)
+        }
+        navController.navigate(route) { launchSingleTop = true }
+    }
 
     LaunchedEffect(Unit) {
         val preferences = ServiceLocator.settings.appSettings.first()
@@ -138,7 +152,9 @@ fun MainScaffold(
             },
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (currentRoute != Routes.MANGA_DETAIL && currentRoute?.startsWith("reader") != true) {
+                if (currentRoute != Routes.MANGA_DETAIL && currentRoute != Routes.LOCAL_DETAIL &&
+                    currentRoute?.startsWith("reader") != true
+                ) {
                     AppTopBar(
                         title = topBarTitle(currentRoute),
                         navigationIcon = if (isDrawerRoot) Icons.Outlined.Menu else Icons.AutoMirrored.Outlined.ArrowBack,
@@ -275,10 +291,22 @@ private fun MainNavHost(
             )
         }
         composable(DrawerDestination.DOWNLOADS.route) {
-            com.mangaos.app.presentation.downloads.DownloadsScreen()
+            com.mangaos.app.presentation.downloads.DownloadsScreen(
+                onOpenWork = { sourceId, mangaId ->
+                    navController.navigate(Routes.localDetail(sourceId, mangaId)) {
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
         composable(DrawerDestination.STORAGE.route) {
-            com.mangaos.app.presentation.storage.LocalStorageScreen()
+            com.mangaos.app.presentation.storage.LocalStorageScreen(
+                onOpenWork = { manga ->
+                    navController.navigate(Routes.localDetail(manga.sourceId, manga.id)) {
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
         composable(DrawerDestination.SETTINGS.route) {
             com.mangaos.app.presentation.settings.SettingsScreen(
@@ -304,7 +332,17 @@ private fun MainNavHost(
             )
         }
         composable(Routes.NOTIFICATIONS) {
-            com.mangaos.app.presentation.notifications.NotificationsScreen()
+            com.mangaos.app.presentation.notifications.NotificationsScreen(
+                onOpenWork = { notification ->
+                    val sourceId = notification.sourceId
+                    val mangaId = notification.mangaId
+                    if (sourceId != null && mangaId != null) {
+                        navController.navigate(Routes.mangaDetail(sourceId, mangaId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                },
+            )
         }
         composable(Routes.PROFILE) {
             com.mangaos.app.presentation.profile.ProfileScreen()
@@ -336,6 +374,24 @@ private fun MainNavHost(
         }
         composable(Routes.READER_SETTINGS) {
             com.mangaos.app.presentation.reader.ReaderSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Routes.LOCAL_DETAIL,
+            arguments = listOf(
+                navArgument(Routes.ARG_SOURCE_ID) { type = NavType.StringType },
+                navArgument(Routes.ARG_MANGA_ID) { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val sourceId = Uri.decode(entry.arguments?.getString(Routes.ARG_SOURCE_ID).orEmpty())
+            val mangaId = Uri.decode(entry.arguments?.getString(Routes.ARG_MANGA_ID).orEmpty())
+            com.mangaos.app.presentation.storage.LocalWorkDetailScreen(
+                sourceId = sourceId,
+                mangaId = mangaId,
+                onBack = { navController.popBackStack() },
+                onOpenChapter = { chapter ->
+                    navController.navigate(Routes.reader(sourceId, mangaId, chapter.id))
+                },
+            )
         }
         composable(
             route = Routes.MANGA_DETAIL,

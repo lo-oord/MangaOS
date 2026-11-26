@@ -398,4 +398,77 @@
     <string name="profile_username_rule">من ٣ إلى ٢٠ حرفًا، أحرف وأرقام ونقاط وشرطات سفلية فقط.</string>
     <string name="profile_value_private">خاص</string>
     <string name="error_display_name_length">يجب ألا يتجاوز الاسم الظاهر ٤٠ حرفًا</string>
+
+    <!-- مهام التنزيل (إشعارات أندرويد) -->
+    <string name="notif_channel_downloads">تنزيل الفصول</string>
+    <string name="notif_channel_downloads_desc">تقدم تنزيل الفصول، تحديثات هادئة بدون صوت</string>
+    <string name="notif_channel_chapters">الفصول الجديدة</string>
+    <string name="notif_channel_chapters_desc">تنبيه عند توفر فصل جديد لعمل في مكتبتك</string>
+    <string name="notif_download_progress_single">الفصل %1$s · %2$d%%</string>
+    <string name="notif_download_progress_multi">%1$d / %2$d فصلًا · %3$d%%</string>
+    <string name="notif_download_completed_single">تم تنزيل الفصل %1$s</string>
+    <string name="notif_download_completed_multi">تم تنزيل %1$d فصلًا</string>
+    <string name="notif_download_chapter_state">الفصل %1$s · %2$s</string>
+    <string name="notif_download_task_state">%1$d / %2$d فصلًا · %3$s</string>
+    <string name="notif_action_pause">إيقاف مؤقت</string>
+    <string name="notif_action_resume">استئناف</string>
+    <string name="notif_action_cancel">إلغاء</string>
+    <string name="notif_action_retry">إعادة المحاولة</string>
+
+    <!-- إشعارات الفصول الجديدة -->
+    <string name="notif_new_chapter_available">فصل جديد متوفر</string>
+    <string name="notif_new_chapter_line">الفصل %1$s متوفر الآن 🎉</string>
+    <string name="notif_new_chapter_more">+%1$d فصول أخرى</string>
+    <string name="notif_new_chapter_group_text">فصول جديدة في مكتبتك</string>
+
+    <!-- تبويب التحميلات -->
+    <string name="downloads_filter_all">الكل</string>
+    <string name="downloads_filter_active">جارٍ التنزيل</string>
+    <string name="downloads_filter_queued">في الانتظار</string>
+    <string name="downloads_filter_completed">مكتمل</string>
+    <string name="downloads_filter_failed">فشل</string>
+    <string name="downloads_no_matching">لا توجد تنزيلات في هذا الفلتر</string>
+    <string name="downloads_task_chapters">تنزيل %1$d فصول</string>
+    <string name="downloads_task_chapter">الفصل %1$s</string>
+    <string name="downloads_chapter_progress">%1$d / %2$d مكتملة</string>
+    <string name="downloads_chapters_header">الفصول</string>
+    <string name="downloads_open_work">فتح العمل</string>
+    <string name="downloads_remove_record">حذف سجل المهمة</string>
+    <string name="downloads_delete_files">حذف الملفات المحلية</string>
+    <string name="downloads_remove_title">حذف سجل المهمة؟</string>
+    <string name="downloads_remove_message">الفصول المكتملة ستبقى في التخزين المحلي. سيُحذف سجل المهمة فقط.</string>
+    <string name="downloads_delete_files_title">حذف الملفات المحلية؟</string>
+    <string name="downloads_delete_files_message">ستُحذف ملفات فصول %1$s من هذا الجهاز مع سجلاتها في التخزين المحلي.</string>
+    <string name="downloads_completed_hint">متاح في التخزين المحلي</string>
+    <string name="downloads_delete_chapter_title">حذف ملفات هذا الفصل؟</string>
+    <string name="download_status_partial">بحاجة إلى إعادة محاولة</string>
+    <string name="download_partial_message">فشل تنزيل بعض الفصول، وتم الاحتفاظ بالفصول المكتملة.</string>
+    <string name="download_error_wifi">بانتظار اتصال Wi-Fi</string>
+    <string name="download_error_no_pages">لم يُرجع المصدر أي صور</string>
+    <string name="download_error_storage">لا توجد مساحة كافية لهذا الفصل</string>
+    <string name="download_error_folder">تعذر إنشاء مجلد الفصل</string>
+    <string name="download_error_verify">فشل التحقق من الصور التي تم تنزيلها</string>
+    <string name="download_error_record">تعذر حفظ الفصل في التخزين المحلي</string>
+
+    <!-- التخزين المحلي والقراءة دون إنترنت -->
+    <string name="storage_summary">%1$d عملًا · %2$s</string>
+    <string name="storage_badge_offline">دون إنترنت</string>
+    <string name="storage_delete_blocked">هذا العمل مفتوح في القارئ. أغلقه قبل الحذف.</string>
+    <string name="local_detail_chapters">الفصول المحمّلة (%1$d)</string>
+    <string name="local_detail_missing_info">غير متاح دون إنترنت</string>
+    <string name="local_detail_source">المصدر: %1$s</string>
+    <string name="local_detail_not_found">هذا العمل لم يعد موجودًا في التخزين المحلي</string>
+    <string name="local_detail_size">%1$s على هذا الجهاز</string>
+    <string name="local_detail_empty_chapters">لا توجد فصول كاملة محفوظة لهذا العمل</string>
+    <string name="reader_chapter_not_downloaded">هذا الفصل غير محمّل. نزّله أو اتصل بالإنترنت.</string>
+
+    <!-- إجراءات الفصل عند الضغط المطول -->
+    <string name="chapter_action_download">تنزيل</string>
+    <string name="chapter_action_select">تحديد</string>
+    <string name="chapter_action_pause">إيقاف التنزيل مؤقتًا</string>
+    <string name="chapter_action_resume">استئناف التنزيل</string>
+    <string name="chapter_action_cancel">إلغاء التنزيل</string>
+    <string name="chapter_action_retry">إعادة محاولة التنزيل</string>
+    <string name="chapter_action_open">فتح الفصل</string>
+    <string name="chapter_action_delete_local">حذف التنزيل المحلي</string>
 </resources>

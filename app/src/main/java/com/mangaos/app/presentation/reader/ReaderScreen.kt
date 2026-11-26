@@ -82,6 +82,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.mangaos.app.R
+import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
@@ -104,6 +105,11 @@ fun ReaderScreen(
 ) {
     val viewModel: ReaderViewModel = viewModel()
     LaunchedEffect(sourceId, mangaId, chapterId) { viewModel.load(sourceId, mangaId, chapterId) }
+    DisposableEffect(sourceId, mangaId) {
+        val key = "$sourceId/$mangaId"
+        ReaderSession.enter(key)
+        onDispose { ReaderSession.exit(key) }
+    }
 
     val pages by viewModel.pages.collectAsStateWithLifecycle()
     val imageStates by viewModel.imageStates.collectAsStateWithLifecycle()

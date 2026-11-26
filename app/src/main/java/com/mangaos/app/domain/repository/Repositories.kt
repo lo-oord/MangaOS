@@ -93,32 +93,57 @@ interface LibraryRepository {
     fun isSaved(mangaKey: String): Boolean
     fun setProgress(mangaKey: String, progress: ReadingProgress)
     fun markChapterRead(mangaKey: String, chapterId: String)
+
+    /** Fresh library snapshot for background work, independent of flow warm-up timing. */
+    suspend fun worksSnapshot(): List<Manga>
 }
 
 /** Stable key for the read-chapter set. */
 fun readChapterKey(mangaKey: String, chapterId: String): String = "$mangaKey\u0001$chapterId"
 
+/**
+ * Download queue + execution. Task records and local chapter files are separate: removing a
+ * task from the downloads tab never deletes a completed chapter, which needs an explicit call.
+ */
 interface DownloadRepository {
     val downloads: StateFlow<List<Download>>
 
-    fun enqueue(manga: Manga, chapter: Chapter)
+    /** One task for every chapter in [chapters]; already completed/active ones are skipped. */
+    fun enqueue(manga: Manga, chapters: List<Chapter>)
+
+    fun enqueue(manga: Manga, chapter: Chapter) = enqueue(manga, listOf(chapter))
 
     /** Completed page files for offline reading, in page order. */
     fun localPages(mangaKey: String, chapterId: String): List<String>
+
     fun pause(downloadId: String)
     fun resume(downloadId: String)
     fun retry(downloadId: String)
     fun cancel(downloadId: String)
-    fun remove(downloadId: String)
+
+    /** Removes the task record only; downloaded chapters stay in the local library. */
+    fun removeRecord(downloadId: String)
+
+    /** Explicitly deletes the downloaded files and their local records, then the task record. */
+    fun deleteLocal(downloadId: String)
+
+    /** Deletes one completed chapter's files and local record; its task stays without it. */
+    fun deleteLocalChapter(mangaKey: String, chapterId: String)
 }
 
 interface LocalStorageRepository {
     val works: StateFlow<List<StoredWork>>
 
-    fun saveChapter(manga: Manga, chapter: Chapter)
-    fun deleteChapter(mangaId: String, chapterId: String)
-    fun deleteChapters(mangaId: String, chapterIds: Set<String>)
-    fun deleteWork(mangaId: String)
+    fun work(mangaId: String): StoredWork?
+    fun localChapter(mangaId: String, chapterId: String): Chapter?
+
+    /** Saves/merges one completed chapter; throws when the record could not be written. */
+    fun saveChapter(manga: Manga, chapter: Chapter, localCoverPath: String? = null)
+
+    /** @return false when the chapter is currently open in the reader. */
+    fun deleteChapter(mangaId: String, chapterId: String): Boolean
+    fun deleteChapters(mangaId: String, chapterIds: Set<String>): Boolean
+    fun deleteWork(mangaId: String): Boolean
 }
 
 interface NotificationRepository {
@@ -130,6 +155,8 @@ interface NotificationRepository {
         message: String,
         type: NotificationType,
     )
+
+    fun add(notification: AppNotification)
 
     fun markRead(notificationId: String)
     fun markAllRead()

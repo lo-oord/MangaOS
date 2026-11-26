@@ -43,6 +43,8 @@ class ReaderViewModel : ViewModel() {
     private val library = ServiceLocator.library
     private val settingsRepo = ServiceLocator.settings
     private val readerSettingsRepo = ServiceLocator.readerSettings
+    private val localStorage = ServiceLocator.localStorage
+    private val context = ServiceLocator.context()
 
     val settings: StateFlow<ReaderSettings> = readerSettingsRepo.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, ReaderSettings())
@@ -100,6 +102,8 @@ class ReaderViewModel : ViewModel() {
     private var nextLoadJob: Job? = null
     private var consecutiveTallImages = 0
     private var webtoonDetectionDone = false
+    /** True when the source could not be reached and only downloaded chapters are usable. */
+    private var offlineOnly = false
 
     fun load(sourceId: String, mangaId: String, chapterId: String) {
         if (this.sourceId == sourceId && this.mangaId == mangaId &&
@@ -125,25 +129,46 @@ class ReaderViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val manga = mangaRepo.byId(sourceId, mangaId)
-                _manga.value = manga
-                val chapters = mangaRepo.chapters(sourceId, mangaId)
-                    .sortedBy { it.number.toFloatOrNull() ?: 0f }
+                val key = "$sourceId/$mangaId"
+                val localWork = localStorage.works.value.firstOrNull { it.manga.key == key }
+                val remoteManga = runCatching { mangaRepo.byId(sourceId, mangaId) }.getOrNull()
+                val remoteChapters = runCatching {
+                    mangaRepo.chapters(sourceId, mangaId)
+                }.getOrNull()
+                offlineOnly = remoteChapters.isNullOrEmpty()
+                _manga.value = remoteManga ?: localWork?.manga
+
+                // Offline falls back to exactly the chapters that are stored on the device;
+                // chapters that were never downloaded are never offered as available.
+                val chapters = when {
+                    !remoteChapters.isNullOrEmpty() -> remoteChapters
+                    localWork != null -> localWork.chapters
+                    else -> emptyList()
+                }.sortedBy { it.number.toFloatOrNull() ?: 0f }
                 _chapters.value = chapters
-                val startIndex = chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0)
-                _currentChapterIndex.value = startIndex
-                val startChapter = chapters.getOrNull(startIndex)
-                if (startChapter == null) {
-                    _error.value = "The chapter is not part of this source's chapter list"
+
+                val startIndex = chapters.indexOfFirst { it.id == chapterId }
+                if (startIndex < 0) {
+                    _error.value = if (offlineOnly) {
+                        context.getString(com.mangaos.app.R.string.reader_chapter_not_downloaded)
+                    } else {
+                        "The chapter is not part of this source's chapter list"
+                    }
                 } else {
+                    _currentChapterIndex.value = startIndex
+                    val startChapter = chapters[startIndex]
                     _initialPage.value = settingsRepo
                         .readerPosition(positionKey(startChapter.id))
                         .first() ?: 0
                     loadChapterPages(startChapter)
                     if (_pages.value.isEmpty() && _error.value == null) {
-                        _error.value = "The source returned no pages for this chapter"
+                        _error.value = if (offlineOnly) {
+                            context.getString(com.mangaos.app.R.string.reader_chapter_not_downloaded)
+                        } else {
+                            "The source returned no pages for this chapter"
+                        }
                     }
-                    if (settings.value.continuousReading) prefetchNextChapters()
+                    if (settings.value.continuousReading && !offlineOnly) prefetchNextChapters()
                 }
             } catch (error: Exception) {
                 _error.value = error.message ?: error.javaClass.simpleName
@@ -160,13 +185,19 @@ class ReaderViewModel : ViewModel() {
             val localUrls = downloads.localPages("$sourceId/$mangaId", chapter.id)
             val urls = if (localUrls.isNotEmpty()) {
                 localUrls
+            } else if (offlineOnly) {
+                emptyList()
             } else {
                 mangaRepo.pages(sourceId, mangaId, chapter.id)
             }
             val headers = if (localUrls.isNotEmpty()) emptyMap() else mangaRepo.imageHeaders(sourceId)
             if (urls.isEmpty()) {
                 if (chapter.id == currentChapterId) {
-                    _error.value = "The source returned no pages for chapter ${chapter.number}"
+                    _error.value = if (offlineOnly) {
+                        context.getString(com.mangaos.app.R.string.reader_chapter_not_downloaded)
+                    } else {
+                        "The source returned no pages for chapter ${chapter.number}"
+                    }
                 }
                 false
             } else {

@@ -29,6 +29,7 @@ object Routes {
     const val TERMS = "terms"
     const val SOURCES = "sources"
     const val MANGA_DETAIL = "detail/{sourceId}/{mangaId}"
+    const val LOCAL_DETAIL = "local/{sourceId}/{mangaId}"
     const val READER = "reader/{sourceId}/{mangaId}/{chapterId}"
     const val READER_SETTINGS = "reader/settings"
     const val ARG_SOURCE_ID = "sourceId"
@@ -41,6 +42,9 @@ object Routes {
 
     fun reader(sourceId: String, mangaId: String, chapterId: String): String =
         "reader/${Uri.encode(sourceId)}/${Uri.encode(mangaId)}/${Uri.encode(chapterId)}"
+
+    fun localDetail(sourceId: String, mangaId: String): String =
+        "local/${Uri.encode(sourceId)}/${Uri.encode(mangaId)}"
 }
 
 /** Drawer destinations, in the order required by the product specification. */

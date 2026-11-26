@@ -1,6 +1,11 @@
 package com.mangaos.app.presentation
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.MangaOsTheme
@@ -31,6 +37,23 @@ import com.mangaos.app.presentation.navigation.RootNavHost
 fun MangaOsApp() {
     val context = LocalContext.current
     val settings = ServiceLocator.settings
+
+    // Download progress and new chapters are Android notifications, so ask once on Android 13+
+    // instead of silently posting notifications the system will drop.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     val language by settings.language.collectAsStateWithLifecycle(
         initialValue = LocaleManager.readLanguage(context),
