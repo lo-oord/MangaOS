@@ -99,6 +99,8 @@ fun ProfileScreen(
     var showCountryPicker by remember { mutableStateOf(false) }
     var showAgePicker by remember { mutableStateOf(false) }
     var showPasswordInfo by remember { mutableStateOf(false) }
+    var avatarReloadKey by remember(profile?.avatarUri) { mutableStateOf(0) }
+    var avatarFailed by remember(profile?.avatarUri) { mutableStateOf(false) }
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -131,6 +133,13 @@ fun ProfileScreen(
         item {
             ProfileHero(
                 profile = current,
+                avatarReloadKey = avatarReloadKey,
+                avatarFailed = avatarFailed,
+                onAvatarError = { avatarFailed = true },
+                onRetryAvatar = {
+                    avatarFailed = false
+                    avatarReloadKey += 1
+                },
                 onPhotoClick = {
                     photoPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -374,6 +383,10 @@ private enum class ProfileEditTarget { DISPLAY_NAME, USERNAME }
 @Composable
 private fun ProfileHero(
     profile: UserProfile,
+    avatarReloadKey: Int,
+    avatarFailed: Boolean,
+    onAvatarError: () -> Unit,
+    onRetryAvatar: () -> Unit,
     onPhotoClick: () -> Unit,
     onUsernameClick: () -> Unit,
     onDisplayNameClick: () -> Unit,
@@ -394,6 +407,8 @@ private fun ProfileHero(
                     name = profile.displayName.ifBlank { profile.username },
                     avatarUri = profile.avatarUri,
                     size = Dimens.avatarLarge,
+                    reloadKey = avatarReloadKey,
+                    onError = onAvatarError,
                     modifier = Modifier.border(
                         width = 2.dp,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
@@ -469,6 +484,15 @@ private fun ProfileHero(
                     contentDescription = stringResource(R.string.profile_edit_display_name),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+        if (avatarFailed && profile.avatarUri != null) {
+            TextButton(onClick = onRetryAvatar) {
+                Text(
+                    text = stringResource(R.string.profile_image_retry),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
