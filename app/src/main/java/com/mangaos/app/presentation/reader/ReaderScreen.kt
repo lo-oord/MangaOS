@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.request.httpHeaders
 import okhttp3.Headers
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
