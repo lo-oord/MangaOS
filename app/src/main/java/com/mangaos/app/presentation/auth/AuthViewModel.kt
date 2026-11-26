@@ -2,12 +2,14 @@ package com.mangaos.app.presentation.auth
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import android.net.Uri
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.R
 import com.mangaos.app.core.util.LocaleManager
 import com.mangaos.app.core.util.Validators
+import com.mangaos.app.data.local.AvatarStore
 import com.mangaos.app.di.ServiceLocator
 import kotlinx.coroutines.launch
 
@@ -36,6 +38,10 @@ class AuthViewModel : ViewModel() {
     var usernameError by mutableStateOf<Int?>(null)
     var codeError by mutableStateOf<Int?>(null)
     var ageError by mutableStateOf<Int?>(null)
+
+    /** Blocks repeated taps while the local account is being written. */
+    var isSubmitting by mutableStateOf(false)
+        private set
 
     fun onEmailChange(value: String) {
         email = value.trim()
@@ -141,40 +147,65 @@ class AuthViewModel : ViewModel() {
     }
 
     fun completeAccount(onDone: () -> Unit) {
+        if (isSubmitting) return
+        isSubmitting = true
         viewModelScope.launch {
-            ServiceLocator.user.createAccount(
-                displayName = displayName.trim(),
-                username = username.trim(),
-                avatarUri = avatarUri,
-                countryCode = countryCode,
-                age = age,
-                preferredLanguage = preferredLanguage,
-            )
-            ServiceLocator.settings.setOnboardingCompleted(true)
-            onDone()
+            try {
+                val storedAvatar = avatarUri?.let { picked ->
+                    runCatching {
+                        AvatarStore.save(ServiceLocator.context(), Uri.parse(picked))
+                    }.getOrNull()
+                }
+                ServiceLocator.user.createAccount(
+                    displayName = displayName.trim(),
+                    username = username.trim(),
+                    avatarUri = storedAvatar,
+                    email = email.trim().ifBlank { null },
+                    countryCode = countryCode,
+                    age = age,
+                    preferredLanguage = preferredLanguage,
+                )
+                ServiceLocator.settings.setOnboardingCompleted(true)
+                onDone()
+            } finally {
+                isSubmitting = false
+            }
         }
     }
 
     fun signIn(onDone: () -> Unit) {
+        if (isSubmitting) return
+        isSubmitting = true
         viewModelScope.launch {
-            val fallbackName = email.substringBefore('@').ifBlank { "reader" }
-            val handle = fallbackName.filter { it.isLetterOrDigit() || it == '_' || it == '.' }.take(20)
-            ServiceLocator.user.createAccount(
-                displayName = fallbackName,
-                username = handle.ifBlank { "reader" },
-                avatarUri = null,
-                preferredLanguage = preferredLanguage,
-            )
-            ServiceLocator.settings.setOnboardingCompleted(true)
-            onDone()
+            try {
+                val fallbackName = email.substringBefore('@').ifBlank { "reader" }
+                val handle = fallbackName.filter { it.isLetterOrDigit() || it == '_' || it == '.' }.take(20)
+                ServiceLocator.user.createAccount(
+                    displayName = fallbackName,
+                    username = handle.ifBlank { "reader" },
+                    avatarUri = null,
+                    email = email.trim().ifBlank { null },
+                    preferredLanguage = preferredLanguage,
+                )
+                ServiceLocator.settings.setOnboardingCompleted(true)
+                onDone()
+            } finally {
+                isSubmitting = false
+            }
         }
     }
 
     fun continueAsGuest(onDone: () -> Unit) {
+        if (isSubmitting) return
+        isSubmitting = true
         viewModelScope.launch {
-            ServiceLocator.user.startGuestSession()
-            ServiceLocator.settings.setOnboardingCompleted(true)
-            onDone()
+            try {
+                ServiceLocator.user.startGuestSession()
+                ServiceLocator.settings.setOnboardingCompleted(true)
+                onDone()
+            } finally {
+                isSubmitting = false
+            }
         }
     }
 }

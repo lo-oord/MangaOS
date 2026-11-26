@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +35,7 @@ fun SignUpScreen(
     viewModel: AuthViewModel,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    onSignIn: () -> Unit,
 ) {
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
@@ -46,9 +48,16 @@ fun SignUpScreen(
                 .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Spacer(Modifier.height(Spacing.xl))
+            AppLogo(size = 68.dp)
             Spacer(Modifier.height(Spacing.md))
-            AppLogo(size = 52.dp)
-            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = stringResource(R.string.signup_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = stringResource(R.string.tagline_signup),
                 style = MaterialTheme.typography.bodyMedium,
@@ -57,15 +66,7 @@ fun SignUpScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(Spacing.lg))
-
-            GoogleButton(
-                onClick = {
-                    scope.launch { snackbarHostState.showSnackbar(googleMessage) }
-                },
-            )
-
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.xl))
 
             AppTextField(
                 value = viewModel.email,
@@ -75,7 +76,7 @@ fun SignUpScreen(
                 keyboardType = KeyboardType.Email,
                 error = viewModel.emailError?.let { stringResource(it) },
             )
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.xs))
             AppTextField(
                 value = viewModel.password,
                 onValueChange = viewModel::onPasswordChange,
@@ -85,7 +86,7 @@ fun SignUpScreen(
                 keyboardType = KeyboardType.Password,
                 error = viewModel.passwordError?.let { stringResource(it) },
             )
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.xs))
             AppTextField(
                 value = viewModel.confirmPassword,
                 onValueChange = viewModel::onConfirmChange,
@@ -97,11 +98,25 @@ fun SignUpScreen(
                 error = viewModel.confirmError?.let { stringResource(it) },
             )
 
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(Spacing.lg))
             PrimaryButton(
                 text = stringResource(R.string.action_continue),
                 onClick = { if (viewModel.validateCredentials()) onNext() },
-                height = 48.dp,
+            )
+
+            Spacer(Modifier.height(Spacing.lg))
+            AuthDivider()
+            Spacer(Modifier.height(Spacing.lg))
+            GoogleButton(
+                onClick = {
+                    scope.launch { snackbarHostState.showSnackbar(googleMessage) }
+                },
+            )
+
+            Spacer(Modifier.height(Spacing.md))
+            AuthLink(
+                text = stringResource(R.string.auth_have_account),
+                onClick = onSignIn,
             )
             Spacer(Modifier.height(Spacing.xxl))
         }

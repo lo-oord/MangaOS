@@ -67,6 +67,9 @@ fun RootNavHost(modifier: Modifier = Modifier) {
                 viewModel = authViewModel,
                 onBack = { navController.popBackStack() },
                 onNext = { navController.navigate(Routes.AUTH_PROFILE) },
+                onSignIn = {
+                    navController.navigate(Routes.AUTH_SIGN_IN) { launchSingleTop = true }
+                },
             )
         }
 
@@ -101,6 +104,9 @@ fun RootNavHost(modifier: Modifier = Modifier) {
                     navController.navigate(Routes.MAIN) {
                         popUpTo(Routes.AUTH_CHOICE) { inclusive = true }
                     }
+                },
+                onCreateAccount = {
+                    navController.navigate(Routes.AUTH_SIGN_UP) { launchSingleTop = true }
                 },
             )
         }

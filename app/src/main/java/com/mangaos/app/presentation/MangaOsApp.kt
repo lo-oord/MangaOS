@@ -20,8 +20,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.MangaOsTheme
+import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.util.LocaleManager
+import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.presentation.navigation.RootNavHost
 
@@ -35,6 +37,7 @@ fun MangaOsApp() {
     )
     val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.DEFAULT)
     val darkModePreference by settings.darkMode.collectAsStateWithLifecycle(initialValue = null)
+    val appSettings by settings.appSettings.collectAsStateWithLifecycle(initialValue = AppSettings())
 
     val darkTheme = darkModePreference ?: isSystemInDarkTheme()
 
@@ -50,7 +53,10 @@ fun MangaOsApp() {
 
     MangaOsTheme(theme = theme, darkTheme = darkTheme) {
         val snackbarHostState = remember { SnackbarHostState() }
-        CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
+        CompositionLocalProvider(
+            LocalSnackbarHostState provides snackbarHostState,
+            LocalReduceMotion provides appSettings.reduceMotion,
+        ) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbarHostState) },

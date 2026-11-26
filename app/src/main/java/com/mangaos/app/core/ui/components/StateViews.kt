@@ -1,5 +1,6 @@
 package com.mangaos.app.core.ui.components
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -32,15 +33,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Dimens
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.ui.LocalReduceMotion
 
 @Composable
 fun EmptyState(
@@ -135,56 +140,175 @@ fun LoadingIndicator(modifier: Modifier = Modifier) {
     }
 }
 
-/** Skeleton placeholders keep the grid layout stable while the first page loads. */
+/**
+ * One shimmer treatment for every skeleton. The gradient is a single animated offset and
+ * becomes a flat placeholder when reduced motion is enabled.
+ */
+@Composable
+fun ShimmerBlock(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(8.dp),
+) {
+    val base = MaterialTheme.colorScheme.surfaceContainerHigh
+    if (LocalReduceMotion.current) {
+        Box(modifier = modifier.background(base, shape))
+        return
+    }
+    val highlight = MaterialTheme.colorScheme.surfaceContainerLowest
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val offset by transition.animateFloat(
+        initialValue = -320f,
+        targetValue = 960f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1150, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "shimmerOffset",
+    )
+    val brush = Brush.linearGradient(
+        colors = listOf(base, highlight, base),
+        start = Offset(offset, 0f),
+        end = Offset(offset + 320f, 320f),
+    )
+    Box(modifier = modifier.background(brush, shape))
+}
+
 @Composable
 fun MangaGridSkeleton(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "skeleton")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "skeletonAlpha",
-    )
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = Spacing.screen, vertical = Spacing.sm)
-            .alpha(alpha),
+            .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         repeat(3) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.gridGap)) {
                 repeat(3) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Box(
+                        ShimmerBlock(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(Dimens.coverAspect)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                .aspectRatio(Dimens.coverAspect),
+                            shape = RoundedCornerShape(12.dp),
                         )
                         Spacer(Modifier.height(Spacing.sm))
-                        Box(
+                        ShimmerBlock(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                .height(10.dp),
+                            shape = RoundedCornerShape(4.dp),
                         )
                         Spacer(Modifier.height(Spacing.xs))
-                        Box(
+                        ShimmerBlock(
                             modifier = Modifier
                                 .fillMaxWidth(0.55f)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                .height(8.dp),
+                            shape = RoundedCornerShape(4.dp),
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun MangaListSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(Spacing.screen),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        repeat(6) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShimmerBlock(
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(80.dp),
+                    shape = RoundedCornerShape(10.dp),
+                )
+                Spacer(Modifier.width(Spacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    ShimmerBlock(
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .height(14.dp),
+                        shape = RoundedCornerShape(4.dp),
+                    )
+                    Spacer(Modifier.height(Spacing.sm))
+                    ShimmerBlock(
+                        modifier = Modifier
+                            .fillMaxWidth(0.45f)
+                            .height(10.dp),
+                        shape = RoundedCornerShape(4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MangaDetailSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(Spacing.screen),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Row {
+            ShimmerBlock(
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(180.dp),
+                shape = RoundedCornerShape(12.dp),
+            )
+            Spacer(Modifier.width(Spacing.lg))
+            Column(modifier = Modifier.weight(1f)) {
+                ShimmerBlock(Modifier.fillMaxWidth(0.85f).height(20.dp))
+                Spacer(Modifier.height(Spacing.sm))
+                ShimmerBlock(Modifier.fillMaxWidth(0.55f).height(12.dp))
+                Spacer(Modifier.height(Spacing.sm))
+                ShimmerBlock(Modifier.fillMaxWidth(0.7f).height(12.dp))
+                Spacer(Modifier.height(Spacing.lg))
+                ShimmerBlock(Modifier.fillMaxWidth().height(36.dp), shape = RoundedCornerShape(12.dp))
+            }
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        repeat(5) {
+            ShimmerBlock(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun ProfileSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(Spacing.screen),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ShimmerBlock(Modifier.size(Dimens.avatarLarge), CircleShape)
+        Spacer(Modifier.height(Spacing.md))
+        ShimmerBlock(Modifier.width(120.dp).height(14.dp))
+        Spacer(Modifier.height(Spacing.sm))
+        ShimmerBlock(Modifier.width(170.dp).height(20.dp))
+        Spacer(Modifier.height(Spacing.xl))
+        repeat(3) {
+            ShimmerBlock(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(14.dp),
+            )
+            Spacer(Modifier.height(Spacing.md))
         }
     }
 }

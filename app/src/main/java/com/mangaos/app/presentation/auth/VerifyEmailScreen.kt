@@ -103,7 +103,8 @@ fun VerifyEmailScreen(
                 onClick = {
                     if (viewModel.validateCode()) viewModel.completeAccount(onComplete)
                 },
-                height = 48.dp,
+                loading = viewModel.isSubmitting,
+                enabled = !viewModel.isSubmitting,
             )
 
             TextButton(

@@ -39,7 +39,6 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -75,6 +74,7 @@ import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppIconButton
 import com.mangaos.app.core.ui.components.CoverImage
 import com.mangaos.app.core.ui.components.EmptyState
+import com.mangaos.app.core.ui.components.MangaDetailSkeleton
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
@@ -284,17 +284,20 @@ private fun DetailContent(
 
         when {
             state.chaptersLoading -> item {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
-                    contentAlignment = Alignment.Center,
+                        .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    repeat(5) {
+                        com.mangaos.app.core.ui.components.ShimmerBlock(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                    }
                 }
             }
             state.chaptersFailure != null -> item {
@@ -763,13 +766,7 @@ private fun DetailLoading(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 onClick = onBack,
             )
         }
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(28.dp),
-                strokeWidth = 2.5.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+        MangaDetailSkeleton(modifier = Modifier.weight(1f))
     }
 }
 

@@ -1,5 +1,6 @@
 package com.mangaos.app.core.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +44,7 @@ fun AppDrawer(
     currentRoute: String?,
     onNavigate: (DrawerDestination) -> Unit,
     onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ModalDrawerSheet(
@@ -59,6 +62,7 @@ fun AppDrawer(
                 profile = profile,
                 unreadNotifications = unreadNotifications,
                 onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick,
             )
 
             HorizontalDivider(
@@ -90,6 +94,7 @@ private fun DrawerHeader(
     profile: UserProfile?,
     unreadNotifications: Int,
     onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit,
 ) {
     val isGuest = profile?.sessionType == SessionType.GUEST
     val displayName = when {
@@ -107,7 +112,10 @@ private fun DrawerHeader(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onProfileClick)
+                .padding(vertical = Spacing.xs),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             ProfileAvatar(

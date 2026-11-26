@@ -24,6 +24,7 @@ object Routes {
     const val MAIN = "main"
 
     const val NOTIFICATIONS = "notifications"
+    const val PROFILE = "profile"
     const val PRIVACY = "privacy"
     const val TERMS = "terms"
     const val SOURCES = "sources"

@@ -31,6 +31,7 @@ class DataStoreUserRepository(
         val username = stringPreferencesKey("user_username")
         val displayName = stringPreferencesKey("user_display_name")
         val avatar = stringPreferencesKey("user_avatar")
+        val email = stringPreferencesKey("user_email")
         val session = stringPreferencesKey("user_session")
         val country = stringPreferencesKey("user_country")
         val age = intPreferencesKey("user_age")
@@ -45,6 +46,7 @@ class DataStoreUserRepository(
                 username = preferences[Keys.username] ?: "reader",
                 displayName = preferences[Keys.displayName] ?: "Reader",
                 avatarUri = preferences[Keys.avatar],
+                email = preferences[Keys.email],
                 sessionType = if (preferences[Keys.session] == "guest") SessionType.GUEST else SessionType.ACCOUNT,
                 countryCode = preferences[Keys.country],
                 age = preferences[Keys.age],
@@ -71,6 +73,7 @@ class DataStoreUserRepository(
         displayName: String,
         username: String,
         avatarUri: String?,
+        email: String?,
         countryCode: String?,
         age: Int?,
         preferredLanguage: String?,
@@ -81,15 +84,44 @@ class DataStoreUserRepository(
                 preferences[Keys.username] = username
                 preferences[Keys.displayName] = displayName
                 preferences[Keys.session] = "account"
-                if (avatarUri != null) preferences[Keys.avatar] = avatarUri else preferences.remove(Keys.avatar)
-                if (countryCode != null) preferences[Keys.country] = countryCode else preferences.remove(Keys.country)
-                if (age != null) preferences[Keys.age] = age else preferences.remove(Keys.age)
-                if (preferredLanguage != null) {
-                    preferences[Keys.preferredLanguage] = preferredLanguage
-                } else {
-                    preferences.remove(Keys.preferredLanguage)
-                }
+                writeProfile(preferences, avatarUri, email, countryCode, age, preferredLanguage)
             }
+        }
+    }
+
+    override suspend fun updateProfile(
+        displayName: String,
+        username: String,
+        avatarUri: String?,
+        email: String?,
+        countryCode: String?,
+        age: Int?,
+        preferredLanguage: String?,
+    ) {
+        dataStore.edit { preferences ->
+            if (preferences[Keys.id] == null) return@edit
+            preferences[Keys.username] = username
+            preferences[Keys.displayName] = displayName
+            writeProfile(preferences, avatarUri, email, countryCode, age, preferredLanguage)
+        }
+    }
+
+    private fun writeProfile(
+        preferences: androidx.datastore.preferences.core.MutablePreferences,
+        avatarUri: String?,
+        email: String?,
+        countryCode: String?,
+        age: Int?,
+        preferredLanguage: String?,
+    ) {
+        if (avatarUri != null) preferences[Keys.avatar] = avatarUri else preferences.remove(Keys.avatar)
+        if (email != null) preferences[Keys.email] = email else preferences.remove(Keys.email)
+        if (countryCode != null) preferences[Keys.country] = countryCode else preferences.remove(Keys.country)
+        if (age != null) preferences[Keys.age] = age else preferences.remove(Keys.age)
+        if (preferredLanguage != null) {
+            preferences[Keys.preferredLanguage] = preferredLanguage
+        } else {
+            preferences.remove(Keys.preferredLanguage)
         }
     }
 
@@ -100,6 +132,7 @@ class DataStoreUserRepository(
                 preferences.remove(Keys.username)
                 preferences.remove(Keys.displayName)
                 preferences.remove(Keys.avatar)
+                preferences.remove(Keys.email)
                 preferences.remove(Keys.session)
                 preferences.remove(Keys.country)
                 preferences.remove(Keys.age)

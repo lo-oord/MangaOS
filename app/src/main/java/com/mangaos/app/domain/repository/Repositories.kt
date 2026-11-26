@@ -133,9 +133,21 @@ interface UserRepository {
         displayName: String,
         username: String,
         avatarUri: String?,
+        email: String? = null,
         countryCode: String? = null,
         age: Int? = null,
         preferredLanguage: String? = null,
+    )
+
+    /** Updates the active local profile in one write so every screen sees the same values. */
+    suspend fun updateProfile(
+        displayName: String,
+        username: String,
+        avatarUri: String?,
+        email: String?,
+        countryCode: String?,
+        age: Int?,
+        preferredLanguage: String?,
     )
 
     fun signOut()

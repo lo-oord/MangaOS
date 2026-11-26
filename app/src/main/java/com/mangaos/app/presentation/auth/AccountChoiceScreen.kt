@@ -65,17 +65,14 @@ fun AccountChoiceScreen(
             PrimaryButton(
                 text = stringResource(R.string.auth_create_account),
                 onClick = onCreateAccount,
-                height = 48.dp,
             )
             SecondaryButton(
                 text = stringResource(R.string.auth_existing_user),
                 onClick = onSignIn,
-                height = 48.dp,
             )
             SecondaryButton(
                 text = stringResource(R.string.auth_guest),
                 onClick = onGuest,
-                height = 48.dp,
             )
         }
 

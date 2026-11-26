@@ -30,6 +30,7 @@ import com.mangaos.app.core.ui.components.ErrorState
 import com.mangaos.app.core.ui.components.MangaGrid
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
 import com.mangaos.app.core.ui.components.MangaList
+import com.mangaos.app.core.ui.components.MangaListSkeleton
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
@@ -66,7 +67,11 @@ fun MangaListScreen(
         )
 
         when (val current = state) {
-            UiState.Loading -> MangaGridSkeleton()
+            UiState.Loading -> if (viewMode == MangaViewMode.GRID) {
+                MangaGridSkeleton()
+            } else {
+                MangaListSkeleton()
+            }
             UiState.Empty -> EmptyState(
                 icon = if (sources.isEmpty()) Icons.Outlined.Extension else Icons.Outlined.MenuBook,
                 title = stringResource(

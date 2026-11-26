@@ -3,6 +3,9 @@ package com.mangaos.app.presentation.navigation
 import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -127,6 +130,10 @@ fun MainScaffold(
                         scope.launch { drawerState.close() }
                         navController.navigate(Routes.NOTIFICATIONS) { launchSingleTop = true }
                     },
+                    onProfileClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Routes.PROFILE) { launchSingleTop = true }
+                    },
                 )
             },
         ) {
@@ -189,6 +196,7 @@ fun MainScaffold(
 @Composable
 private fun topBarTitle(route: String?): String = when (route) {
     Routes.NOTIFICATIONS -> stringResource(R.string.notifications_title)
+    Routes.PROFILE -> stringResource(R.string.profile_screen_title)
     Routes.PRIVACY -> stringResource(R.string.about_privacy)
     Routes.TERMS -> stringResource(R.string.about_terms)
     else -> SettingsSection.fromRoute(route)?.let { stringResource(it.titleRes) }
@@ -208,10 +216,24 @@ private fun MainNavHost(
         navController = navController,
         startDestination = DrawerDestination.startRoute,
         modifier = modifier,
-        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(transitionMillis)) },
-        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 160)) },
-        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(transitionMillis)) },
-        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 160)) },
+        enterTransition = {
+            if (reduceMotion) {
+                fadeIn(androidx.compose.animation.core.tween(0))
+            } else {
+                fadeIn(androidx.compose.animation.core.tween(transitionMillis)) +
+                    slideInHorizontally(androidx.compose.animation.core.tween(transitionMillis)) { it / 16 }
+            }
+        },
+        exitTransition = { fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 150)) },
+        popEnterTransition = {
+            if (reduceMotion) {
+                fadeIn(androidx.compose.animation.core.tween(0))
+            } else {
+                fadeIn(androidx.compose.animation.core.tween(transitionMillis)) +
+                    slideInHorizontally(androidx.compose.animation.core.tween(transitionMillis)) { -it / 16 }
+            }
+        },
+        popExitTransition = { fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 150)) },
     ) {
         composable(DrawerDestination.LATEST.route) {
             com.mangaos.app.presentation.latest.LatestScreen(
@@ -283,6 +305,9 @@ private fun MainNavHost(
         }
         composable(Routes.NOTIFICATIONS) {
             com.mangaos.app.presentation.notifications.NotificationsScreen()
+        }
+        composable(Routes.PROFILE) {
+            com.mangaos.app.presentation.profile.ProfileScreen()
         }
         composable(Routes.PRIVACY) {
             com.mangaos.app.presentation.about.LegalPlaceholderScreen()

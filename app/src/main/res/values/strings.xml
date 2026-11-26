@@ -27,7 +27,7 @@
     <string name="label_password">Password</string>
     <string name="label_confirm_password">Confirm password</string>
     <string name="action_next">Next</string>
-    <string name="google_unavailable">Google sign-in arrives in a later phase.</string>
+    <string name="google_unavailable">Google sign-in is unavailable because no authentication service is connected in this version.</string>
     <string name="error_email_invalid">Invalid email address</string>
     <string name="error_password_short">Use at least 8 characters</string>
     <string name="error_password_mismatch">Passwords do not match</string>
@@ -376,4 +376,41 @@
     <string name="reader_next_failed">Next chapter failed · Retry</string>
     <string name="notif_wifi_required_title">Wi-Fi required</string>
     <string name="notif_wifi_required_message">Downloads are paused because Wi-Fi only is enabled. %1$s · Chapter %2$s</string>
+
+    <!-- Polished auth and profile -->
+    <string name="cd_show_password">Show password</string>
+    <string name="cd_hide_password">Hide password</string>
+    <string name="auth_or">or</string>
+    <string name="auth_have_account">Already have an account? Sign in</string>
+    <string name="auth_no_account">New to MangaOS? Create an account</string>
+    <string name="forgot_password">Forgot password?</string>
+    <string name="forgot_password_title">Password recovery</string>
+    <string name="forgot_password_unavailable">Password recovery is not available in this version because MangaOS has no authentication or email service connected yet. No email will be sent.</string>
+    <string name="action_google_sign_in">Sign in with Google</string>
+    <string name="profile_screen_title">Profile</string>
+    <string name="profile_account_info">Account information</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_password">Password</string>
+    <string name="profile_change_password">Change password</string>
+    <string name="profile_password_unavailable">Password management is unavailable because this version does not store or verify passwords on a server.</string>
+    <string name="profile_auth_sync">Authentication and sync</string>
+    <string name="profile_auto_sync">Automatic sync</string>
+    <string name="profile_auto_sync_desc">Library, app settings and reader settings</string>
+    <string name="profile_sync_unavailable">No sync service is connected in this version, so nothing is uploaded.</string>
+    <string name="profile_edit_display_name">Edit display name</string>
+    <string name="profile_edit_username">Edit username</string>
+    <string name="profile_edit_username_hint">Letters, numbers, dots and underscores</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_saving">Saving…</string>
+    <string name="profile_saved">Profile updated</string>
+    <string name="profile_save_failed">Could not save the changes</string>
+    <string name="profile_photo_title">Profile picture</string>
+    <string name="profile_photo_upload_note">The picture is saved on this device. Cloud upload is not connected.</string>
+    <string name="profile_photo_saved">Profile picture updated</string>
+    <string name="profile_photo_save_failed">Could not save the picture</string>
+    <string name="profile_choose_photo">Choose picture</string>
+    <string name="profile_image_retry">Reload picture</string>
+    <string name="profile_username_rule">3–20 characters. Letters, numbers, dots and underscores only.</string>
+    <string name="profile_value_private">Private</string>
+    <string name="error_display_name_length">Display name must be 40 characters or fewer</string>
 </resources>

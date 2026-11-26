@@ -56,6 +56,7 @@ import com.mangaos.app.core.ui.components.ErrorState
 import com.mangaos.app.core.ui.components.MangaGrid
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
 import com.mangaos.app.core.ui.components.MangaList
+import com.mangaos.app.core.ui.components.MangaListSkeleton
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.AppSettings
@@ -129,7 +130,11 @@ fun LatestScreen(
 
         Box(modifier = Modifier.weight(1f)) {
             when (val current = state) {
-                LatestUiState.Loading -> MangaGridSkeleton()
+                LatestUiState.Loading -> if (viewMode == MangaViewMode.GRID) {
+                    MangaGridSkeleton()
+                } else {
+                    MangaListSkeleton()
+                }
                 LatestUiState.NoSources -> EmptyState(
                     icon = Icons.Outlined.Extension,
                     title = stringResource(R.string.state_no_source_title),
