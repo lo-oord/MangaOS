@@ -3,6 +3,13 @@ package com.mangaos.app.data.extension
 import com.mangaos.app.domain.model.ManagedExtension
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Minimal protobuf wire reader. The index is a small, stable message, so a generated
@@ -78,8 +85,8 @@ internal class ProtoReader(private val data: ByteArray) {
  */
 object MihonIndexParser {
 
+    const val REPO_URL = "https://raw.githubusercontent.com/keiyoushi/extensions/repo/repo.json"
     const val INDEX_URL = "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"
-    private const val ICON_BASE = "https://raw.githubusercontent.com/keiyoushi/extensions/repo/icon/"
     private const val EXTENSION_FIELD = 101
 
     // The repository wraps its entries in a repeated field: ExtensionRepo.extensions (101)
@@ -91,8 +98,27 @@ object MihonIndexParser {
         parseOrThrow(payload)
     }.getOrDefault(emptyList())
 
+    /**
+     * Resolves the index pointer published by a repository's `repo.json`
+     * (`index_v2` in current Mihon/DropSauce stores, with `index_v1` as the legacy name).
+     */
+    fun indexUrlFromRepo(payload: ByteArray): String? = runCatching {
+        val root = json.parseToJsonElement(payload.toString(Charsets.UTF_8)) as? JsonObject
+            ?: return@runCatching null
+        (root.text("index_v2") ?: root.text("index_v1") ?: root.text("index"))
+            ?.takeIf { it.startsWith("https://") }
+    }.getOrNull()
+
     private fun parseOrThrow(payload: ByteArray): List<ManagedExtension> {
         val raw = gunzipIfNeeded(payload)
+        val first = raw.firstOrNull { !it.toInt().toChar().isWhitespace() }
+        if (first == '{'.code.toByte() || first == '['.code.toByte()) {
+            return parseJson(raw)
+        }
+        return parseProto(raw)
+    }
+
+    private fun parseProto(raw: ByteArray): List<ManagedExtension> {
         val found = LinkedHashMap<String, ManagedExtension>()
         ProtoReader.walk(raw) { reader ->
             when (reader.field) {
@@ -126,6 +152,87 @@ object MihonIndexParser {
             }
         }
         return found.values.toList()
+    }
+
+    private fun parseJson(raw: ByteArray): List<ManagedExtension> {
+        val root = json.parseToJsonElement(raw.toString(Charsets.UTF_8))
+        val entries = when (root) {
+            is JsonArray -> root
+            is JsonObject -> (root["extensionList"] as? JsonObject)
+                ?.get("extensions") as? JsonArray
+                ?: root["extensions"] as? JsonArray
+                ?: return emptyList()
+            else -> return emptyList()
+        }
+        return entries
+            .mapNotNull { (it as? JsonObject)?.toExtension() }
+            .distinctBy { it.pkgName }
+    }
+
+    private fun JsonObject.toExtension(): ManagedExtension? {
+        val pkgName = text("packageName") ?: text("pkgName") ?: text("pkg") ?: return null
+        val name = text("name") ?: text("extName") ?: pkgName
+        val resources = this["resources"] as? JsonObject
+        val apkUrl = resources?.text("apkUrl") ?: text("apkUrl") ?: text("apk") ?: ""
+        val iconUrl = resources?.text("iconUrl") ?: text("iconUrl") ?: text("icon")
+        val libVersion = text("libVersion") ?: ""
+        val versionCode = long("versionCode") ?: long("version") ?: 0L
+        val versionName = text("versionName") ?: text("version") ?: libVersion
+        val contentWarning = classification()
+        val sourceObjects = (this["sources"] as? JsonArray)
+            ?.mapNotNull { it as? JsonObject }
+            .orEmpty()
+        val languages = sourceObjects
+            .mapNotNull { it.text("language") ?: it.text("lang") }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .ifEmpty {
+                listOfNotNull(
+                    text("language")
+                        ?: text("lang")
+                        ?: pkgName.split('.').getOrNull(4)?.takeIf { it.length in 2..3 },
+                )
+            }
+        val baseUrls = sourceObjects
+            .mapNotNull { it.text("homeUrl") ?: it.text("baseUrl") }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(4)
+
+        return ManagedExtension(
+            name = name,
+            pkgName = pkgName,
+            apkUrl = apkUrl,
+            iconUrl = iconUrl,
+            libVersion = libVersion,
+            versionCode = versionCode,
+            versionName = versionName,
+            languages = languages,
+            contentWarning = contentWarning,
+            baseUrls = baseUrls,
+        )
+    }
+
+    private fun JsonObject.text(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    private fun JsonObject.long(key: String): Long? =
+        (this[key] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() }
+
+    private fun JsonObject.int(key: String): Int? =
+        (this[key] as? JsonPrimitive)?.let { it.intOrNull ?: it.contentOrNull?.toIntOrNull() }
+
+    private fun JsonObject.bool(key: String): Boolean? =
+        (this[key] as? JsonPrimitive)?.let { it.contentOrNull?.toBooleanStrictOrNull() }
+
+    private fun JsonObject.classification(): Int {
+        int("contentWarning")?.let { return it }
+        return when (text("contentWarning")?.uppercase()) {
+            "SAFE" -> 1
+            "MIXED", "SUGGESTIVE" -> 2
+            "NSFW", "ADULT", "EXPLICIT" -> 3
+            else -> if (bool("nsfw") == true) 3 else 0
+        }
     }
 
     private fun gunzipIfNeeded(payload: ByteArray): ByteArray {
@@ -181,7 +288,7 @@ object MihonIndexParser {
             name = resolvedName,
             pkgName = resolvedPkg,
             apkUrl = resolvedApk,
-            iconUrl = iconUrl ?: "$ICON_BASE$resolvedPkg.png",
+            iconUrl = iconUrl,
             libVersion = libVersion,
             versionCode = versionCode,
             versionName = versionName.ifBlank { libVersion },
@@ -204,6 +311,8 @@ object MihonIndexParser {
         }
         onValue(apk, icon)
     }
+
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private fun parseSource(payload: ByteArray, onValue: (String, String) -> Unit) {
         var lang = ""

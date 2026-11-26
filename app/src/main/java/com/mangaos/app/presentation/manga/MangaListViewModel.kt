@@ -8,12 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.ui.UiState
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MangaListViewModel : ViewModel() {
@@ -30,16 +34,28 @@ class MangaListViewModel : ViewModel() {
     private var loadJob: Job? = null
 
     init {
-        load()
+        if (extensions.sources.value.isEmpty()) {
+            _state.value = UiState.Empty
+        } else {
+            load()
+        }
         viewModelScope.launch {
-            // Reload when extensions are installed/removed while the tab is open.
-            extensions.sources.collect { sources ->
-                if (sources.isNotEmpty() && _state.value is UiState.Empty) {
-                    runCatching { repository.catalogue() }.onSuccess { list ->
-                        _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
+            // Re-run only when the set of usable sources actually changes. The initial value is
+            // dropped because it was handled above.
+            extensions.sources
+                .map { sources -> sources.map { it.id } }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { ids ->
+                    if (ids.isEmpty()) {
+                        loadJob?.cancel()
+                        _state.value = UiState.Empty
+                    } else if (query.isBlank()) {
+                        load()
+                    } else {
+                        onQueryChange(query)
                     }
                 }
-            }
         }
     }
 
@@ -54,34 +70,48 @@ class MangaListViewModel : ViewModel() {
         loadJob = viewModelScope.launch {
             delay(SEARCH_DEBOUNCE_MS)
             _state.value = UiState.Loading
-            runCatching { repository.searchAll(trimmed) }
-                .onSuccess { list ->
-                    // Guard against a slower previous query overwriting newer results.
-                    if (query.trim() == trimmed) {
-                        _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
-                    }
+            try {
+                val list = sanitize(repository.searchAll(trimmed))
+                if (query.trim() == trimmed) {
+                    _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
                 }
-                .onFailure {
-                    if (query.trim() == trimmed) _state.value = UiState.Error()
-                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                if (query.trim() == trimmed) _state.value = UiState.Error()
+            }
         }
     }
 
     fun load() {
+        if (query.isNotBlank()) {
+            onQueryChange(query)
+            return
+        }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
+            if (extensions.sources.value.isEmpty()) {
+                _state.value = UiState.Empty
+                return@launch
+            }
             _state.value = UiState.Loading
-            runCatching { repository.catalogue() }
-                .onSuccess { list ->
-                    if (query.isBlank()) {
-                        _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
-                    }
+            try {
+                val list = sanitize(repository.catalogue())
+                if (query.isBlank()) {
+                    _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
                 }
-                .onFailure {
-                    if (query.isBlank()) _state.value = UiState.Error()
-                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                if (query.isBlank()) _state.value = UiState.Error()
+            }
         }
     }
+
+    /** One malformed source result must not poison the whole tab or create duplicate keys. */
+    private fun sanitize(mangas: List<Manga>): List<Manga> = mangas
+        .filter { it.id.isNotBlank() && it.title.isNotBlank() }
+        .distinctBy { it.key }
 
     private companion object {
         private const val SEARCH_DEBOUNCE_MS = 350L

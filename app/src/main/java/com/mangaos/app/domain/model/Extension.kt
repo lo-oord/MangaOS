@@ -68,6 +68,8 @@ sealed interface TransferState {
     data object Downloading : TransferState
     data object Installing : TransferState
     data object Installed : TransferState
+    data object Uninstalling : TransferState
+    data object UninstallFailed : TransferState
     data class Failed(val failure: ExtensionFailure, val message: String? = null) : TransferState
 }
 

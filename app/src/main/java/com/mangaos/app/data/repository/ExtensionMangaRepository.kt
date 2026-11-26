@@ -21,11 +21,14 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.Collections
+import java.util.Locale
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -43,24 +46,34 @@ class ExtensionMangaRepository(
 ) : MangaRepository {
 
     override suspend fun latest(sourceId: String, page: Int): List<Manga> = call(sourceId) { source ->
-        source.getLatestUpdates(page).mangas.map { it.toDomain(source) }
+        source.getLatestUpdates(page).mangas.mapNotNull { manga ->
+            manga.toDomain(source).takeIf { !it.isExplicit() }
+        }
     }
 
     override suspend fun popular(sourceId: String, page: Int): List<Manga> = call(sourceId) { source ->
-        source.getPopularManga(page).mangas.map { it.toDomain(source) }
+        source.getPopularManga(page).mangas.mapNotNull { manga ->
+            manga.toDomain(source).takeIf { !it.isExplicit() }
+        }
     }
 
     override suspend fun search(sourceId: String, query: String, page: Int): List<Manga> =
         call(sourceId) { source ->
-            source.getSearchManga(page, query, source.filters()).mangas.map { it.toDomain(source) }
+            source.getSearchManga(page, query, source.filters()).mangas.mapNotNull { manga ->
+                manga.toDomain(source).takeIf { !it.isExplicit() }
+            }
         }
 
-    override suspend fun catalogue(): List<Manga> = aggregate { source ->
-        source.getPopularManga(1)
+    override suspend fun catalogue(): List<Manga> {
+        // The Manga tab is allowed to be empty; having no installed sources is a state, not an
+        // error, and must never surface as an exception to the screen.
+        if (extensions.sources.value.isEmpty()) return emptyList()
+        return aggregate { source -> source.getPopularManga(1) }
     }
 
-    override suspend fun searchAll(query: String, page: Int): List<Manga> = aggregate { source ->
-        source.getSearchManga(page, query, source.filters())
+    override suspend fun searchAll(query: String, page: Int): List<Manga> {
+        if (extensions.sources.value.isEmpty()) return emptyList()
+        return aggregate { source -> source.getSearchManga(page, query, source.filters()) }
     }
 
     override suspend fun byId(sourceId: String, mangaId: String): Manga? = call(sourceId) { source ->
@@ -72,7 +85,7 @@ class ExtensionMangaRepository(
         if (updated.title.isBlank() && updated.url.isBlank()) {
             null
         } else {
-            updated.toDomain(source)
+            updated.toDomain(source).takeIf { !it.isExplicit() }
         }
     }
 
@@ -127,29 +140,32 @@ class ExtensionMangaRepository(
      */
     private suspend fun aggregate(block: suspend (Source) -> MangasPage): List<Manga> {
         val infos = extensions.sources.value
-        if (infos.isEmpty()) {
-            throw SourceUnavailableException(
-                ExtensionFailure.NO_SOURCES,
-                "No installed extension provides a usable source",
-            )
-        }
+            .filterNot { it.isNsfw }
+            .distinctBy { it.id }
+        if (infos.isEmpty()) return emptyList()
 
         val failures = Collections.synchronizedList(mutableListOf<Throwable>())
+        val semaphore = Semaphore(MAX_CONCURRENT_SOURCES)
         val pages = coroutineScope {
             infos.map { info ->
                 async(Dispatchers.IO) {
-                    val source = MihonRuntime.source(info.id) ?: return@async emptyList()
-                    runCatching {
-                        withTimeout(SOURCE_TIMEOUT_MS) {
-                            MihonRuntime.withSourceLock(info.id) { block(source) }
+                    try {
+                        semaphore.withPermit {
+                            val source = MihonRuntime.source(info.id) ?: return@withPermit emptyList()
+                            withTimeout(SOURCE_TIMEOUT_MS) {
+                                MihonRuntime.withSourceLock(info.id) { block(source) }
+                            }.mangas.mapNotNull { manga ->
+                                manga.toDomain(source).takeIf {
+                                    it.id.isNotBlank() && !it.isExplicit()
+                                }
+                            }
                         }
-                    }.fold(
-                        onSuccess = { page -> page.mangas.map { it.toDomain(source) } },
-                        onFailure = { error ->
-                            failures += error
-                            emptyList()
-                        },
-                    )
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Throwable) {
+                        failures += error
+                        emptyList()
+                    }
                 }
             }.awaitAll()
         }
@@ -182,6 +198,11 @@ class ExtensionMangaRepository(
             url = absolute(url, baseUrl),
             sourceName = source.name,
         )
+    }
+
+    /** Conservative per-work guard for MIXED extensions that also publish adult titles. */
+    private fun Manga.isExplicit(): Boolean = genres.any { genre ->
+        genre.trim().lowercase(Locale.ROOT) in EXPLICIT_GENRES
     }
 
     private fun SChapter.toDomain(mangaId: String): Chapter {
@@ -232,6 +253,17 @@ class ExtensionMangaRepository(
 
     private companion object {
         private const val SOURCE_TIMEOUT_MS = 30_000L
+        private const val MAX_CONCURRENT_SOURCES = 6
         private val NUMBER_PATTERN = Regex("""(\d+(?:\.\d+)?)""")
+        private val EXPLICIT_GENRES = setOf(
+            "hentai",
+            "erotica",
+            "pornographic",
+            "porn",
+            "adult",
+            "18+",
+            "xxx",
+            "smut",
+        )
     }
 }

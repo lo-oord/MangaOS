@@ -145,12 +145,17 @@ object MihonRuntime {
      */
     suspend fun reload(context: Context, installedPackages: Map<String, Long>) = withContext(Dispatchers.IO) {
         loadMutex.withLock {
-            ensureHostNetwork(context)
+            // A missing network service must not prevent already-installed sources from loading.
+            runCatching { ensureHostNetwork(context) }
+                .onFailure { Log.w(TAG, "Could not initialise the shared network services", it) }
             val packageManager = context.packageManager
             val nextLoaded = LinkedHashMap<String, LoadedExtension>()
             val nextFailures = LinkedHashMap<String, String>()
 
-            for (pkgName in installedPackages.keys.sorted()) {
+            for (pkgName in installedPackages.keys
+                .filter(ExtensionAllowlist::isAllowedPackage)
+                .sorted()
+            ) {
                 val existing = loaded[pkgName]
                 val installedVersion = installedPackages[pkgName]
                 if (existing != null &&
@@ -163,8 +168,18 @@ object MihonRuntime {
                 }
                 val result = runCatching { loadPackage(context, packageManager, pkgName) }
                 val loadedNow = result.getOrNull()
-                if (loadedNow != null) {
-                    nextLoaded[pkgName] = loadedNow
+                if (loadedNow != null && loadedNow.isNsfw) {
+                    nextFailures[pkgName] = "Blocked: NSFW extension"
+                } else if (loadedNow != null) {
+                    nextLoaded[pkgName] = loadedNow.copy(
+                        sources = loadedNow.sources.filter {
+                            ExtensionAllowlist.isAllowedRuntimeSource(pkgName, loadedNow.isNsfw)
+                        },
+                    )
+                    if (nextLoaded[pkgName]?.sources.isNullOrEmpty()) {
+                        nextLoaded.remove(pkgName)
+                        nextFailures[pkgName] = "No allowlisted source in this extension"
+                    }
                 } else {
                     val error = result.exceptionOrNull()
                     val message = error?.let { "${it.javaClass.simpleName}: ${it.message.orEmpty()}" }

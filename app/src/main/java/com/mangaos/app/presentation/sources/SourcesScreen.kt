@@ -7,7 +7,6 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,8 +53,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.flow.collect
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.collect
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalSnackbarHostState
@@ -89,6 +89,7 @@ fun SourcesScreen(
 
     var permissionDismissed by remember { mutableStateOf(false) }
     var pendingInstall by remember { mutableStateOf<ManagedExtension?>(null) }
+    var pendingUninstall by remember { mutableStateOf<ManagedExtension?>(null) }
 
     val settingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -159,6 +160,7 @@ fun SourcesScreen(
                     onRetry = viewModel::refresh,
                     offline = current.failure == ExtensionFailure.OFFLINE,
                 )
+
                 else -> EmptyState(
                     icon = Icons.Outlined.Extension,
                     title = stringResource(R.string.sources_index_error),
@@ -166,84 +168,88 @@ fun SourcesScreen(
                     onAction = viewModel::refresh,
                 )
             }
-            is ExtensionsState.Content -> {
-                val visibleSources = viewModel.visibleSources(sources)
-                val visibleExtensions = viewModel.visibleExtensions(current.entries)
-                val installedExtensions = visibleExtensions.filter { it.isInstalled }
-                val failedExtensions = failures.filterKeys { pkg ->
-                    visibleExtensions.any { it.extension.pkgName == pkg }
-                }
 
-                when {
-                    visibleSources.isEmpty() && visibleExtensions.isEmpty() -> EmptyState(
+            is ExtensionsState.Content -> {
+                val visible = viewModel.visibleExtensions(current.entries)
+                val available = visible.filterNot { it.isInstalled }
+                val installed = visible.filter { it.isInstalled }
+                val iconByPackage = current.entries.associate {
+                    it.extension.pkgName to it.extension.iconUrl
+                }
+                val sourceByPackage = sources.associateBy { it.pkgName }
+
+                if (visible.isEmpty()) {
+                    EmptyState(
                         icon = Icons.Outlined.SearchOff,
                         title = stringResource(
-                            if (viewModel.query.isBlank()) R.string.sources_empty else R.string.search_no_results,
+                            if (viewModel.query.isBlank()) {
+                                R.string.sources_empty
+                            } else {
+                                R.string.search_no_results
+                            },
                         ),
                     )
-
-                    visibleSources.isEmpty() && installedExtensions.isNotEmpty() &&
-                        failedExtensions.isNotEmpty() -> EmptyState(
-                        icon = Icons.Outlined.ErrorOutline,
-                        title = stringResource(R.string.sources_incompatible_title),
-                        actionLabel = stringResource(R.string.sources_refresh),
-                        onAction = viewModel::refresh,
-                    )
-
-                    visibleSources.isEmpty() && installedExtensions.isNotEmpty() -> EmptyState(
-                        icon = Icons.Outlined.Extension,
-                        title = stringResource(R.string.sources_no_usable_title),
-                        actionLabel = stringResource(R.string.sources_refresh),
-                        onAction = viewModel::refresh,
-                    )
-
-                    else -> {
-                        val iconByPackage = current.entries.associate {
-                            it.extension.pkgName to it.extension.iconUrl
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            start = Spacing.screen,
+                            end = Spacing.screen,
+                            top = Spacing.xs,
+                            bottom = Spacing.xl,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        item(key = "available-header") {
+                            SectionHeader(
+                                title = stringResource(R.string.sources_section_available),
+                                count = available.size,
+                            )
                         }
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                start = Spacing.screen,
-                                end = Spacing.screen,
-                                top = Spacing.xs,
-                                bottom = Spacing.xl,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            if (visibleSources.isNotEmpty()) {
-                                item(key = "sources-header") {
-                                    SectionHeader(
-                                        title = stringResource(R.string.sources_section_sources),
-                                        count = visibleSources.size,
-                                    )
-                                }
-                                items(visibleSources, key = { "source:${it.id}" }) { source ->
-                                    SourceRow(
-                                        source = source,
-                                        iconUrl = iconByPackage[source.pkgName],
-                                        onOpen = { onOpenSource(source) },
-                                    )
-                                }
+                        if (available.isEmpty()) {
+                            item(key = "available-empty") {
+                                SectionNote(stringResource(R.string.sources_no_available))
                             }
+                        }
+                        items(available, key = { "available:${it.extension.pkgName}" }) { entry ->
+                            ExtensionRow(
+                                entry = entry,
+                                iconUrl = iconByPackage[entry.extension.pkgName],
+                                transfer = transfers[entry.extension.pkgName],
+                                loadFailure = failures[entry.extension.pkgName],
+                                source = sourceByPackage[entry.extension.pkgName],
+                                onOpen = {
+                                    sourceByPackage[entry.extension.pkgName]?.let(onOpenSource)
+                                },
+                                onInstall = { requestInstall(entry.extension) },
+                                onUninstall = { pendingUninstall = entry.extension },
+                            )
+                        }
 
-                            if (visibleExtensions.isNotEmpty()) {
-                                item(key = "extensions-header") {
-                                    SectionHeader(
-                                        title = stringResource(R.string.sources_section_extensions),
-                                        count = visibleExtensions.size,
-                                    )
-                                }
-                                items(visibleExtensions, key = { "extension:${it.extension.pkgName}" }) { entry ->
-                                    ExtensionRow(
-                                        entry = entry,
-                                        transfer = transfers[entry.extension.pkgName],
-                                        loadFailure = failures[entry.extension.pkgName],
-                                        onInstall = { requestInstall(entry.extension) },
-                                        onUninstall = { viewModel.uninstall(entry.extension.pkgName) },
-                                    )
-                                }
+                        item(key = "installed-header") {
+                            SectionHeader(
+                                title = stringResource(R.string.sources_section_installed),
+                                count = installed.size,
+                            )
+                        }
+                        if (installed.isEmpty()) {
+                            item(key = "installed-empty") {
+                                SectionNote(stringResource(R.string.sources_no_installed))
                             }
+                        }
+                        items(installed, key = { "installed:${it.extension.pkgName}" }) { entry ->
+                            ExtensionRow(
+                                entry = entry,
+                                iconUrl = iconByPackage[entry.extension.pkgName],
+                                transfer = transfers[entry.extension.pkgName],
+                                loadFailure = failures[entry.extension.pkgName],
+                                source = sourceByPackage[entry.extension.pkgName],
+                                onOpen = {
+                                    sourceByPackage[entry.extension.pkgName]?.let(onOpenSource)
+                                },
+                                onInstall = { requestInstall(entry.extension) },
+                                onUninstall = { pendingUninstall = entry.extension },
+                            )
                         }
                     }
                 }
@@ -278,6 +284,20 @@ fun SourcesScreen(
         )
     }
 
+    val removing = pendingUninstall
+    if (removing != null) {
+        AppDialog(
+            title = stringResource(R.string.sources_remove_title),
+            message = stringResource(R.string.sources_remove_message, removing.name),
+            confirmLabel = stringResource(R.string.sources_remove_confirm),
+            dismissLabel = stringResource(R.string.action_cancel),
+            onConfirm = {
+                pendingUninstall = null
+                viewModel.uninstall(removing.pkgName)
+            },
+            onDismiss = { pendingUninstall = null },
+        )
+    }
 }
 
 @Composable
@@ -357,6 +377,16 @@ private fun SectionHeader(title: String, count: Int) {
 }
 
 @Composable
+private fun SectionNote(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = Spacing.xs),
+    )
+}
+
+@Composable
 private fun RefreshFailureBanner(failure: ExtensionFailure, onRetry: () -> Unit) {
     Row(
         modifier = Modifier
@@ -376,7 +406,11 @@ private fun RefreshFailureBanner(failure: ExtensionFailure, onRetry: () -> Unit)
         Spacer(Modifier.width(Spacing.sm))
         Text(
             text = stringResource(
-                if (failure == ExtensionFailure.OFFLINE) R.string.state_offline else R.string.sources_refresh_failed_short,
+                if (failure == ExtensionFailure.OFFLINE) {
+                    R.string.state_offline
+                } else {
+                    R.string.sources_refresh_failed_short
+                },
             ),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -389,54 +423,13 @@ private fun RefreshFailureBanner(failure: ExtensionFailure, onRetry: () -> Unit)
 }
 
 @Composable
-private fun SourceRow(
-    source: SourceInfo,
-    iconUrl: String?,
-    onOpen: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onOpen)
-            .padding(vertical = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ExtensionIcon(iconUrl)
-        Spacer(Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = source.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = buildString {
-                    append(languageName(source.lang))
-                    append(" · ").append(source.extensionName)
-                    if (source.versionName.isNotBlank()) append(" · v").append(source.versionName)
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        TextButton(onClick = onOpen) {
-            Text(stringResource(R.string.sources_open), color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
-@Composable
 private fun ExtensionRow(
     entry: ExtensionEntry,
+    iconUrl: String?,
     transfer: TransferState?,
     loadFailure: String?,
+    source: SourceInfo?,
+    onOpen: () -> Unit,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
 ) {
@@ -447,7 +440,7 @@ private fun ExtensionRow(
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ExtensionIcon(extension.iconUrl)
+        ExtensionIcon(iconUrl)
 
         Spacer(Modifier.width(Spacing.md))
 
@@ -470,61 +463,118 @@ private fun ExtensionRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
-            if (transfer is TransferState.Failed) {
-                Text(
+            when {
+                transfer is TransferState.Failed -> StatusNote(
                     text = stringResource(R.string.sources_install_failed),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 1,
+                    error = true,
                 )
-            } else if (entry.isInstalled && loadFailure != null) {
-                Text(
-                    text = stringResource(R.string.sources_incompatible_body),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+
+                transfer is TransferState.UninstallFailed -> StatusNote(
+                    text = stringResource(R.string.sources_uninstall_failed),
+                    error = true,
+                )
+
+                entry.isInstalled && source == null -> StatusNote(
+                    text = stringResource(R.string.sources_cannot_run),
+                    error = true,
+                )
+
+                entry.isInstalled && loadFailure != null -> StatusNote(
+                    text = stringResource(R.string.sources_cannot_run),
+                    error = true,
+                )
+
+                entry.hasUpdate -> StatusNote(
+                    text = stringResource(R.string.sources_update_available),
+                    error = false,
                 )
             }
         }
 
         when (transfer) {
-            TransferState.Downloading -> StatusPill(stringResource(R.string.sources_downloading), true)
-            TransferState.Installing -> StatusPill(stringResource(R.string.sources_installing), true)
-            is TransferState.Failed -> TextButton(onClick = onInstall) {
-                Text(stringResource(R.string.state_error_retry), color = MaterialTheme.colorScheme.primary)
+            TransferState.Downloading -> StatusPill(stringResource(R.string.sources_downloading))
+            TransferState.Installing -> StatusPill(stringResource(R.string.sources_installing))
+            TransferState.Uninstalling -> StatusPill(stringResource(R.string.sources_uninstalling))
+            TransferState.UninstallFailed -> TextButton(onClick = onUninstall) {
+                Text(
+                    text = stringResource(R.string.sources_remove_retry),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-            else -> {
-                when {
-                    entry.isInstalled && entry.hasUpdate -> TextButton(onClick = onInstall) {
+
+            is TransferState.Failed -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onInstall) {
                         Text(
-                            text = stringResource(R.string.sources_update),
+                            text = stringResource(R.string.state_error_retry),
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    entry.isInstalled -> Text(
-                        text = stringResource(R.string.sources_installed),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Spacing.xs),
-                    )
-                    extension.apkUrl.isNotEmpty() -> TextButton(onClick = onInstall) {
+                    if (entry.isInstalled) {
+                        RemoveAction(onUninstall)
+                    }
+                }
+            }
+
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                if (entry.isInstalled) {
+                    if (entry.hasUpdate) {
+                        TextButton(onClick = onInstall) {
+                            Text(
+                                text = stringResource(R.string.sources_update),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else if (source != null) {
+                        TextButton(onClick = onOpen) {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                text = stringResource(R.string.sources_open),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    RemoveAction(onUninstall)
+                } else {
+                    TextButton(onClick = onInstall) {
                         Text(
                             text = stringResource(R.string.sources_install),
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
-                if (entry.isInstalled) {
-                    AppIconButton(
-                        icon = Icons.Outlined.DeleteOutline,
-                        contentDescription = stringResource(R.string.sources_remove),
-                        onClick = onUninstall,
-                    )
-                }
             }
         }
     }
+}
+
+@Composable
+private fun RemoveAction(onUninstall: () -> Unit) {
+    AppIconButton(
+        icon = Icons.Outlined.DeleteOutline,
+        contentDescription = stringResource(R.string.sources_remove),
+        onClick = onUninstall,
+    )
+}
+
+@Composable
+private fun StatusNote(text: String, error: Boolean) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (error) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
@@ -554,16 +604,14 @@ private fun ExtensionIcon(iconUrl: String?) {
 }
 
 @Composable
-private fun StatusPill(label: String, loading: Boolean) {
+private fun StatusPill(label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(14.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.width(Spacing.xs))
-        }
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(Spacing.xs))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
