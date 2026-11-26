@@ -1,7 +1,8 @@
 package com.mangaos.app.core.ui.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,16 +41,17 @@ fun MangaSearchField(
         onValueChange = onValueChange,
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .heightIn(min = 56.dp),
         singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge,
         placeholder = {
-            Text(text = placeholder, style = MaterialTheme.typography.bodyMedium)
+            Text(text = placeholder, style = MaterialTheme.typography.bodyLarge)
         },
         leadingIcon = {
             Icon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = null,
-                modifier = Modifier.height(20.dp),
+                modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
@@ -59,7 +61,7 @@ fun MangaSearchField(
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = stringResource(R.string.cd_clear_search),
-                        modifier = Modifier.height(18.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

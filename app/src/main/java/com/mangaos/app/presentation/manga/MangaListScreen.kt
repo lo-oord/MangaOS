@@ -31,6 +31,7 @@ import com.mangaos.app.core.ui.components.MangaGrid
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
 import com.mangaos.app.core.ui.components.MangaList
 import com.mangaos.app.core.ui.components.MangaSearchField
+import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
@@ -126,11 +127,10 @@ fun MangaListScreen(
 }
 
 internal fun filterByQuery(mangas: List<Manga>, query: String): List<Manga> {
-    val trimmed = query.trim()
-    if (trimmed.isEmpty()) return mangas
+    if (SearchText.normalize(query).isEmpty()) return mangas
     return mangas.filter { manga ->
-        manga.title.contains(trimmed, ignoreCase = true) ||
-            manga.altTitle?.contains(trimmed, ignoreCase = true) == true ||
-            manga.author?.contains(trimmed, ignoreCase = true) == true
+        SearchText.matches(manga.title, query) ||
+            SearchText.matches(manga.altTitle, query) ||
+            SearchText.matches(manga.author, query)
     }
 }

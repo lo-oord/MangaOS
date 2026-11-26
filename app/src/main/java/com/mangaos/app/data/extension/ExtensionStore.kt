@@ -19,6 +19,7 @@ import com.mangaos.app.domain.model.ManagedExtension
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.TransferState
 import com.mangaos.app.domain.repository.ExtensionRepository
+import com.mangaos.app.domain.repository.SettingsRepository
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,6 +56,7 @@ import kotlinx.coroutines.withContext
 class ExtensionStore(
     private val context: Context,
     private val scope: kotlinx.coroutines.CoroutineScope,
+    private val settings: SettingsRepository,
 ) : ExtensionRepository {
 
     private val refreshMutex = Mutex()
@@ -103,8 +106,23 @@ class ExtensionStore(
         }
         scope.launch {
             refreshInstalled()
-            refresh(force = false)
+            // "Refresh on open" controls the startup network check only. The cached index is
+            // always read, and a first launch without a cache still needs the network.
+            if (settings.appSettings.first().autoRefreshOnOpen || loadCachedIndex().not()) {
+                refresh(force = false)
+            }
         }
+    }
+
+    private fun loadCachedIndex(): Boolean {
+        val payload = runCatching {
+            indexFile.takeIf { it.exists() }?.readBytes()
+        }.getOrNull() ?: return false
+        val entries = runCatching { MihonIndexParser.parse(payload) }.getOrNull()
+        if (entries.isNullOrEmpty()) return false
+        catalogue.value = entries
+        lastRefreshAt = System.currentTimeMillis()
+        return true
     }
 
     override suspend fun refresh(force: Boolean) {

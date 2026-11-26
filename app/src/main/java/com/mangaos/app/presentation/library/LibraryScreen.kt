@@ -30,7 +30,6 @@ import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.presentation.common.LibraryToggleSheet
-import com.mangaos.app.presentation.manga.filterByQuery
 import kotlinx.coroutines.launch
 
 @Composable
@@ -42,6 +41,8 @@ fun LibraryScreen(
 ) {
     val viewModel: LibraryViewModel = viewModel()
     val works by viewModel.works.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val libraryIds by ServiceLocator.library.ids.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
@@ -67,7 +68,7 @@ fun LibraryScreen(
                 onAction = onBrowse,
             )
         } else {
-            val visible = filterByQuery(works, viewModel.query)
+            val visible = viewModel.visible(works, viewModel.query, progress, settings)
             if (visible.isEmpty()) {
                 EmptyState(
                     icon = Icons.Outlined.SearchOff,

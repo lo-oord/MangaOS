@@ -1,12 +1,17 @@
 package com.mangaos.app.presentation.common
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
@@ -28,7 +33,12 @@ import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.domain.model.SourceInfo
+import java.util.Locale
 
+/**
+ * Compact installed-source picker. It never covers the whole screen: the list is capped in
+ * height so the screen underneath stays visible while choosing.
+ */
 @Composable
 fun SourcePickerSheet(
     sources: List<SourceInfo>,
@@ -39,71 +49,101 @@ fun SourcePickerSheet(
     onDismiss: () -> Unit,
 ) {
     AppBottomSheet(onDismiss = onDismiss) {
-        Text(
-            text = stringResource(R.string.source_pick_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = Spacing.sm),
-        )
-        sources.forEach { source ->
-            val selected = source.id == selectedId
-            Row(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.source_pick_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = Spacing.sm),
+            )
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { onSelect(source.id) }
-                    .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
+                    .heightIn(max = 380.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                val icon = icons[source.pkgName]
-                if (icon != null) {
-                    AsyncImage(
-                        model = icon,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Extension,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                Spacer(Modifier.width(Spacing.md))
-                Text(
-                    text = source.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = source.lang.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (selected) {
-                    Spacer(Modifier.width(Spacing.xs))
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
+                items(sources, key = { it.id }) { source ->
+                    SourceRow(
+                        source = source,
+                        icon = icons[source.pkgName],
+                        selected = source.id == selectedId,
+                        onClick = { onSelect(source.id) },
                     )
                 }
             }
+            TextButton(onClick = onManage, modifier = Modifier.padding(top = Spacing.xs)) {
+                Text(
+                    text = stringResource(R.string.source_manage),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
-        TextButton(onClick = onManage, modifier = Modifier.padding(top = Spacing.xs)) {
-            Text(
-                text = stringResource(R.string.source_manage),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary,
+    }
+}
+
+@Composable
+private fun SourceRow(
+    source: SourceInfo,
+    icon: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            AsyncImage(
+                model = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.Extension,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = source.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = languageName(source.lang),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (selected) {
+            Spacer(Modifier.width(Spacing.xs))
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
+}
+
+/** Localised language name so the picker follows the app language and reading direction. */
+private fun languageName(tag: String): String {
+    if (tag.isBlank()) return ""
+    return runCatching {
+        Locale.forLanguageTag(tag).getDisplayLanguage(Locale.getDefault())
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: tag.uppercase()
 }

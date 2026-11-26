@@ -133,18 +133,46 @@ jobs:
       - name: Collect artifacts
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          mkdir -p artifacts
+          mkdir -p artifacts/arm64-v8a artifacts/armeabi-v7a
+          count=0
           for apk in app/build/outputs/apk/release/*.apk; do
+            test -f "$apk"
             name=$(basename "$apk")
-            cp "$apk" "artifacts/MangaOS-${SHORT_SHA}-${name}"
+            case "$name" in
+              *arm64-v8a*) abi=arm64-v8a ;;
+              *armeabi-v7a*) abi=armeabi-v7a ;;
+              *) echo "::error title=Unexpected APK::${name} is not an ABI split"; exit 1 ;;
+            esac
+            cp "$apk" "artifacts/${abi}/MangaOS-${SHORT_SHA}-${name}"
+            count=$((count + 1))
           done
-          sha256sum artifacts/* | tee artifacts/checksums-sha256.txt
+          if [ "$count" -ne 2 ]; then
+            echo "::error title=ABI splits::Expected exactly 2 ABI APKs, found $count"
+            exit 1
+          fi
+          sha256sum artifacts/arm64-v8a/* artifacts/armeabi-v7a/* | tee artifacts/checksums-sha256.txt
 
-      - name: Upload release artifacts
+      - name: Upload arm64-v8a APK
         uses: actions/upload-artifact@v4
         with:
-          name: mangaos-release-${{ github.sha }}
-          path: artifacts/*
+          name: mangaos-arm64-v8a-${{ github.sha }}
+          path: artifacts/arm64-v8a/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaos-armeabi-v7a-${{ github.sha }}
+          path: artifacts/armeabi-v7a/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaos-checksums-${{ github.sha }}
+          path: artifacts/checksums-sha256.txt
           if-no-files-found: error
           retention-days: 30
 

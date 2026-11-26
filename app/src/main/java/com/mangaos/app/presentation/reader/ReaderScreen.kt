@@ -1,13 +1,21 @@
 package com.mangaos.app.presentation.reader
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,11 +28,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
@@ -37,39 +47,49 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalContext
-import android.view.WindowManager
-import android.app.Activity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
-import okhttp3.Headers
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import okhttp3.Headers
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReaderScreen(
     sourceId: String,
@@ -90,157 +110,456 @@ fun ReaderScreen(
     val currentChapterIndex by viewModel.currentChapterIndex.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val nextChapterLoading by viewModel.nextChapterLoading.collectAsStateWithLifecycle()
+    val nextChapterError by viewModel.nextChapterError.collectAsStateWithLifecycle()
+    val autoWebtoon by viewModel.autoWebtoon.collectAsStateWithLifecycle()
+    val initialPage by viewModel.initialPage.collectAsStateWithLifecycle()
+    val readingFraction by viewModel.readingFraction.collectAsStateWithLifecycle()
+
+    val mode = if (settings.autoWebtoonDetection && autoWebtoon &&
+        settings.readingMode == ReaderMode.VERTICAL
+    ) {
+        ReaderMode.WEBTOON
+    } else {
+        settings.readingMode
+    }
 
     var controlsVisible by remember { mutableStateOf(true) }
+    var restored by remember(sourceId, mangaId, chapterId) { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val window = activity?.window
 
-    // auto hide
-    LaunchedEffect(controlsVisible) {
+    DisposableEffect(settings.keepScreenOn) {
+        if (settings.keepScreenOn) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    DisposableEffect(settings.screenOrientation) {
+        activity?.requestedOrientation = when (settings.screenOrientation) {
+            1 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            2 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
+
+    DisposableEffect(settings.fullscreen, settings.hideStatusBar) {
+        if (window != null) {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            if (settings.fullscreen || settings.hideStatusBar) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose {
+            if (window != null) {
+                WindowCompat.getInsetsController(window, window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    LaunchedEffect(controlsVisible, settings.autoHideControls, settings.autoHideDelayMs) {
         if (controlsVisible && settings.autoHideControls) {
-            kotlinx.coroutines.delay(settings.autoHideDelayMs)
+            delay(settings.autoHideDelayMs)
             controlsVisible = false
         }
     }
 
-    val context = LocalContext.current
-    DisposableEffect(settings.keepScreenOn) {
-        val window = (context as? Activity)?.window
-        if (settings.keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    LaunchedEffect(pages.isNotEmpty(), initialPage) {
+        if (!restored && pages.isNotEmpty()) {
+            val target = if (mode == ReaderMode.DOUBLE_PAGE) {
+                initialPage / 2
+            } else {
+                initialPage
+            }
+            listState.scrollToItem(target.coerceIn(0, pages.lastIndex.coerceAtLeast(0)))
+            restored = true
+        }
     }
 
-    // continuous ensure next
-    LaunchedEffect(listState.firstVisibleItemIndex, pages.size) {
-        viewModel.ensureNextLoaded(listState.firstVisibleItemIndex)
+    LaunchedEffect(mode, pages.size) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collectLatest { visible ->
+                delay(220)
+                val pageIndex = if (mode == ReaderMode.DOUBLE_PAGE) visible * 2 else visible
+                viewModel.onPageChanged(pageIndex)
+                viewModel.ensureNextLoaded(pageIndex)
+            }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(bgColor(settings))) {
-        // content
-        when (settings.readingMode) {
-            ReaderMode.VERTICAL, ReaderMode.WEBTOON -> {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(pages, key = { _, p -> p.url }) { index, page ->
-                        ReaderImage(
-                            page = page,
-                            state = imageStates[page.url] ?: ImageState.Loading,
-                            settings = settings,
-                            onRetry = { viewModel.retryImage(page.url) },
-                            onSuccess = { viewModel.onImageSuccess(page.url) },
-                            onError = { viewModel.onImageError(page.url) },
-                        )
-                        if (settings.readingMode == ReaderMode.WEBTOON) Spacer(Modifier.height(settings.imageSpacingDp.dp)) else Spacer(Modifier.height(settings.imageSpacingDp.dp))
+    // Auto scroll is real scrolling of the same list the user controls, at the chosen speed.
+    LaunchedEffect(settings.autoScroll, settings.autoScrollSpeed, mode) {
+        if (!settings.autoScroll) return@LaunchedEffect
+        if (mode != ReaderMode.VERTICAL && mode != ReaderMode.WEBTOON) return@LaunchedEffect
+        while (true) {
+            delay(40)
+            listState.scrollBy(settings.autoScrollSpeed * 2.2f)
+        }
+    }
+
+    // Prefetch the upcoming pages with the same headers Coil uses for display.
+    LaunchedEffect(listState.firstVisibleItemIndex, pages.size, settings.preloadImages) {
+        if (pages.isEmpty() || settings.preloadImages <= 0) return@LaunchedEffect
+        val loader = context.imageLoader
+        val start = listState.firstVisibleItemIndex + 1
+        pages.drop(start).take(settings.preloadImages).forEach { page ->
+            val headers = Headers.Builder().apply {
+                page.headers.forEach { (name, value) -> add(name, value) }
+            }.build()
+            loader.enqueue(
+                ImageRequest.Builder(context)
+                    .data(page.url)
+                    .headers(headers)
+                    .build(),
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(bgColor(settings))
+            .pointerInput(Unit) {
+                detectTapGestures { controlsVisible = !controlsVisible }
+            },
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val pageWidth = maxWidth
+            val pageHeight = maxHeight
+            when (mode) {
+                ReaderMode.VERTICAL, ReaderMode.WEBTOON -> {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        itemsIndexed(pages, key = { _, page -> page.key }) { _, page ->
+                            ReaderImage(
+                                page = page,
+                                state = imageStates[page.key] ?: ImageState.Loading,
+                                settings = settings,
+                                vertical = true,
+                                onRetry = { viewModel.retryImage(page.key) },
+                                onSuccess = { width, height -> viewModel.onImageSuccess(page.key, width, height) },
+                                onError = { viewModel.onImageError(page.key) },
+                                onTap = { controlsVisible = !controlsVisible },
+                            )
+                            if (settings.imageSpacingDp > 0) {
+                                Spacer(Modifier.height(settings.imageSpacingDp.dp))
+                            }
+                        }
+                    }
+                }
+
+                ReaderMode.SINGLE_PAGE -> {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        LazyRow(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                        ) {
+                            itemsIndexed(pages, key = { _, page -> page.key }) { _, page ->
+                                ReaderImage(
+                                    page = page,
+                                    state = imageStates[page.key] ?: ImageState.Loading,
+                                    settings = settings,
+                                    vertical = false,
+                                    onRetry = { viewModel.retryImage(page.key) },
+                                    onSuccess = { width, height -> viewModel.onImageSuccess(page.key, width, height) },
+                                    onError = { viewModel.onImageError(page.key) },
+                                    onTap = { controlsVisible = !controlsVisible },
+                                    modifier = Modifier
+                                        .width(pageWidth)
+                                        .fillMaxHeight()
+                                        .padding(settings.marginsDp.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                ReaderMode.DOUBLE_PAGE -> {
+                    val chunks = remember(pages) { pages.chunked(2) }
+                    val rtl = false
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                        reverseLayout = rtl,
+                    ) {
+                        itemsIndexed(chunks, key = { index, _ -> "chunk-$index" }) { _, chunk ->
+                            Row(
+                                modifier = Modifier
+                                    .width(pageWidth)
+                                    .fillMaxHeight(),
+                            ) {
+                                chunk.forEach { page ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight(),
+                                    ) {
+                                        ReaderImage(
+                                            page = page,
+                                            state = imageStates[page.key] ?: ImageState.Loading,
+                                            settings = settings,
+                                            vertical = false,
+                                            onRetry = { viewModel.retryImage(page.key) },
+                                            onSuccess = { width, height ->
+                                                viewModel.onImageSuccess(page.key, width, height)
+                                            },
+                                            onError = { viewModel.onImageError(page.key) },
+                                            onTap = { controlsVisible = !controlsVisible },
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(settings.marginsDp.dp / 2),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ReaderMode.HORIZONTAL_LTR,
+                ReaderMode.HORIZONTAL_RTL,
+                -> {
+                    val rtl = mode == ReaderMode.HORIZONTAL_RTL
+                    CompositionLocalProvider(
+                        LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                    ) {
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        reverseLayout = false,
+                        flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                    ) {
+                        itemsIndexed(pages, key = { _, page -> page.key }) { _, page ->
+                            ReaderImage(
+                                page = page,
+                                state = imageStates[page.key] ?: ImageState.Loading,
+                                settings = settings,
+                                vertical = false,
+                                onRetry = { viewModel.retryImage(page.key) },
+                                onSuccess = { width, height -> viewModel.onImageSuccess(page.key, width, height) },
+                                onError = { viewModel.onImageError(page.key) },
+                                onTap = { controlsVisible = !controlsVisible },
+                                modifier = Modifier
+                                    .width(pageWidth)
+                                    .fillMaxHeight()
+                                    .padding(settings.marginsDp.dp),
+                            )
+                        }
+                    }
                     }
                 }
             }
-            ReaderMode.HORIZONTAL_LTR, ReaderMode.HORIZONTAL_RTL, ReaderMode.SINGLE_PAGE, ReaderMode.DOUBLE_PAGE -> {
-                LazyRow(
-                    state = rememberLazyListState(),
-                    reverseLayout = settings.readingMode == ReaderMode.HORIZONTAL_RTL,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    itemsIndexed(pages, key = { _, p -> p.url }) { _, page ->
-                        ReaderImage(
-                            page = page,
-                            state = imageStates[page.url] ?: ImageState.Loading,
-                            settings = settings,
-                            onRetry = { viewModel.retryImage(page.url) },
-                            onSuccess = { viewModel.onImageSuccess(page.url) },
-                            onError = { viewModel.onImageError(page.url) },
-                            modifier = Modifier.fillMaxHeight(),
-                        )
-                    }
-                }
-            }
-
         }
 
-        // tap to toggle controls
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable { controlsVisible = !controlsVisible },
-        )
-
-        // top bar
-        AnimatedVisibility(visible = controlsVisible && settings.showTopBar, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
+        AnimatedVisibility(
+            visible = controlsVisible && settings.showTopBar,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(Spacing.sm),
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = Color.White) }
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = stringResource(R.string.cd_back),
+                        tint = Color.White,
+                    )
+                }
                 manga?.coverUrl?.let { url ->
-                    coil.compose.AsyncImage(
+                    AsyncImage(
                         model = url,
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(6.dp)),
                     )
-                    Spacer(Modifier.width(Spacing.xs))
+                    Spacer(Modifier.width(Spacing.sm))
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = manga?.title ?: "", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                    Text(text = stringResource(R.string.chapter_number, chapters.getOrNull(viewModel.currentChapterIndex.value)?.number ?: ""), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = manga?.title.orEmpty(),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.chapter_number,
+                            chapters.getOrNull(currentChapterIndex)?.number.orEmpty(),
+                        ),
+                        color = Color.White.copy(alpha = 0.75f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                 }
-                IconButton(onClick = onOpenSettings) { Icon(Icons.Outlined.Settings, contentDescription = null, tint = Color.White) }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = stringResource(R.string.reader_settings),
+                        tint = Color.White,
+                    )
+                }
             }
         }
 
-        // bottom bar
-        AnimatedVisibility(visible = controlsVisible && settings.showBottomBar, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+        AnimatedVisibility(
+            visible = controlsVisible && settings.showBottomBar,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            val currentChapter = chapters.getOrNull(currentChapterIndex)
+            val chapterStart = pages.indexOfFirst { it.chapterId == currentChapter?.id }
+            val chapterEnd = pages.indexOfLast { it.chapterId == currentChapter?.id }
+            val chapterSize = if (chapterStart >= 0 && chapterEnd >= chapterStart) {
+                chapterEnd - chapterStart + 1
+            } else {
+                0
+            }
+            val visiblePage = if (mode == ReaderMode.DOUBLE_PAGE) {
+                listState.firstVisibleItemIndex * 2
+            } else {
+                listState.firstVisibleItemIndex
+            }
+            val localProgress = if (chapterSize > 1 && chapterStart >= 0) {
+                ((visiblePage - chapterStart).toFloat() / (chapterSize - 1)).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+            val loaded = imageStates.count { it.value is ImageState.Success }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(Spacing.sm),
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
             ) {
-                val total = viewModel.totalCount()
-                val loaded = viewModel.loadedCount()
-                val percent = if (total > 0) (viewModel.loadedCount().toFloat() / total * 100).toInt() else 0
-                if (settings.showProgressPercent) {
-                    Text(text = "${percent}%", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                }
-                // reading progress slider
-                val progress = if (pages.isNotEmpty()) {
-                    if (false) {
-                        0f
-                    } else {
-                        listState.firstVisibleItemIndex.toFloat() / (pages.size - 1).coerceAtLeast(1)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (settings.showProgressPercent) {
+                        Text(
+                            text = "${(readingFraction * 100).toInt()}%",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
-                } else 0f
+                    Text(
+                        text = "$loaded/${pages.size}",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
                 Slider(
-                    value = progress.coerceIn(0f, 1f),
-                    onValueChange = { v ->
-                        val idx = (v * (pages.size - 1)).toInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-                        scope.launch { listState.animateScrollToItem(idx) }
+                    value = localProgress,
+                    onValueChange = { value ->
+                        if (chapterSize > 1) {
+                            val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
+                            val itemIndex = if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
+                            scope.launch { listState.scrollToItem(itemIndex) }
+                        }
                     },
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = {
-                        val idx = (currentChapterIndex - 1).coerceAtLeast(0)
-                        if (idx != currentChapterIndex) chapters.getOrNull(idx)?.let { viewModel.goToChapter(it) }
-                    }, enabled = currentChapterIndex > 0) { Icon(Icons.Outlined.SkipPrevious, contentDescription = null, tint = Color.White) }
-                    Text(
-                        text = "$loaded/$total",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    IconButton(onClick = {
-                        val idx = (currentChapterIndex + 1).coerceAtMost(chapters.size - 1)
-                        if (idx != currentChapterIndex) chapters.getOrNull(idx)?.let { viewModel.goToChapter(it) }
-                    }, enabled = currentChapterIndex < chapters.size - 1) { Icon(Icons.Outlined.SkipNext, contentDescription = null, tint = Color.White) }
+                    IconButton(
+                        onClick = {
+                            val index = (currentChapterIndex - 1).coerceAtLeast(0)
+                            if (index != currentChapterIndex) {
+                                chapters.getOrNull(index)?.let { viewModel.goToChapter(it) }
+                            }
+                        },
+                        enabled = currentChapterIndex > 0,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SkipPrevious,
+                            contentDescription = stringResource(R.string.reader_previous_chapter),
+                            tint = Color.White,
+                        )
+                    }
+                    when {
+                        nextChapterLoading -> CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                        nextChapterError -> TextButton(onClick = { viewModel.retryNextChapter() }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Replay,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text(
+                                text = stringResource(R.string.reader_next_failed),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        else -> Text(
+                            text = currentChapter?.number?.let {
+                                stringResource(R.string.chapter_number, it)
+                            }.orEmpty(),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val nextIndex = currentChapterIndex + 1
+                            val next = chapters.getOrNull(nextIndex) ?: return@IconButton
+                            val appendedIndex = viewModel.pageIndexOfChapter(next.id)
+                            if (viewModel.settings.value.continuousReading && appendedIndex >= 0) {
+                                scope.launch {
+                                    listState.scrollToItem(
+                                        if (mode == ReaderMode.DOUBLE_PAGE) appendedIndex / 2 else appendedIndex,
+                                    )
+                                }
+                            } else {
+                                viewModel.goToChapter(next)
+                            }
+                        },
+                        enabled = currentChapterIndex < chapters.lastIndex,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SkipNext,
+                            contentDescription = stringResource(R.string.reader_next_chapter),
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
         }
 
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        if (isLoading && pages.isEmpty()) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         if (!isLoading && pages.isEmpty() && error != null) {
@@ -257,7 +576,10 @@ fun ReaderScreen(
                 )
                 Spacer(Modifier.height(Spacing.xs))
                 TextButton(onClick = { viewModel.retry() }) {
-                    Text(stringResource(R.string.state_error_retry), color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = stringResource(R.string.state_error_retry),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
         }
@@ -269,49 +591,148 @@ private fun ReaderImage(
     page: ReaderPage,
     state: ImageState,
     settings: ReaderSettings,
+    vertical: Boolean,
     onRetry: () -> Unit,
-    onSuccess: () -> Unit,
+    onSuccess: (Int, Int) -> Unit,
     onError: () -> Unit,
+    onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var attempt by remember(page.key) { mutableStateOf(0) }
+    var zoomed by remember(page.key) { mutableStateOf(false) }
+    var panX by remember(page.key) { mutableStateOf(0f) }
+    var panY by remember(page.key) { mutableStateOf(0f) }
     val contentScale = when (settings.imageFit) {
         ImageFit.FIT_WIDTH -> ContentScale.FillWidth
         ImageFit.FIT_HEIGHT -> ContentScale.FillHeight
         ImageFit.FIT_SCREEN -> ContentScale.Fit
         ImageFit.ORIGINAL -> ContentScale.None
+    }.let { fit ->
+        if (!vertical && fit == ContentScale.FillWidth) ContentScale.Fit else fit
+    }
+    val headers = remember(page.headers) {
+        Headers.Builder().apply { page.headers.forEach { (name, value) -> add(name, value) } }.build()
+    }
+    val request = remember(page.url, attempt, headers) {
+        ImageRequest.Builder(context)
+            .data(page.url)
+            .headers(headers)
+            .crossfade(true)
+            .build()
     }
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = settings.marginsDp.dp, vertical = (settings.imageSpacingDp / 2).dp),
+            .then(if (vertical) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+            .padding(
+                horizontal = if (vertical) settings.marginsDp.dp else 0.dp,
+                vertical = if (vertical) 0.dp else 0.dp,
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        when (state) {
-            ImageState.Loading -> CircularProgressIndicator(modifier = Modifier.size(28.dp))
-            ImageState.Error -> Text(text = "Retry", color = Color.White, modifier = Modifier.clickable { onRetry() })
-            ImageState.Success -> {}
+        if (state is ImageState.Loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                color = Color.White.copy(alpha = 0.8f),
+                strokeWidth = 2.dp,
+            )
         }
-        val colorFilter = if (settings.grayscale) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null
-        val headerBuilder = Headers.Builder()
-        page.headers.forEach { (name, value) -> headerBuilder.add(name, value) }
+        if (state is ImageState.Error) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clickable {
+                        attempt++
+                        onRetry()
+                    }
+                    .padding(Spacing.md),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Replay,
+                    contentDescription = null,
+                    tint = Color.White,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = stringResource(R.string.state_error_retry),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(page.url)
-                .headers(headerBuilder.build())
-                .crossfade(true)
-                .build(),
-                contentDescription = null,
-                contentScale = contentScale,
-                colorFilter = colorFilter,
-            modifier = Modifier.fillMaxWidth(),
-            onSuccess = { onSuccess() },
+            model = request,
+            contentDescription = null,
+            contentScale = contentScale,
+            colorFilter = readerColorFilter(settings),
+            modifier = Modifier
+                .then(if (vertical) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+                .clipToBounds()
+                .graphicsLayer {
+                    scaleX = if (zoomed) 2f else 1f
+                    scaleY = if (zoomed) 2f else 1f
+                    translationX = panX
+                    translationY = panY
+                }
+                .pointerInput(settings.zoomEnabled, zoomed) {
+                    if (!settings.zoomEnabled) return@pointerInput
+                    detectTapGestures(
+                        onTap = { onTap() },
+                        onDoubleTap = {
+                            zoomed = !zoomed
+                            if (!zoomed) {
+                                panX = 0f
+                                panY = 0f
+                            }
+                        },
+                    )
+                }
+                .pointerInput(zoomed) {
+                    if (!zoomed) return@pointerInput
+                    detectTransformGestures { _, pan, _, _ ->
+                        panX += pan.x
+                        panY += pan.y
+                    }
+                },
+            onSuccess = { result ->
+                val drawable = result.result.drawable
+                onSuccess(drawable.intrinsicWidth, drawable.intrinsicHeight)
+            },
             onError = { onError() },
         )
     }
 }
 
-private fun bgColor(s: ReaderSettings): Color = when (s.backgroundColor) {
+/** Saturation, contrast, brightness and invert share one colour matrix. */
+private fun readerColorFilter(settings: ReaderSettings): ColorFilter? {
+    val unchanged = !settings.grayscale &&
+        settings.saturation == 1f &&
+        settings.contrast == 1f &&
+        settings.brightness == 1f &&
+        !settings.invertColors
+    if (unchanged) return null
+
+    val saturation = if (settings.grayscale) 0f else settings.saturation
+    val lr = 0.213f
+    val lg = 0.715f
+    val lb = 0.072f
+    val sr = lr * (1 - saturation)
+    val sg = lg * (1 - saturation)
+    val sb = lb * (1 - saturation)
+    val contrast = settings.contrast
+    val offsetBase = (1 - contrast) * 127.5f + (settings.brightness - 1f) * 255f
+    val factor = if (settings.invertColors) -contrast else contrast
+    val offset = if (settings.invertColors) 255f - offsetBase else offsetBase
+    val matrix = floatArrayOf(
+        (sr + saturation) * factor, sg * factor, sb * factor, 0f, offset,
+        sr * factor, (sg + saturation) * factor, sb * factor, 0f, offset,
+        sr * factor, sg * factor, (sb + saturation) * factor, 0f, offset,
+        0f, 0f, 0f, 1f, 0f,
+    )
+    return ColorFilter.colorMatrix(ColorMatrix(matrix))
+}
+
+private fun bgColor(settings: ReaderSettings): Color = when (settings.backgroundColor) {
     com.mangaos.app.domain.model.ReaderBackground.BLACK -> Color.Black
     com.mangaos.app.domain.model.ReaderBackground.WHITE -> Color.White
     com.mangaos.app.domain.model.ReaderBackground.GRAY -> Color.DarkGray

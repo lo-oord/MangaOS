@@ -1,6 +1,7 @@
 package com.mangaos.app.domain.repository
 
 import com.mangaos.app.core.designsystem.AppTheme
+import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.AppNotification
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.Download
@@ -150,10 +151,22 @@ interface SettingsRepository {
     /** Source id shown in the Latest tab, or null for the first usable source. */
     val latestSourceId: Flow<String?>
 
+    /** Behaviour, notifications, downloads, library and interaction preferences. */
+    val appSettings: Flow<AppSettings>
+
+    /** Last drawer destination, used only when "restore last screen" is enabled. */
+    val lastDestination: Flow<String?>
+
     suspend fun setLanguage(language: String)
     suspend fun setTheme(theme: AppTheme)
     suspend fun setDarkMode(darkMode: Boolean?)
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setViewMode(viewMode: MangaViewMode)
     suspend fun setLatestSourceId(sourceId: String?)
+    suspend fun updateAppSettings(transform: (AppSettings) -> AppSettings)
+    suspend fun setLastDestination(route: String?)
+
+    /** Saved page index for one chapter, keyed by source/manga/chapter. */
+    fun readerPosition(positionKey: String): Flow<Int?>
+    suspend fun setReaderPosition(positionKey: String, pageIndex: Int)
 }

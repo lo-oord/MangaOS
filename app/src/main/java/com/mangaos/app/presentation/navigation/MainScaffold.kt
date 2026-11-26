@@ -1,6 +1,8 @@
 package com.mangaos.app.presentation.navigation
 
+import android.app.Activity
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,8 +17,13 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,11 +35,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mangaos.app.R
 import com.mangaos.app.core.ui.components.AppDrawer
+import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppTopBar
 import com.mangaos.app.core.ui.components.ViewModeToggle
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.UserProfile
+import com.mangaos.app.presentation.settings.SettingsSection
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,6 +68,37 @@ fun MainScaffold(
         DrawerDestination.MANGA.route,
         DrawerDestination.LIBRARY.route,
     )
+    val appSettings by ServiceLocator.settings.appSettings.collectAsStateWithLifecycle(
+        initialValue = AppSettings(),
+    )
+    var showExitDialog by remember { mutableStateOf(false) }
+    var restoredDestination by remember { mutableStateOf(false) }
+    val activity = LocalContext.current as? Activity
+
+    LaunchedEffect(Unit) {
+        val preferences = ServiceLocator.settings.appSettings.first()
+        if (preferences.restoreLastScreen) {
+            val saved = ServiceLocator.settings.lastDestination.first()
+            if (saved != null && DrawerDestination.fromRoute(saved) != null && saved != currentRoute) {
+                navController.navigate(saved) {
+                    popUpTo(DrawerDestination.startRoute) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+        restoredDestination = true
+    }
+
+    LaunchedEffect(currentRoute, restoredDestination) {
+        if (restoredDestination && isDrawerRoot && currentRoute != null) {
+            ServiceLocator.settings.setLastDestination(currentRoute)
+        }
+    }
+
+    BackHandler(enabled = isDrawerRoot && appSettings.confirmExit) {
+        showExitDialog = true
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         // A drawer never covers the whole screen: 84% wide, at most 360dp.
@@ -120,12 +162,27 @@ fun MainScaffold(
                 MainNavHost(
                     navController = navController,
                     viewMode = viewMode,
+                    reduceMotion = appSettings.reduceMotion,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
                 )
             }
         }
+    }
+
+    if (showExitDialog) {
+        AppDialog(
+            title = stringResource(R.string.exit_confirm_title),
+            message = stringResource(R.string.exit_confirm_message),
+            confirmLabel = stringResource(R.string.action_exit),
+            dismissLabel = stringResource(R.string.action_cancel),
+            onConfirm = {
+                showExitDialog = false
+                activity?.finish()
+            },
+            onDismiss = { showExitDialog = false },
+        )
     }
 }
 
@@ -134,24 +191,27 @@ private fun topBarTitle(route: String?): String = when (route) {
     Routes.NOTIFICATIONS -> stringResource(R.string.notifications_title)
     Routes.PRIVACY -> stringResource(R.string.about_privacy)
     Routes.TERMS -> stringResource(R.string.about_terms)
-    else -> DrawerDestination.fromRoute(route)?.let { stringResource(it.labelRes) }.orEmpty()
+    else -> SettingsSection.fromRoute(route)?.let { stringResource(it.titleRes) }
+        ?: DrawerDestination.fromRoute(route)?.let { stringResource(it.labelRes) }.orEmpty()
 }
 
 @Composable
 private fun MainNavHost(
     navController: NavHostController,
     viewMode: MangaViewMode,
+    reduceMotion: Boolean,
     modifier: Modifier,
 ) {
     val navScope = rememberCoroutineScope()
+    val transitionMillis = if (reduceMotion) 0 else 200
     androidx.navigation.compose.NavHost(
         navController = navController,
         startDestination = DrawerDestination.startRoute,
         modifier = modifier,
-        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) },
-        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
-        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) },
-        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) },
+        enterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(transitionMillis)) },
+        exitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 160)) },
+        popEnterTransition = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(transitionMillis)) },
+        popExitTransition = { androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(if (reduceMotion) 0 else 160)) },
     ) {
         composable(DrawerDestination.LATEST.route) {
             com.mangaos.app.presentation.latest.LatestScreen(
@@ -199,7 +259,21 @@ private fun MainNavHost(
             com.mangaos.app.presentation.storage.LocalStorageScreen()
         }
         composable(DrawerDestination.SETTINGS.route) {
-            com.mangaos.app.presentation.settings.SettingsScreen()
+            com.mangaos.app.presentation.settings.SettingsScreen(
+                onOpenSection = { section -> navController.navigate(section.route) },
+            )
+        }
+        SettingsSection.entries.forEach { section ->
+            composable(section.route) {
+                com.mangaos.app.presentation.settings.SettingsDetailScreen(
+                    section = section,
+                    onOpenDownloads = {
+                        navController.navigate(DrawerDestination.DOWNLOADS.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
         }
         composable(DrawerDestination.ABOUT.route) {
             com.mangaos.app.presentation.about.AboutScreen(

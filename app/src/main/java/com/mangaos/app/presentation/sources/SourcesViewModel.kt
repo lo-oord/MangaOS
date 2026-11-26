@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.ExtensionEntry
 import com.mangaos.app.domain.model.ExtensionFailure
@@ -90,23 +91,23 @@ class SourcesViewModel : ViewModel() {
     fun uninstall(pkgName: String) = extensions.uninstall(pkgName)
 
     fun visibleSources(all: List<SourceInfo>): List<SourceInfo> {
-        val trimmed = query.trim()
+        val empty = SearchText.normalize(query).isEmpty()
         return all.filter { source ->
             languageFilter.matches(listOf(source.lang)) &&
-                (trimmed.isEmpty() ||
-                    source.name.contains(trimmed, ignoreCase = true) ||
-                    source.extensionName.contains(trimmed, ignoreCase = true))
+                (empty ||
+                    SearchText.matches(source.name, query) ||
+                    SearchText.matches(source.extensionName, query))
         }
     }
 
     fun visibleExtensions(entries: List<ExtensionEntry>): List<ExtensionEntry> {
-        val trimmed = query.trim()
+        val empty = SearchText.normalize(query).isEmpty()
         return entries.filter { entry ->
             languageFilter.matches(entry.extension.languages) &&
-                (trimmed.isEmpty() ||
-                    entry.extension.name.contains(trimmed, ignoreCase = true) ||
-                    entry.extension.pkgName.contains(trimmed, ignoreCase = true) ||
-                    entry.extension.baseUrls.any { it.contains(trimmed, ignoreCase = true) })
+                (empty ||
+                    SearchText.matches(entry.extension.name, query) ||
+                    SearchText.matches(entry.extension.pkgName, query) ||
+                    entry.extension.baseUrls.any { SearchText.matches(it, query) })
         }
     }
 }

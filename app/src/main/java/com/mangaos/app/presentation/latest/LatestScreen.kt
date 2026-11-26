@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -23,14 +24,23 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +49,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.core.ui.UiState
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.ErrorState
@@ -47,12 +58,15 @@ import com.mangaos.app.core.ui.components.MangaGridSkeleton
 import com.mangaos.app.core.ui.components.MangaList
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.ExtensionsState
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.presentation.common.SourcePickerSheet
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun LatestScreen(
@@ -70,6 +84,34 @@ fun LatestScreen(
     val listState = rememberLazyListState()
 
     var showSourcePicker by remember { mutableStateOf(false) }
+    var fabVisible by remember { mutableStateOf(true) }
+    val prefs by ServiceLocator.settings.appSettings.collectAsStateWithLifecycle(
+        initialValue = AppSettings(),
+    )
+    val view = LocalView.current
+
+    LaunchedEffect(viewMode) {
+        snapshotFlow {
+            val scrolling = if (viewMode == MangaViewMode.GRID) {
+                gridState.isScrollInProgress
+            } else {
+                listState.isScrollInProgress
+            }
+            val index = if (viewMode == MangaViewMode.GRID) {
+                gridState.firstVisibleItemIndex
+            } else {
+                listState.firstVisibleItemIndex
+            }
+            index to scrolling
+        }.collectLatest { (_, scrolling) ->
+            if (scrolling) {
+                fabVisible = false
+            } else {
+                delay(900)
+                fabVisible = true
+            }
+        }
+    }
 
     val icons = remember(extensionState) {
         val content = extensionState as? ExtensionsState.Content
@@ -144,25 +186,38 @@ fun LatestScreen(
             }
 
             if (sources.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    onClick = { showSourcePicker = true },
+                AnimatedVisibility(
+                    visible = fabVisible,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(Spacing.lg),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 },
                 ) {
-                    SourceBadge(
-                        source = selectedSource,
-                        iconUrl = selectedSource?.let { icons[it.pkgName] },
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text(
-                        text = selectedSource?.name ?: stringResource(R.string.source_choose),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            if (prefs.hapticFeedback) {
+                                view.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            showSourcePicker = true
+                        },
+                        modifier = Modifier.widthIn(max = 280.dp),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        SourceBadge(
+                            source = selectedSource,
+                            iconUrl = selectedSource?.let { icons[it.pkgName] },
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = selectedSource?.name ?: stringResource(R.string.source_choose),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 190.dp),
+                        )
+                    }
                 }
             }
         }
@@ -206,7 +261,6 @@ private fun SourceBadge(source: SourceInfo?, iconUrl: String?) {
 }
 
 private fun filterByQuery(mangas: List<Manga>, query: String): List<Manga> {
-    val trimmed = query.trim()
-    if (trimmed.isEmpty()) return mangas
-    return mangas.filter { it.title.contains(trimmed, ignoreCase = true) }
+    if (SearchText.normalize(query).isEmpty()) return mangas
+    return mangas.filter { SearchText.matches(it.title, query) }
 }

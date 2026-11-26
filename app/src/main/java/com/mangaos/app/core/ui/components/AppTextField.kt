@@ -52,6 +52,7 @@ fun AppTextField(
         modifier = modifier,
         enabled = enabled,
         singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge,
         isError = error != null,
         label = { Text(text = label, style = MaterialTheme.typography.bodyMedium) },
         prefix = prefix?.let { text -> { Text(text = text, style = MaterialTheme.typography.bodyLarge) } },

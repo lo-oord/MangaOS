@@ -38,9 +38,9 @@ class LatestViewModel : ViewModel() {
     private val extensions = ServiceLocator.extensions
     private val settings = ServiceLocator.settings
 
-    val sources: StateFlow<List<SourceInfo>> = extensions.sources
-        .map { list -> list.sortedBy { source -> source.name.lowercase() } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val sources: StateFlow<List<SourceInfo>> = combine(extensions.sources, extensions.installed) { list, installed ->
+        list.filter { it.pkgName in installed }.sortedBy { source -> source.name.lowercase() }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val selectedSourceId: StateFlow<String?> = settings.latestSourceId
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)

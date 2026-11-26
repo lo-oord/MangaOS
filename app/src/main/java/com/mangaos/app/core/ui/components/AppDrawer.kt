@@ -1,5 +1,6 @@
 package com.mangaos.app.core.ui.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -98,22 +99,26 @@ private fun DrawerHeader(
     }
     val username = profile?.username ?: stringResource(R.string.guest_username)
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.md, bottom = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(top = Spacing.md, bottom = Spacing.xs),
     ) {
-        ProfileAvatar(
-            name = displayName.ifBlank { username },
-            avatarUri = profile?.avatarUri,
-            size = Dimens.avatarMedium,
-        )
-        Spacer(Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ProfileAvatar(
+                name = displayName.ifBlank { username },
+                avatarUri = profile?.avatarUri,
+                size = 64.dp,
+            )
+            Spacer(Modifier.height(Spacing.sm))
             Text(
                 text = "@$username",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -121,7 +126,7 @@ private fun DrawerHeader(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = displayName,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -134,6 +139,9 @@ private fun DrawerHeader(
             onClick = onNotificationsClick,
             badgeCount = unreadNotifications,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = Spacing.sm),
         )
     }
 }

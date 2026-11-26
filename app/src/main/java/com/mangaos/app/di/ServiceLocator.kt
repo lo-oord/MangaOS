@@ -63,11 +63,11 @@ object ServiceLocator {
         readerSettings = ReaderSettingsRepositoryImpl(dataStore)
         user = DataStoreUserRepository(dataStore, appScope)
         library = DataStoreLibraryRepository(dataStore, appScope)
-        extensions = ExtensionStore(appContext, appScope)
+        extensions = ExtensionStore(appContext, appScope, settings)
         manga = ExtensionMangaRepository(extensions)
         localStorage = InMemoryLocalStorageRepository()
         notifications = InMemoryNotificationRepository(appScope)
-        downloads = LocalDownloadRepository(appScope, localStorage, notifications, appContext)
+        downloads = LocalDownloadRepository(appScope, localStorage, notifications, appContext, settings)
 
         initialized = true
     }
