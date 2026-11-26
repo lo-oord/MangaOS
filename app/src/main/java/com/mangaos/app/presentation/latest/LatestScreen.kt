@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -145,69 +146,14 @@ fun LatestScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
+            MangaSearchField(
+                value = viewModel.query,
+                onValueChange = viewModel::onQueryChange,
+                placeholder = stringResource(R.string.search_latest_placeholder),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                if (sources.isNotEmpty()) {
-                    CompactSourceButton(
-                        source = selectedSource,
-                        iconUrl = selectedSource?.let { icons[it.pkgName] },
-                        onClick = {
-                            vibrate()
-                            showSourcePicker = true
-                        },
-                        onLongPressStart = { rootPosition ->
-                            vibrate()
-                            radialOrigin = rootPosition
-                            radialCenter = clampRadialCenter(
-                                position = rootPosition,
-                                screenWidth = screenWidth,
-                                screenHeight = screenHeight,
-                                minMargin = with(density) { 62.dp.toPx() },
-                                verticalShift = with(density) { 30.dp.toPx() },
-                            )
-                            radialSelection = null
-                            radialOpen = true
-                        },
-                        onLongPressMove = { pointer ->
-                            val gate = with(density) { 22.dp.toPx() }
-                            radialSelection = if ((pointer - radialOrigin).getDistance() > gate) {
-                                radialSelectionAt(
-                                    pointer = pointer,
-                                    center = radialCenter,
-                                    count = minOf(sources.size, MAX_RADIAL),
-                                    density = density,
-                                )
-                            } else {
-                                null
-                            }
-                        },
-                        onLongPressEnd = {
-                            val index = radialSelection
-                            if (index != null) {
-                                val source = sources.getOrNull(index)
-                                if (source != null) viewModel.selectSource(source.id)
-                            }
-                            radialOpen = false
-                            radialSelection = null
-                        },
-                        onLongPressCancel = {
-                            radialOpen = false
-                            radialSelection = null
-                        },
-                    )
-                }
-                MangaSearchField(
-                    value = viewModel.query,
-                    onValueChange = viewModel::onQueryChange,
-                    placeholder = stringResource(R.string.search_latest_placeholder),
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            )
 
             Box(modifier = Modifier.weight(1f)) {
                 if (viewModel.query.isNotBlank()) {
@@ -257,10 +203,14 @@ fun LatestScreen(
                         }
                         is LatestUiState.Content -> {
                             val footer: @Composable () -> Unit = {
-                                FeedFooter(
-                                    content = current,
-                                    onRetry = viewModel::retryNextPage,
-                                )
+                                Column {
+                                    FeedFooter(
+                                        content = current,
+                                        onRetry = viewModel::retryNextPage,
+                                    )
+                                    // Keeps the floating source selector clear of the last row.
+                                    Spacer(Modifier.height(64.dp))
+                                }
                             }
                             if (viewMode == MangaViewMode.GRID) {
                                 MangaGrid(
@@ -285,6 +235,60 @@ fun LatestScreen(
                     }
                 }
             }
+        }
+
+        if (sources.isNotEmpty()) {
+            CompactSourceButton(
+                source = selectedSource,
+                iconUrl = selectedSource?.let { icons[it.pkgName] },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(start = Spacing.screen, bottom = Spacing.lg),
+                onClick = {
+                    vibrate()
+                    showSourcePicker = true
+                },
+                onLongPressStart = { rootPosition ->
+                    vibrate()
+                    radialOrigin = rootPosition
+                    radialCenter = clampRadialCenter(
+                        position = rootPosition,
+                        screenWidth = screenWidth,
+                        screenHeight = screenHeight,
+                        minMargin = with(density) { 62.dp.toPx() },
+                        verticalShift = with(density) { 20.dp.toPx() },
+                    )
+                    radialSelection = null
+                    radialOpen = true
+                },
+                onLongPressMove = { pointer ->
+                    val gate = with(density) { 22.dp.toPx() }
+                    radialSelection = if ((pointer - radialOrigin).getDistance() > gate) {
+                        radialSelectionAt(
+                            pointer = pointer,
+                            center = radialCenter,
+                            count = minOf(sources.size, MAX_RADIAL),
+                            density = density,
+                        )
+                    } else {
+                        null
+                    }
+                },
+                onLongPressEnd = {
+                    val index = radialSelection
+                    if (index != null) {
+                        val source = sources.getOrNull(index)
+                        if (source != null) viewModel.selectSource(source.id)
+                    }
+                    radialOpen = false
+                    radialSelection = null
+                },
+                onLongPressCancel = {
+                    radialOpen = false
+                    radialSelection = null
+                },
+            )
         }
 
         if (radialOpen) {
@@ -419,13 +423,14 @@ private fun CompactSourceButton(
     onLongPressMove: (Offset) -> Unit,
     onLongPressEnd: () -> Unit,
     onLongPressCancel: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Surface(
-        modifier = Modifier
-            .height(48.dp)
-            .widthIn(max = 132.dp)
-            .clip(RoundedCornerShape(14.dp))
+        modifier = modifier
+            .height(40.dp)
+            .widthIn(max = 148.dp)
+            .clip(RoundedCornerShape(20.dp))
             .onGloballyPositioned { coordinates = it }
             .radialPress(
                 coordinates = { coordinates },
@@ -437,6 +442,7 @@ private fun CompactSourceButton(
             ),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        shadowElevation = 6.dp,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm),
@@ -526,9 +532,10 @@ private fun RadialSourceSelector(
     val density = LocalDensity.current
     val screenWidth = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val margin = with(density) { if (sources.size > 8) 146.dp.toPx() else 58.dp.toPx() }
     val safeCenter = Offset(
-        center.x.coerceIn(with(density) { 58.dp.toPx() }, screenWidth - with(density) { 58.dp.toPx() }),
-        center.y.coerceIn(with(density) { 58.dp.toPx() }, screenHeight - with(density) { 58.dp.toPx() }),
+        center.x.coerceIn(margin, (screenWidth - margin).coerceAtLeast(margin)),
+        center.y.coerceIn(margin, (screenHeight - margin).coerceAtLeast(margin)),
     )
     val itemSize = with(density) { 54.dp.toPx() }
     val positions = radialPositions(sources.size, safeCenter, density)
@@ -610,13 +617,22 @@ private fun SourceBadge(source: SourceInfo?, iconUrl: String?) {
 private fun radialPositions(count: Int, center: Offset, density: androidx.compose.ui.unit.Density): List<Offset> {
     if (count <= 0) return emptyList()
     return with(density) {
-        val radius = 96.dp.toPx()
-        List(count) { index ->
-            val angle = -Math.PI / 2.0 + index * 2.0 * Math.PI / count
-            Offset(
-                center.x + cos(angle).toFloat() * radius,
-                center.y + sin(angle).toFloat() * radius,
-            )
+        fun ring(items: Int, radius: Float, startAngle: Double, offset: Int): List<Offset> =
+            List(items) { index ->
+                val angle = startAngle + index * 2.0 * Math.PI / items.coerceAtLeast(1)
+                Offset(
+                    center.x + cos(angle).toFloat() * radius,
+                    center.y + sin(angle).toFloat() * radius,
+                )
+            }
+        if (count <= 8) {
+            ring(count, 94.dp.toPx(), -Math.PI / 2.0, 0)
+        } else {
+            // Two rings keep the icons apart when many sources are installed.
+            val inner = (count + 1) / 2
+            val outer = count - inner
+            ring(inner, 76.dp.toPx(), -Math.PI / 2.0, 0) +
+                ring(outer, 138.dp.toPx(), -Math.PI / 2.0 + Math.PI / outer.coerceAtLeast(1), inner)
         }
     }
 }
@@ -648,4 +664,4 @@ private fun clampRadialCenter(
     ),
 )
 
-private const val MAX_RADIAL = 10
+private const val MAX_RADIAL = 16

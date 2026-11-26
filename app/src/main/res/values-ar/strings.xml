@@ -471,4 +471,17 @@
     <string name="chapter_action_retry">إعادة محاولة التنزيل</string>
     <string name="chapter_action_open">فتح الفصل</string>
     <string name="chapter_action_delete_local">حذف التنزيل المحلي</string>
+    <string name="reader_image_failed">تعذّر تحميل الصورة</string>
+    <string name="reader_direction">اتجاه القراءة</string>
+    <string name="reader_direction_hint">يُطبَّق على أوضاع الصفحات الأفقية</string>
+    <string name="detail_chapters_stats">%1$d مقروء · %2$d محمّل</string>
+    <string name="detail_filter_all">الكل</string>
+    <string name="detail_filter_unread">غير مقروء</string>
+    <string name="detail_filter_downloaded">محمّل</string>
+    <string name="action_mark_selected_read">تعليم كمقروء</string>
+    <string name="action_clear_selection">إلغاء التحديد</string>
+    <string name="detail_chapter_search">بحث في الفصول</string>
+    <string name="detail_jump_resume">الانتقال إلى آخر قراءة</string>
+    <string name="action_close">إغلاق</string>
+    <string name="action_more">خيارات إضافية</string>
 </resources>

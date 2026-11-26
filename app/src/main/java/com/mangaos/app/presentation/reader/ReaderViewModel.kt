@@ -61,6 +61,10 @@ class ReaderViewModel : ViewModel() {
     private val _imageStates = MutableStateFlow<Map<String, ImageState>>(emptyMap())
     val imageStates: StateFlow<Map<String, ImageState>> = _imageStates.asStateFlow()
 
+    /** height/width per page once the bitmap is decoded, used to reserve layout space. */
+    private val _imageRatios = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val imageRatios: StateFlow<Map<String, Float>> = _imageRatios.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -116,6 +120,7 @@ class ReaderViewModel : ViewModel() {
         this.currentChapterId = chapterId
         _pages.value = emptyList()
         _imageStates.value = emptyMap()
+        _imageRatios.value = emptyMap()
         loadedChapterIds.clear()
         chapterPageCounts.clear()
         _error.value = null
@@ -254,6 +259,12 @@ class ReaderViewModel : ViewModel() {
         _imageStates.value = _imageStates.value.toMutableMap().apply {
             this[pageKey] = ImageState.Success
         }
+        if (width > 0 && height > 0) {
+            val ratio = height.toFloat() / width.toFloat()
+            if (_imageRatios.value[pageKey] != ratio) {
+                _imageRatios.value = _imageRatios.value + (pageKey to ratio)
+            }
+        }
         recalculateLoading()
         detectWebtoon(width, height)
     }
@@ -387,6 +398,7 @@ class ReaderViewModel : ViewModel() {
             _currentChapterIndex.value = index
             _pages.value = emptyList()
             _imageStates.value = emptyMap()
+            _imageRatios.value = emptyMap()
             loadedChapterIds.clear()
             chapterPageCounts.clear()
             _error.value = null

@@ -4,11 +4,13 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -23,19 +25,21 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
@@ -45,11 +49,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,17 +66,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -82,8 +88,9 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.mangaos.app.R
-import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.session.ReaderSession
+import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
@@ -113,6 +120,7 @@ fun ReaderScreen(
 
     val pages by viewModel.pages.collectAsStateWithLifecycle()
     val imageStates by viewModel.imageStates.collectAsStateWithLifecycle()
+    val imageRatios by viewModel.imageRatios.collectAsStateWithLifecycle()
     val manga by viewModel.manga.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val chapters by viewModel.chapters.collectAsStateWithLifecycle()
@@ -136,11 +144,13 @@ fun ReaderScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }
     var restored by remember(sourceId, mangaId, chapterId) { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = context as? Activity
     val window = activity?.window
+    val reduceMotion = LocalReduceMotion.current
 
     DisposableEffect(settings.keepScreenOn) {
         if (settings.keepScreenOn) {
@@ -179,8 +189,8 @@ fun ReaderScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible, settings.autoHideControls, settings.autoHideDelayMs) {
-        if (controlsVisible && settings.autoHideControls) {
+    LaunchedEffect(controlsVisible, settings.autoHideControls, settings.autoHideDelayMs, dragging) {
+        if (controlsVisible && settings.autoHideControls && !dragging) {
             delay(settings.autoHideDelayMs)
             controlsVisible = false
         }
@@ -226,7 +236,7 @@ fun ReaderScreen(
         }
     }
 
-    // Prefetch the upcoming pages with the same headers Coil uses for display.
+    // Prefetch upcoming pages through the same loader (and headers) used for display.
     LaunchedEffect(listState.firstVisibleItemIndex, pages.size, settings.preloadImages) {
         if (pages.isEmpty() || settings.preloadImages <= 0) return@LaunchedEffect
         val loader = context.imageLoader
@@ -237,12 +247,15 @@ fun ReaderScreen(
             }.build()
             loader.enqueue(
                 ImageRequest.Builder(context)
-                    .data(page.url)
+                    .data(page.data(context))
                     .headers(headers)
                     .build(),
             )
         }
     }
+
+    val enterSpec = tween<Float>(if (reduceMotion) 0 else 170)
+    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(if (reduceMotion) 0 else 170)
 
     Box(
         modifier = modifier
@@ -262,6 +275,7 @@ fun ReaderScreen(
                             ReaderImage(
                                 page = page,
                                 state = imageStates[page.key] ?: ImageState.Loading,
+                                ratio = imageRatios[page.key],
                                 settings = settings,
                                 vertical = true,
                                 onRetry = { viewModel.retryImage(page.key) },
@@ -287,6 +301,7 @@ fun ReaderScreen(
                                 ReaderImage(
                                     page = page,
                                     state = imageStates[page.key] ?: ImageState.Loading,
+                                    ratio = imageRatios[page.key],
                                     settings = settings,
                                     vertical = false,
                                     onRetry = { viewModel.retryImage(page.key) },
@@ -305,12 +320,10 @@ fun ReaderScreen(
 
                 ReaderMode.DOUBLE_PAGE -> {
                     val chunks = remember(pages) { pages.chunked(2) }
-                    val rtl = false
                     LazyRow(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
-                        reverseLayout = rtl,
                     ) {
                         itemsIndexed(chunks, key = { index, _ -> "chunk-$index" }) { _, chunk ->
                             Row(
@@ -327,6 +340,7 @@ fun ReaderScreen(
                                         ReaderImage(
                                             page = page,
                                             state = imageStates[page.key] ?: ImageState.Loading,
+                                            ratio = imageRatios[page.key],
                                             settings = settings,
                                             vertical = false,
                                             onRetry = { viewModel.retryImage(page.key) },
@@ -353,29 +367,29 @@ fun ReaderScreen(
                     CompositionLocalProvider(
                         LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                     ) {
-                    LazyRow(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        reverseLayout = false,
-                        flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
-                    ) {
-                        itemsIndexed(pages, key = { _, page -> page.key }) { _, page ->
-                            ReaderImage(
-                                page = page,
-                                state = imageStates[page.key] ?: ImageState.Loading,
-                                settings = settings,
-                                vertical = false,
-                                onRetry = { viewModel.retryImage(page.key) },
-                                onSuccess = { width, height -> viewModel.onImageSuccess(page.key, width, height) },
-                                onError = { viewModel.onImageError(page.key) },
-                                onTap = { controlsVisible = !controlsVisible },
-                                modifier = Modifier
-                                    .width(pageWidth)
-                                    .fillMaxHeight()
-                                    .padding(settings.marginsDp.dp),
-                            )
+                        LazyRow(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                        ) {
+                            itemsIndexed(pages, key = { _, page -> page.key }) { _, page ->
+                                ReaderImage(
+                                    page = page,
+                                    state = imageStates[page.key] ?: ImageState.Loading,
+                                    ratio = imageRatios[page.key],
+                                    settings = settings,
+                                    vertical = false,
+                                    onRetry = { viewModel.retryImage(page.key) },
+                                    onSuccess = { width, height -> viewModel.onImageSuccess(page.key, width, height) },
+                                    onError = { viewModel.onImageError(page.key) },
+                                    onTap = { controlsVisible = !controlsVisible },
+                                    modifier = Modifier
+                                        .width(pageWidth)
+                                        .fillMaxHeight()
+                                        .padding(settings.marginsDp.dp),
+                                )
+                            }
                         }
-                    }
                     }
                 }
             }
@@ -383,59 +397,28 @@ fun ReaderScreen(
 
         AnimatedVisibility(
             visible = controlsVisible && settings.showTopBar,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(enterSpec) + slideInVertically(slideSpec) { -it / 3 },
+            exit = fadeOut(tween(if (reduceMotion) 0 else 130)) +
+                slideOutVertically(tween(if (reduceMotion) 0 else 130)) { -it / 3 },
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.62f))
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_back),
-                        tint = Color.White,
-                    )
-                }
-                manga?.coverUrl?.let { url ->
-                    AsyncImage(
-                        model = url,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(6.dp)),
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = manga?.title.orEmpty(),
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = stringResource(
-                            R.string.chapter_number,
-                            chapters.getOrNull(currentChapterIndex)?.number.orEmpty(),
-                        ),
-                        color = Color.White.copy(alpha = 0.75f),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
+            ReaderTopBar(
+                title = manga?.title.orEmpty(),
+                chapterLabel = chapters.getOrNull(currentChapterIndex)?.let { chapter ->
+                    buildString {
+                        append(stringResource(R.string.chapter_number, chapter.number))
+                        chapter.title?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
+                    }
+                }.orEmpty(),
+                onBack = onBack,
+            )
         }
 
         AnimatedVisibility(
             visible = controlsVisible && settings.showBottomBar,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(enterSpec) + slideInVertically(slideSpec) { it / 4 },
+            exit = fadeOut(tween(if (reduceMotion) 0 else 130)) +
+                slideOutVertically(tween(if (reduceMotion) 0 else 130)) { it / 4 },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             val currentChapter = chapters.getOrNull(currentChapterIndex)
@@ -451,7 +434,7 @@ fun ReaderScreen(
             } else {
                 listState.firstVisibleItemIndex
             }
-            val localProgress = if (chapterSize > 1 && chapterStart >= 0) {
+            val progress = if (chapterSize > 1 && chapterStart >= 0) {
                 ((visiblePage - chapterStart).toFloat() / (chapterSize - 1)).coerceIn(0f, 1f)
             } else {
                 0f
@@ -461,88 +444,106 @@ fun ReaderScreen(
             } else {
                 0
             }
-            Column(
+
+            Surface(
+                color = Color.Black.copy(alpha = 0.82f),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                    .background(Color.Black.copy(alpha = 0.72f))
-                    .padding(start = Spacing.xs, end = Spacing.xs, top = 2.dp, bottom = 2.dp),
+                    .navigationBarsPadding(),
             ) {
-                Slider(
-                    value = localProgress,
-                    onValueChange = { value ->
-                        if (chapterSize > 1) {
-                            val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
-                            val itemIndex = if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
-                            scope.launch { listState.scrollToItem(itemIndex) }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(22.dp)
-                        .padding(horizontal = Spacing.sm),
-                    thumb = {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .background(Color.White, CircleShape),
+                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.78f),
                         )
-                    },
-                    track = { state ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .background(Color.White.copy(alpha = 0.25f), CircleShape),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(state.value)
-                                    .height(2.dp)
-                                    .background(Color.White, CircleShape),
+                        if (settings.showProgressPercent) {
+                            Text(
+                                text = "${(readingFraction * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.6f),
                             )
                         }
-                    },
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = {
-                            val previous = chapters.getOrNull(currentChapterIndex - 1)
-                                ?: return@IconButton
-                            val appendedIndex = viewModel.pageIndexOfChapter(previous.id)
-                            if (viewModel.settings.value.continuousReading && appendedIndex >= 0) {
-                                scope.launch {
-                                    listState.scrollToItem(
-                                        if (mode == ReaderMode.DOUBLE_PAGE) appendedIndex / 2 else appendedIndex,
+                    }
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Slider(
+                            value = progress,
+                            onValueChange = { value ->
+                                dragging = true
+                                if (chapterSize > 1) {
+                                    val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
+                                    val itemIndex =
+                                        if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
+                                    scope.launch { listState.scrollToItem(itemIndex) }
+                                }
+                            },
+                            onValueChangeFinished = { dragging = false },
+                            enabled = chapterSize > 1,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(20.dp),
+                            thumb = {
+                                Box(
+                                    Modifier
+                                        .size(10.dp)
+                                        .background(Color.White, CircleShape),
+                                )
+                            },
+                            track = { state ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(3.dp)
+                                        .background(Color.White.copy(alpha = 0.22f), CircleShape),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(state.value)
+                                            .height(3.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
                                     )
                                 }
-                            } else {
-                                viewModel.goToChapter(previous)
-                            }
-                        },
-                        enabled = currentChapterIndex > 0,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SkipPrevious,
-                            contentDescription = stringResource(R.string.reader_previous_chapter),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            },
                         )
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ReaderControl(
+                            icon = Icons.Outlined.SkipPrevious,
+                            description = stringResource(R.string.reader_previous_chapter),
+                            enabled = currentChapterIndex > 0,
+                            onClick = {
+                                val previous = chapters.getOrNull(currentChapterIndex - 1)
+                                    ?: return@ReaderControl
+                                val appendedIndex = viewModel.pageIndexOfChapter(previous.id)
+                                if (settings.continuousReading && appendedIndex >= 0 && mode != ReaderMode.DOUBLE_PAGE) {
+                                    scope.launch { listState.scrollToItem(appendedIndex) }
+                                } else {
+                                    viewModel.goToChapter(previous)
+                                }
+                            },
+                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
                                 text = currentChapter?.number?.let {
                                     stringResource(R.string.chapter_number, it)
                                 }.orEmpty(),
-                                color = Color.White,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             if (nextChapterLoading) {
                                 Spacer(Modifier.width(Spacing.xs))
@@ -552,76 +553,41 @@ fun ReaderScreen(
                                     strokeWidth = 1.5.dp,
                                 )
                             }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "$pageInChapter / $chapterSize",
-                                color = Color.White.copy(alpha = 0.68f),
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                            if (settings.showProgressPercent) {
-                                Text(
-                                    text = " · ${(readingFraction * 100).toInt()}%",
-                                    color = Color.White.copy(alpha = 0.68f),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
                             if (nextChapterError) {
-                                TextButton(
+                                Spacer(Modifier.width(Spacing.xxs))
+                                IconButton(
                                     onClick = { viewModel.retryNextChapter() },
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.height(22.dp),
+                                    modifier = Modifier.size(32.dp),
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Replay,
-                                        contentDescription = null,
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = stringResource(R.string.reader_next_failed),
                                         tint = Color.White,
-                                        modifier = Modifier.size(12.dp),
-                                    )
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(
-                                        text = stringResource(R.string.reader_next_failed),
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.size(18.dp),
                                     )
                                 }
                             }
                         }
-                    }
-                    IconButton(
-                        onClick = {
-                            val nextIndex = currentChapterIndex + 1
-                            val next = chapters.getOrNull(nextIndex) ?: return@IconButton
-                            val appendedIndex = viewModel.pageIndexOfChapter(next.id)
-                            if (viewModel.settings.value.continuousReading && appendedIndex >= 0) {
-                                scope.launch {
-                                    listState.scrollToItem(
-                                        if (mode == ReaderMode.DOUBLE_PAGE) appendedIndex / 2 else appendedIndex,
-                                    )
-                                }
-                            } else {
-                                viewModel.goToChapter(next)
-                            }
-                        },
-                        enabled = currentChapterIndex < chapters.lastIndex,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SkipNext,
-                            contentDescription = stringResource(R.string.reader_next_chapter),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                        ReaderControl(
+                            icon = Icons.Outlined.Settings,
+                            description = stringResource(R.string.reader_settings),
+                            enabled = true,
+                            onClick = { showQuickSettings = true },
                         )
-                    }
-                    IconButton(
-                        onClick = { showQuickSettings = true },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = stringResource(R.string.reader_settings),
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                        ReaderControl(
+                            icon = Icons.Outlined.SkipNext,
+                            description = stringResource(R.string.reader_next_chapter),
+                            enabled = currentChapterIndex < chapters.lastIndex,
+                            onClick = {
+                                val next = chapters.getOrNull(currentChapterIndex + 1)
+                                    ?: return@ReaderControl
+                                val appendedIndex = viewModel.pageIndexOfChapter(next.id)
+                                if (settings.continuousReading && appendedIndex >= 0 && mode != ReaderMode.DOUBLE_PAGE) {
+                                    scope.launch { listState.scrollToItem(appendedIndex) }
+                                } else {
+                                    viewModel.goToChapter(next)
+                                }
+                            },
                         )
                     }
                 }
@@ -632,29 +598,46 @@ fun ReaderScreen(
             CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.dp,
             )
         }
 
         if (!isLoading && pages.isEmpty() && error != null) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(Spacing.xl),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Black.copy(alpha = 0.7f),
+                contentColor = Color.White,
             ) {
-                Text(
-                    text = stringResource(R.string.reader_chapter_error),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                TextButton(onClick = { viewModel.retry() }) {
-                    Text(
-                        text = stringResource(R.string.state_error_retry),
-                        color = MaterialTheme.colorScheme.primary,
+                Column(
+                    modifier = Modifier.padding(Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                        tint = Color.White.copy(alpha = 0.9f),
                     )
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        text = stringResource(R.string.reader_chapter_error),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    TextButton(onClick = { viewModel.retry() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text(stringResource(R.string.state_error_retry))
+                    }
                 }
-                        }
+            }
         }
     }
 
@@ -671,11 +654,91 @@ fun ReaderScreen(
     }
 }
 
+@Composable
+private fun ReaderTopBar(
+    title: String,
+    chapterLabel: String,
+    onBack: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Black.copy(alpha = 0.78f),
+                        Color.Black.copy(alpha = 0.38f),
+                        Color.Transparent,
+                    ),
+                ),
+            )
+            .statusBarsPadding()
+            .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = stringResource(R.string.cd_back),
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(Spacing.xxs))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (chapterLabel.isNotBlank()) {
+                    Text(
+                        text = chapterLabel,
+                        color = Color.White.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.sm))
+        }
+    }
+}
+
+@Composable
+private fun ReaderControl(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(44.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = if (enabled) Color.White else Color.White.copy(alpha = 0.32f),
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
 
 @Composable
 private fun ReaderImage(
     page: ReaderPage,
     state: ImageState,
+    ratio: Float?,
     settings: ReaderSettings,
     vertical: Boolean,
     onRetry: () -> Unit,
@@ -702,98 +765,137 @@ private fun ReaderImage(
     }
     val request = remember(page.url, attempt, headers) {
         ImageRequest.Builder(context)
-            .data(
-                if (page.url.startsWith("http://") || page.url.startsWith("https://") || page.url.startsWith("data:")) {
-                    page.url
-                } else {
-                    java.io.File(page.url)
-                },
-            )
+            .data(page.data(context))
             .headers(headers)
-            .crossfade(true)
+            .crossfade(false)
             .build()
     }
-    Box(
+
+    BoxWithConstraints(
         modifier = modifier
             .then(if (vertical) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
-            .padding(
-                horizontal = if (vertical) settings.marginsDp.dp else 0.dp,
-                vertical = if (vertical) 0.dp else 0.dp,
-            ),
+            .padding(horizontal = if (vertical) settings.marginsDp.dp else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (state is ImageState.Loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(28.dp),
-                color = Color.White.copy(alpha = 0.8f),
-                strokeWidth = 2.dp,
-            )
+        // Reserve the real image height as soon as the ratio is known so scrolling never jumps.
+        val reservedModifier = if (vertical) {
+            val effectiveRatio = (ratio ?: 1.45f).coerceIn(0.2f, 8f)
+            Modifier
+                .fillMaxWidth()
+                .height((maxWidth.value / effectiveRatio).dp)
+        } else {
+            Modifier.fillMaxSize()
         }
-        if (state is ImageState.Error) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clickable {
-                        attempt++
-                        onRetry()
-                    }
-                    .padding(Spacing.md),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Replay,
-                    contentDescription = null,
-                    tint = Color.White,
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = stringResource(R.string.state_error_retry),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-        }
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = contentScale,
-            colorFilter = readerColorFilter(settings),
-            modifier = Modifier
-                .then(if (vertical) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+
+        Box(
+            modifier = reservedModifier
                 .clipToBounds()
-                .graphicsLayer {
-                    scaleX = if (zoomed) 2f else 1f
-                    scaleY = if (zoomed) 2f else 1f
-                    translationX = panX
-                    translationY = panY
-                }
-                .pointerInput(settings.zoomEnabled, zoomed) {
-                    if (!settings.zoomEnabled) return@pointerInput
-                    detectTapGestures(
-                        onTap = { onTap() },
-                        onDoubleTap = {
-                            zoomed = !zoomed
-                            if (!zoomed) {
-                                panX = 0f
-                                panY = 0f
-                            }
-                        },
+                .background(Color.White.copy(alpha = 0.03f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (state is ImageState.Loading) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        color = Color.White.copy(alpha = 0.85f),
+                        strokeWidth = 2.dp,
                     )
                 }
-                .pointerInput(zoomed) {
-                    if (!zoomed) return@pointerInput
-                    detectTransformGestures { _, pan, _, _ ->
-                        panX += pan.x
-                        panY += pan.y
+            }
+            if (state is ImageState.Error) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(Spacing.md),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = stringResource(R.string.reader_image_failed),
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Spacer(Modifier.height(Spacing.xxs))
+                    TextButton(
+                        onClick = {
+                            attempt++
+                            onRetry()
+                        },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = Spacing.sm,
+                            vertical = Spacing.xxs,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Refresh,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.xxs))
+                        Text(
+                            text = stringResource(R.string.state_error_retry),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
+                }
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = contentScale,
+                colorFilter = readerColorFilter(settings),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+                    .graphicsLayer {
+                        scaleX = if (zoomed) 2f else 1f
+                        scaleY = if (zoomed) 2f else 1f
+                        translationX = panX
+                        translationY = panY
+                    }
+                    .pointerInput(settings.zoomEnabled, zoomed) {
+                        if (!settings.zoomEnabled) return@pointerInput
+                        detectTapGestures(
+                            onTap = { onTap() },
+                            onDoubleTap = {
+                                zoomed = !zoomed
+                                if (!zoomed) {
+                                    panX = 0f
+                                    panY = 0f
+                                }
+                            },
+                        )
+                    }
+                    .pointerInput(zoomed) {
+                        if (!zoomed) return@pointerInput
+                        detectTransformGestures { _, pan, _, _ ->
+                            panX += pan.x
+                            panY += pan.y
+                        }
+                    },
+                onSuccess = { result ->
+                    val drawable = result.result.drawable
+                    onSuccess(drawable.intrinsicWidth, drawable.intrinsicHeight)
                 },
-            onSuccess = { result ->
-                val drawable = result.result.drawable
-                onSuccess(drawable.intrinsicWidth, drawable.intrinsicHeight)
-            },
-            onError = { onError() },
-        )
+                onError = { onError() },
+            )
+        }
     }
 }
+
+/** Coil needs a File for downloaded pages and the URL string for remote pages. */
+private fun ReaderPage.data(context: android.content.Context): Any =
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+        url
+    } else {
+        java.io.File(url)
+    }
 
 /** Saturation, contrast, brightness and invert share one colour matrix. */
 private fun readerColorFilter(settings: ReaderSettings): ColorFilter? {

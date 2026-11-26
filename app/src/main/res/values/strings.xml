@@ -497,4 +497,17 @@
     <string name="chapter_action_retry">Retry download</string>
     <string name="chapter_action_open">Open chapter</string>
     <string name="chapter_action_delete_local">Delete local download</string>
+    <string name="reader_image_failed">Image failed to load</string>
+    <string name="reader_direction">Reading direction</string>
+    <string name="reader_direction_hint">Applies to horizontal page modes</string>
+    <string name="detail_chapters_stats">%1$d read · %2$d downloaded</string>
+    <string name="detail_filter_all">All</string>
+    <string name="detail_filter_unread">Unread</string>
+    <string name="detail_filter_downloaded">Downloaded</string>
+    <string name="action_mark_selected_read">Mark read</string>
+    <string name="action_clear_selection">Clear</string>
+    <string name="detail_chapter_search">Search chapters</string>
+    <string name="detail_jump_resume">Jump to last read</string>
+    <string name="action_close">Close</string>
+    <string name="action_more">More options</string>
 </resources>
