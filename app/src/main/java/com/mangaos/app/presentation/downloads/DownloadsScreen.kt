@@ -98,7 +98,6 @@ private fun DownloadRow(
                 CoverImage(
                     title = download.mangaTitle,
                     coverUrl = null,
-                    coverRes = download.localCoverRes,
                     modifier = Modifier
                         .width(42.dp)
                         .aspectRatio(2f / 3f)

@@ -1,8 +1,10 @@
 # MangaOS
 
 تطبيق أندرويد لقراءة المانجا والمانهوا، مبني بـ Kotlin و Jetpack Compose و Material 3.
-المرحلة الحالية هي **المرحلة الأولى**: الهوية البصرية، جميع الشاشات والتفاعلات، الترجمة بثلاث لغات،
-وحالات التنزيل والتخزين المحلي على بيانات تجريبية — بدون مصادقة حقيقية وبدون مصادر مانجا خارجية.
+
+المرحلة الثانية أضافت: صفحة تفاصيل مانجا كاملة، قائمة جانبية محسّنة، وضعي العرض Grid/List
+مع حفظ التفضيل، إعادة تصميم واجهات الحساب، حقول ملف شخصي موسّعة (الدولة/العمر/اللغة المفضلة)،
+العربية كلغة افتراضية، وإدارة مصادر متوافقة مع صيغة فهرس Mihon (تثبيت/تحديث/حذف مع صلاحيات Android).
 
 ## التقنية
 
@@ -18,17 +20,18 @@
 app/src/main/java/com/mangaos/app/
 ├── core/
 │   ├── designsystem/   Color, Theme (4 themes), Type, Dimens
-│   ├── ui/             Snackbar host + shared components
+│   ├── ui/             Snackbar host + shared components (card, list row, search, states)
 │   └── util/           LocaleManager, Validators, TimeAgo, Formatters
 ├── data/
-│   ├── local/          DemoCatalogue, DataStore settings
-│   └── repository/     Demo/in-memory implementations
-├── domain/model/       Manga, Chapter, UserProfile, DownloadTask, ...
+│   ├── extension/      Mihon index parser + extension store/installer
+│   ├── local/          DataStore settings
+│   └── repository/     Extension-backed catalogue, persisted library, download queue
+├── domain/model/       Manga, Chapter, Extension, UserProfile, Download, ...
 ├── presentation/
 │   ├── navigation/     RootNavHost, MainScaffold, Destinations
-│   ├── auth/           Login, sign-up, profile, verification
-│   ├── latest/ manga/ library/ downloads/ storage/ notifications/
-│   ├── settings/ about/ detail/
+│   ├── auth/           Choice, sign-up, sign-in, profile, verification
+│   ├── latest/ manga/ library/ sources/ downloads/ storage/ notifications/
+│   ├── settings/ about/ detail/ common/
 └── di/ServiceLocator.kt
 ```
 
@@ -36,7 +39,18 @@ app/src/main/java/com/mangaos/app/
 
 - الثيمات: Default، Miko، Neon، Sky — لكل ثيم نسخة فاتحة وأخرى داكنة تتبع النظام افتراضياً.
 - الأزرق (`#018AFE` ومشتقاته) لون تمييزي مستخرج من الشعار، وليس لوناً طاغياً.
-- اللغات: العربية (RTL)، English، 日本語 (LTR) عبر `res/values`, `values-en`, `values-ja`.
+- اللغات: العربية (RTL، اللغة الافتراضية)، English، 日本語 عبر String Resources وحفظ اختيار المستخدم.
+
+## المصادر
+
+- الفهرس مدمج في `MihonIndexParser` ويُقرأ عند فتح شاشة المصادر (مع نسخة مخبأة عند انقطاع الشبكة).
+- المستخدم يرى المصادر فقط: لا يظهر اسم المستودع ولا رابطه ولا صيغة الفهرس في أي مكان.
+- التثبيت يمرّ عبر `PackageInstaller` بعد فحص اسم الحزمة وإصدار الـ APK، وبعد موافقة المستخدم
+  على «تثبيت التطبيقات غير المعروفة» (`ACTION_MANAGE_UNKNOWN_APP_SOURCES`).
+- **قيود وقت التشغيل**: إضافات Mihon تُبنى مقابل `source-api` بـ `compileOnly`، أي أن التطبيق
+  المضيف يجب أن يوفّر تنفيذ `HttpSource` وشبكته. هذا البناء يدير دورة حياة الإضافات وينفّذ
+  التثبيت والتحديث والحذف فعلياً، لكنه لا يشغّل شيفرة الإضافات بعد؛ لذلك تعرض شاشات التصفح
+  حالة «المصدر غير متاح» مع إعادة المحاولة بدلاً من بيانات وهمية.
 
 ## البناء والتوقيع
 
@@ -63,16 +77,10 @@ tools/setup-signing.sh owner/repo # أو حدّد المستودع صراحةً
 احتفظ بنسخة احتياطية من `signing/mangaos-release.jks` وكلمتي المرور: بدونهما لا يمكن إصدار
 تحديثات بنفس هوية التطبيق. الملف مستثنى من git عبر `.gitignore`.
 
-للبناء المحلي (اختياري، بدون توقيع):
+## ما لا يزال ناقصاً
 
-```bash
-./gradlew :app:assembleDebug
-./gradlew :app:testReleaseUnitTest
-```
-
-## ما هو تجريبي في هذه المرحلة
-
-- لا يوجد Firebase أو Google Sign-In أو أي مصادقة حقيقية؛ التحقق من البريد محلي ووهمي بوضوح.
-- لا توجد مصادر مانجا خارجية: كل الأعمال والأغلفة من `DemoCatalogue` وأصول محلية.
-- التنزيل محاكى داخل `DemoDownloadRepository` (Coroutines) وينقل الفصل إلى التخزين المحلي.
+- لا مصادقة حقيقية (Firebase/Google)؛ التحقق من البريد محلي بوضوح.
+- لا تنفيذ لشيفرة إضافات Mihon (انظر «قيود وقت التشغيل» أعلاه)، وبالتالي لا قراءة صفحات
+  ولا تنزيل فعلي بعد.
 - الإشعارات داخل التطبيق فقط، وليست إشعارات نظام.
+- لا بيانات تجريبية: التطبيق لا يعرض أي مانجا من صنعه.

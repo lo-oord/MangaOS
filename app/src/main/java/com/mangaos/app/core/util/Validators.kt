@@ -10,6 +10,7 @@ object Validators {
     const val MIN_USERNAME_LENGTH = 3
     const val MAX_USERNAME_LENGTH = 20
     const val VERIFICATION_CODE_LENGTH = 6
+    const val MIN_AGE = 13
 
     fun isEmailValid(email: String): Boolean = EMAIL_REGEX.matches(email.trim())
 

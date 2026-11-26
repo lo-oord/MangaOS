@@ -1,84 +1,206 @@
 package com.mangaos.app.presentation.latest
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.mangaos.app.R
-import com.mangaos.app.core.ui.LocalSnackbarHostState
+import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.UiState
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.ErrorState
 import com.mangaos.app.core.ui.components.MangaGrid
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
+import com.mangaos.app.core.ui.components.MangaList
+import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.ExtensionFailure
+import com.mangaos.app.domain.model.ExtensionsState
+import com.mangaos.app.domain.model.InstalledExtension
 import com.mangaos.app.domain.model.Manga
-import com.mangaos.app.presentation.common.LibraryToggleSheet
-import kotlinx.coroutines.launch
+import com.mangaos.app.domain.model.MangaViewMode
+import com.mangaos.app.presentation.common.SourcePickerSheet
 
 @Composable
 fun LatestScreen(
+    viewMode: MangaViewMode,
     onMangaClick: (Manga) -> Unit,
+    onOpenSources: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: LatestViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val libraryIds by ServiceLocator.library.ids.collectAsStateWithLifecycle()
+    val sources by viewModel.installedSources.collectAsStateWithLifecycle()
+    val selectedSourceId by viewModel.selectedSourceId.collectAsStateWithLifecycle()
+    val extensionState by ServiceLocator.extensions.state.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
 
-    var sheetManga by remember { mutableStateOf<Manga?>(null) }
-    val snackbarHostState = LocalSnackbarHostState.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    var showSourcePicker by remember { mutableStateOf(false) }
 
-    when (val current = state) {
-        UiState.Loading -> MangaGridSkeleton(modifier = modifier)
-        UiState.Empty -> EmptyState(
-            icon = Icons.Outlined.AutoStories,
-            title = stringResource(R.string.state_empty_title),
-            modifier = modifier,
-        )
-        is UiState.Error -> ErrorState(
-            onRetry = viewModel::load,
-            offline = current.offline,
-            modifier = modifier,
-        )
-        is UiState.Content -> MangaGrid(
-            mangas = current.data,
-            onMangaClick = onMangaClick,
-            modifier = modifier,
-            gridState = gridState,
-            onMangaLongClick = { sheetManga = it },
-            showLatestChapter = true,
-            showUpdatedAt = true,
-        )
+    val icons = remember(extensionState) {
+        val content = extensionState as? ExtensionsState.Content
+        content?.entries.orEmpty().associate { it.extension.pkgName to it.extension.iconUrl }
     }
+    val selectedSource = sources.firstOrNull { it.pkgName == selectedSourceId } ?: sources.firstOrNull()
 
-    sheetManga?.let { manga ->
-        LibraryToggleSheet(
-            manga = manga,
-            isInLibrary = manga.id in libraryIds,
-            onToggle = {
-                val added = manga.id !in libraryIds
-                ServiceLocator.library.toggle(manga)
-                sheetManga = null
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        context.getString(if (added) R.string.library_added else R.string.library_removed),
+    Column(modifier = modifier.fillMaxSize()) {
+        MangaSearchField(
+            value = viewModel.query,
+            onValueChange = viewModel::onQueryChange,
+            placeholder = stringResource(R.string.search_latest_placeholder),
+            modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.sm),
+        )
+
+        Box(modifier = Modifier.weight(1f)) {
+            when (val current = state) {
+                LatestUiState.Loading -> MangaGridSkeleton()
+                LatestUiState.NoSources -> EmptyState(
+                    icon = Icons.Outlined.Extension,
+                    title = stringResource(R.string.state_no_source_title),
+                    actionLabel = stringResource(R.string.state_no_source_action),
+                    onAction = onOpenSources,
+                )
+                LatestUiState.Empty -> EmptyState(
+                    icon = Icons.Outlined.SearchOff,
+                    title = stringResource(R.string.state_empty_title),
+                )
+                is LatestUiState.Error -> when (current.failure) {
+                    ExtensionFailure.OFFLINE, ExtensionFailure.NETWORK -> ErrorState(
+                        onRetry = viewModel::retry,
+                        offline = current.failure == ExtensionFailure.OFFLINE,
+                    )
+                    else -> EmptyState(
+                        icon = Icons.Outlined.CloudOff,
+                        title = stringResource(R.string.state_source_unavailable),
+                        actionLabel = stringResource(R.string.state_error_retry),
+                        onAction = viewModel::retry,
                     )
                 }
+                is LatestUiState.Content -> {
+                    val visible = filterByQuery(current.mangas, viewModel.query)
+                    if (visible.isEmpty()) {
+                        EmptyState(
+                            icon = Icons.Outlined.SearchOff,
+                            title = stringResource(R.string.search_no_results),
+                        )
+                    } else if (viewMode == MangaViewMode.GRID) {
+                        MangaGrid(
+                            mangas = visible,
+                            onMangaClick = onMangaClick,
+                            gridState = gridState,
+                            showLatestChapter = true,
+                            showUpdatedAt = true,
+                        )
+                    } else {
+                        MangaList(
+                            mangas = visible,
+                            onMangaClick = onMangaClick,
+                            listState = listState,
+                            showLatestChapter = true,
+                            showUpdatedAt = true,
+                        )
+                    }
+                }
+            }
+
+            if (sources.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = { showSourcePicker = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(Spacing.lg),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    SourceBadge(
+                        source = selectedSource,
+                        iconUrl = selectedSource?.let { icons[it.pkgName] },
+                    )
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(
+                        text = selectedSource?.label ?: stringResource(R.string.source_choose),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showSourcePicker) {
+        SourcePickerSheet(
+            sources = sources,
+            icons = icons,
+            selectedId = selectedSource?.pkgName,
+            onSelect = {
+                viewModel.selectSource(it)
+                showSourcePicker = false
             },
-            onDismiss = { sheetManga = null },
+            onManage = {
+                showSourcePicker = false
+                onOpenSources()
+            },
+            onDismiss = { showSourcePicker = false },
         )
     }
+}
+
+@Composable
+private fun SourceBadge(source: InstalledExtension?, iconUrl: String?) {
+    if (iconUrl != null) {
+        AsyncImage(
+            model = iconUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(22.dp)
+                .clip(RoundedCornerShape(6.dp)),
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Outlined.Extension,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+private fun filterByQuery(mangas: List<Manga>, query: String): List<Manga> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return mangas
+    return mangas.filter { it.title.contains(trimmed, ignoreCase = true) }
 }

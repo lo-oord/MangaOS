@@ -41,8 +41,11 @@ fun AppDrawer(
     currentRoute: String?,
     onNavigate: (DrawerDestination) -> Unit,
     onNotificationsClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     ModalDrawerSheet(
+        modifier = modifier,
+        drawerShape = RoundedCornerShape(20.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(

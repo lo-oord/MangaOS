@@ -27,7 +27,6 @@ import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.MangaCoverArt
 import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.domain.model.Manga
-import com.mangaos.app.domain.model.MangaType
 
 @Composable
 fun LibraryToggleSheet(
@@ -55,13 +54,17 @@ fun LibraryToggleSheet(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(Spacing.xxs))
-                Text(
-                    text = stringResource(
-                        if (manga.type == MangaType.MANGA) R.string.type_manga else R.string.type_manhwa,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                val subtitle = manga.sourceName?.takeIf { it.isNotBlank() }
+                    ?: manga.genres.take(2).joinToString(" · ")
+                if (subtitle.isNotEmpty()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(Spacing.lg))

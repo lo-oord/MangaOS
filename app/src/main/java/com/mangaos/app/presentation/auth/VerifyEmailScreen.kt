@@ -64,6 +64,15 @@ fun VerifyEmailScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = stringResource(R.string.tagline_verify),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Spacer(Modifier.height(Spacing.xl))
             CodeField(
                 code = viewModel.code,
@@ -94,6 +103,7 @@ fun VerifyEmailScreen(
                 onClick = {
                     if (viewModel.validateCode()) viewModel.completeAccount(onComplete)
                 },
+                height = 48.dp,
             )
 
             TextButton(

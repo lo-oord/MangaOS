@@ -3,6 +3,7 @@ package com.mangaos.app.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.mangaos.app.domain.model.SessionType
 import com.mangaos.app.domain.model.UserProfile
@@ -31,6 +32,9 @@ class DataStoreUserRepository(
         val displayName = stringPreferencesKey("user_display_name")
         val avatar = stringPreferencesKey("user_avatar")
         val session = stringPreferencesKey("user_session")
+        val country = stringPreferencesKey("user_country")
+        val age = intPreferencesKey("user_age")
+        val preferredLanguage = stringPreferencesKey("user_preferred_language")
     }
 
     override val profile: StateFlow<UserProfile?> = dataStore.data
@@ -42,6 +46,9 @@ class DataStoreUserRepository(
                 displayName = preferences[Keys.displayName] ?: "Reader",
                 avatarUri = preferences[Keys.avatar],
                 sessionType = if (preferences[Keys.session] == "guest") SessionType.GUEST else SessionType.ACCOUNT,
+                countryCode = preferences[Keys.country],
+                age = preferences[Keys.age],
+                preferredLanguage = preferences[Keys.preferredLanguage],
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, null)
@@ -60,17 +67,27 @@ class DataStoreUserRepository(
         }
     }
 
-    override fun createAccount(displayName: String, username: String, avatarUri: String?) {
+    override fun createAccount(
+        displayName: String,
+        username: String,
+        avatarUri: String?,
+        countryCode: String?,
+        age: Int?,
+        preferredLanguage: String?,
+    ) {
         scope.launch {
             dataStore.edit { preferences ->
                 preferences[Keys.id] = UUID.randomUUID().toString()
                 preferences[Keys.username] = username
                 preferences[Keys.displayName] = displayName
                 preferences[Keys.session] = "account"
-                if (avatarUri != null) {
-                    preferences[Keys.avatar] = avatarUri
+                if (avatarUri != null) preferences[Keys.avatar] = avatarUri else preferences.remove(Keys.avatar)
+                if (countryCode != null) preferences[Keys.country] = countryCode else preferences.remove(Keys.country)
+                if (age != null) preferences[Keys.age] = age else preferences.remove(Keys.age)
+                if (preferredLanguage != null) {
+                    preferences[Keys.preferredLanguage] = preferredLanguage
                 } else {
-                    preferences.remove(Keys.avatar)
+                    preferences.remove(Keys.preferredLanguage)
                 }
             }
         }
@@ -84,6 +101,9 @@ class DataStoreUserRepository(
                 preferences.remove(Keys.displayName)
                 preferences.remove(Keys.avatar)
                 preferences.remove(Keys.session)
+                preferences.remove(Keys.country)
+                preferences.remove(Keys.age)
+                preferences.remove(Keys.preferredLanguage)
             }
         }
     }

@@ -223,7 +223,6 @@ private fun StoredWorkCard(
                 CoverImage(
                     title = work.manga.title,
                     coverUrl = work.manga.coverUrl,
-                    coverRes = work.manga.localCoverRes,
                     modifier = Modifier
                         .width(40.dp)
                         .aspectRatio(2f / 3f)

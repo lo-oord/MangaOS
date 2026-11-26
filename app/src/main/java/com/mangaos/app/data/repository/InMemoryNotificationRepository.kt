@@ -1,6 +1,5 @@
 package com.mangaos.app.data.repository
 
-import com.mangaos.app.data.local.DemoCatalogue
 import com.mangaos.app.domain.model.AppNotification
 import com.mangaos.app.domain.model.NotificationType
 import com.mangaos.app.domain.repository.NotificationRepository
@@ -16,7 +15,7 @@ import java.util.UUID
 
 class InMemoryNotificationRepository(scope: CoroutineScope) : NotificationRepository {
 
-    private val _notifications = MutableStateFlow(DemoCatalogue.seedNotifications())
+    private val _notifications = MutableStateFlow<List<AppNotification>>(emptyList())
     override val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
 
     override val unreadCount: StateFlow<Int> = _notifications

@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.R
+import com.mangaos.app.core.util.LocaleManager
 import com.mangaos.app.core.util.Validators
 import com.mangaos.app.di.ServiceLocator
 import kotlinx.coroutines.launch
@@ -24,12 +25,17 @@ class AuthViewModel : ViewModel() {
     var avatarUri by mutableStateOf<String?>(null)
     var code by mutableStateOf("")
 
+    var preferredLanguage by mutableStateOf(LocaleManager.readLanguage(ServiceLocator.context()))
+    var countryCode by mutableStateOf<String?>(null)
+    var age by mutableStateOf<Int?>(null)
+
     var emailError by mutableStateOf<Int?>(null)
     var passwordError by mutableStateOf<Int?>(null)
     var confirmError by mutableStateOf<Int?>(null)
     var nameError by mutableStateOf<Int?>(null)
     var usernameError by mutableStateOf<Int?>(null)
     var codeError by mutableStateOf<Int?>(null)
+    var ageError by mutableStateOf<Int?>(null)
 
     fun onEmailChange(value: String) {
         email = value.trim()
@@ -66,6 +72,19 @@ class AuthViewModel : ViewModel() {
         avatarUri = uri
     }
 
+    fun onPreferredLanguageChange(language: String) {
+        preferredLanguage = language
+    }
+
+    fun onCountryChange(country: String?) {
+        countryCode = country
+    }
+
+    fun onAgeChange(value: Int?) {
+        age = value
+        ageError = null
+    }
+
     fun validateCredentials(): Boolean {
         emailError = when {
             email.isEmpty() -> R.string.error_required
@@ -85,6 +104,21 @@ class AuthViewModel : ViewModel() {
         return emailError == null && passwordError == null && confirmError == null
     }
 
+    fun validateSignIn(): Boolean {
+        emailError = when {
+            email.isEmpty() -> R.string.error_required
+            !Validators.isEmailValid(email) -> R.string.error_email_invalid
+            else -> null
+        }
+        passwordError = when {
+            password.isEmpty() -> R.string.error_required
+            !Validators.isPasswordValid(password) -> R.string.error_password_short
+            else -> null
+        }
+        confirmError = null
+        return emailError == null && passwordError == null
+    }
+
     fun validateProfile(): Boolean {
         nameError = if (displayName.isBlank()) R.string.error_required else null
         usernameError = when (Validators.usernameError(username)) {
@@ -93,7 +127,12 @@ class AuthViewModel : ViewModel() {
             Validators.UsernameError.LENGTH -> R.string.error_username_length
             Validators.UsernameError.CHARACTERS -> R.string.error_username_chars
         }
-        return nameError == null && usernameError == null
+        ageError = when {
+            age == null -> null
+            age!! < Validators.MIN_AGE -> R.string.error_age_min
+            else -> null
+        }
+        return nameError == null && usernameError == null && ageError == null
     }
 
     fun validateCode(): Boolean {
@@ -107,6 +146,9 @@ class AuthViewModel : ViewModel() {
                 displayName = displayName.trim(),
                 username = username.trim(),
                 avatarUri = avatarUri,
+                countryCode = countryCode,
+                age = age,
+                preferredLanguage = preferredLanguage,
             )
             ServiceLocator.settings.setOnboardingCompleted(true)
             onDone()
@@ -121,6 +163,7 @@ class AuthViewModel : ViewModel() {
                 displayName = fallbackName,
                 username = handle.ifBlank { "reader" },
                 avatarUri = null,
+                preferredLanguage = preferredLanguage,
             )
             ServiceLocator.settings.setOnboardingCompleted(true)
             onDone()

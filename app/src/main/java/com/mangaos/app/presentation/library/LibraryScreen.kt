@@ -1,8 +1,13 @@
 package com.mangaos.app.presentation.library
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,16 +20,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.MangaGrid
+import com.mangaos.app.core.ui.components.MangaList
+import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.presentation.common.LibraryToggleSheet
+import com.mangaos.app.presentation.manga.filterByQuery
 import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(
+    viewMode: MangaViewMode,
     onMangaClick: (Manga) -> Unit,
     onBrowse: () -> Unit,
     modifier: Modifier = Modifier,
@@ -33,34 +44,57 @@ fun LibraryScreen(
     val works by viewModel.works.collectAsStateWithLifecycle()
     val libraryIds by ServiceLocator.library.ids.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
 
     var sheetManga by remember { mutableStateOf<Manga?>(null) }
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    if (works.isEmpty()) {
-        EmptyState(
-            icon = Icons.Outlined.CollectionsBookmark,
-            title = stringResource(R.string.library_empty_title),
-            actionLabel = stringResource(R.string.library_empty_action),
-            onAction = onBrowse,
-            modifier = modifier,
+    Column(modifier = modifier.fillMaxSize()) {
+        MangaSearchField(
+            value = viewModel.query,
+            onValueChange = viewModel::onQueryChange,
+            placeholder = stringResource(R.string.search_library_placeholder),
+            modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.sm),
         )
-    } else {
-        MangaGrid(
-            mangas = works,
-            onMangaClick = onMangaClick,
-            modifier = modifier,
-            gridState = gridState,
-            onMangaLongClick = { sheetManga = it },
-        )
+
+        if (works.isEmpty()) {
+            EmptyState(
+                icon = Icons.Outlined.CollectionsBookmark,
+                title = stringResource(R.string.library_empty_title),
+                actionLabel = stringResource(R.string.library_empty_action),
+                onAction = onBrowse,
+            )
+        } else {
+            val visible = filterByQuery(works, viewModel.query)
+            if (visible.isEmpty()) {
+                EmptyState(
+                    icon = Icons.Outlined.SearchOff,
+                    title = stringResource(R.string.search_no_results),
+                )
+            } else if (viewMode == MangaViewMode.GRID) {
+                MangaGrid(
+                    mangas = visible,
+                    onMangaClick = onMangaClick,
+                    gridState = gridState,
+                    onMangaLongClick = { sheetManga = it },
+                )
+            } else {
+                MangaList(
+                    mangas = visible,
+                    onMangaClick = onMangaClick,
+                    listState = listState,
+                    onMangaLongClick = { sheetManga = it },
+                )
+            }
+        }
     }
 
     sheetManga?.let { manga ->
         LibraryToggleSheet(
             manga = manga,
-            isInLibrary = manga.id in libraryIds,
+            isInLibrary = manga.key in libraryIds,
             onToggle = {
                 ServiceLocator.library.toggle(manga)
                 sheetManga = null

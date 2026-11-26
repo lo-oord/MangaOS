@@ -1,6 +1,5 @@
 package com.mangaos.app.data.repository
 
-import com.mangaos.app.data.local.DemoCatalogue
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.StoredWork
@@ -17,12 +16,8 @@ import kotlinx.coroutines.flow.update
  */
 class InMemoryLocalStorageRepository : LocalStorageRepository {
 
-    private val _works = MutableStateFlow(seed())
+    private val _works = MutableStateFlow<List<StoredWork>>(emptyList())
     override val works: StateFlow<List<StoredWork>> = _works.asStateFlow()
-
-    private fun seed(): List<StoredWork> = DemoCatalogue.seededStoredWorks.mapNotNull { (mangaId, chapters) ->
-        DemoCatalogue.mangaById(mangaId)?.let { StoredWork(it, chapters) }
-    }
 
     override fun saveChapter(manga: Manga, chapter: Chapter) {
         _works.update { current ->

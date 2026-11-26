@@ -85,7 +85,7 @@ fun GoogleButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.buttonHeight)
+            .height(48.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     ) {

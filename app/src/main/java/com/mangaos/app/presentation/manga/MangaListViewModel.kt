@@ -1,5 +1,8 @@
 package com.mangaos.app.presentation.manga
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.ui.UiState
@@ -16,12 +19,18 @@ class MangaListViewModel : ViewModel() {
     private val _state = MutableStateFlow<UiState<List<Manga>>>(UiState.Loading)
     val state: StateFlow<UiState<List<Manga>>> = _state.asStateFlow()
 
+    var query by mutableStateOf("")
+        private set
+
     init {
         load()
     }
 
+    fun onQueryChange(value: String) {
+        query = value
+    }
+
     fun load() {
-        if (_state.value is UiState.Content) return
         viewModelScope.launch {
             _state.value = UiState.Loading
             runCatching { repository.catalogue() }

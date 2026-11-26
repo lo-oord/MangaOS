@@ -19,6 +19,9 @@ object LocaleManager {
 
     val supportedLanguages = listOf(ARABIC, ENGLISH, JAPANESE)
 
+    /** MangaOS starts in Arabic, whatever the device language is. */
+    const val DEFAULT_LANGUAGE = ARABIC
+
     private const val PREFS_NAME = "mangaos_locale"
     private const val KEY_LANGUAGE = "language"
 
@@ -33,7 +36,7 @@ object LocaleManager {
     fun readLanguage(context: Context): String {
         val stored = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LANGUAGE, null)
-        return if (isSupported(stored)) stored!! else deviceLanguage()
+        return if (isSupported(stored)) stored!! else DEFAULT_LANGUAGE
     }
 
     fun cacheLanguage(context: Context, language: String) {

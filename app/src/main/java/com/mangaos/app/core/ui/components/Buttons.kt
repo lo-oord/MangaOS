@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.core.designsystem.Dimens
 
@@ -33,6 +34,7 @@ fun PrimaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     icon: ImageVector? = null,
+    height: Dp = Dimens.buttonHeight,
 ) {
     Button(
         onClick = onClick,
@@ -40,7 +42,7 @@ fun PrimaryButton(
         shape = buttonShape,
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.buttonHeight),
+            .height(height),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -76,6 +78,7 @@ fun SecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
+    height: Dp = Dimens.buttonHeight,
 ) {
     OutlinedButton(
         onClick = onClick,
@@ -83,7 +86,7 @@ fun SecondaryButton(
         shape = buttonShape,
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.buttonHeight),
+            .height(height),
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),

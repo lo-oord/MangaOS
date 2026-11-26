@@ -1,23 +1,37 @@
 package com.mangaos.app.domain.model
 
-import androidx.annotation.DrawableRes
-
 /**
- * A work in the catalogue. Phase 1 has no remote source: [localCoverRes] points at the
- * bundled demo artwork, [coverUrl] is where a real network cover will arrive later.
+ * A work as delivered by one installed extension. [id] is the source's own identifier
+ * (usually a relative URL), so it is only unique together with [sourceId].
  */
 data class Manga(
     val id: String,
+    val sourceId: String,
     val title: String,
-    val type: MangaType,
-    val status: MangaStatus,
-    val rating: Double,
-    val latestChapter: String? = null,
-    val updatedAt: Long = 0L,
+    val altTitle: String? = null,
+    val description: String? = null,
+    val genres: List<String> = emptyList(),
+    val status: MangaStatus = MangaStatus.UNKNOWN,
+    val rating: Double? = null,
+    val author: String? = null,
+    val artist: String? = null,
+    val year: Int? = null,
+    val originalLanguage: String? = null,
     val coverUrl: String? = null,
-    @DrawableRes val localCoverRes: Int? = null,
+    val latestChapter: String? = null,
+    val updatedAt: Long? = null,
+    val url: String? = null,
+    val sourceName: String? = null,
+) {
+    /** Stable key across sources; used by the library and reading progress. */
+    val key: String get() = "$sourceId/$id"
+}
+
+enum class MangaStatus { ONGOING, COMPLETED, HIATUS, CANCELLED, UNKNOWN }
+
+/** The last chapter the reader opened for a work. */
+data class ReadingProgress(
+    val chapterId: String,
+    val chapterNumber: String,
+    val updatedAt: Long = 0L,
 )
-
-enum class MangaStatus { ONGOING, COMPLETED, HIATUS, CANCELLED }
-
-enum class MangaType { MANGA, MANHWA }
