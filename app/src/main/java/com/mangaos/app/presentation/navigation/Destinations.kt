@@ -28,12 +28,18 @@ object Routes {
     const val TERMS = "terms"
     const val SOURCES = "sources"
     const val MANGA_DETAIL = "detail/{sourceId}/{mangaId}"
+    const val READER = "reader/{sourceId}/{mangaId}/{chapterId}"
+    const val READER_SETTINGS = "reader/settings"
     const val ARG_SOURCE_ID = "sourceId"
     const val ARG_MANGA_ID = "mangaId"
+    const val ARG_CHAPTER_ID = "chapterId"
 
     /** Manga ids are often source-relative URLs, so both parts are percent-encoded. */
     fun mangaDetail(sourceId: String, mangaId: String): String =
         "detail/${Uri.encode(sourceId)}/${Uri.encode(mangaId)}"
+
+    fun reader(sourceId: String, mangaId: String, chapterId: String): String =
+        "reader/${Uri.encode(sourceId)}/${Uri.encode(mangaId)}/${Uri.encode(chapterId)}"
 }
 
 /** Drawer destinations, in the order required by the product specification. */

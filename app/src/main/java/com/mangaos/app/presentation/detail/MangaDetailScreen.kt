@@ -95,6 +95,7 @@ fun MangaDetailScreen(
     mangaId: String,
     onBack: () -> Unit,
     onOpenSources: () -> Unit,
+    onOpenChapter: (Chapter) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: MangaDetailViewModel = viewModel()
@@ -119,6 +120,7 @@ fun MangaDetailScreen(
             progress = progress[current.manga.key],
             viewModel = viewModel,
             onBack = onBack,
+            onOpenChapter = onOpenChapter,
             modifier = modifier,
         )
     }
@@ -131,6 +133,7 @@ private fun DetailContent(
     progress: ReadingProgress?,
     viewModel: MangaDetailViewModel,
     onBack: () -> Unit,
+    onOpenChapter: (Chapter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val manga = state.manga
@@ -356,6 +359,7 @@ private fun DetailContent(
                                 }
                             } else {
                                 viewModel.markOpened(chapter)
+                                onOpenChapter(chapter)
                                 scope.launch {
                                     snackbar.showSnackbar(
                                         context.getString(R.string.detail_marked_read, chapter.number),

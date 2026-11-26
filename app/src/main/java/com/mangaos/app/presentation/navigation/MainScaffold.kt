@@ -89,7 +89,7 @@ fun MainScaffold(
             },
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (currentRoute != Routes.MANGA_DETAIL) {
+                if (currentRoute != Routes.MANGA_DETAIL && currentRoute?.startsWith("reader") != true) {
                     AppTopBar(
                         title = topBarTitle(currentRoute),
                         navigationIcon = if (isDrawerRoot) Icons.Outlined.Menu else Icons.AutoMirrored.Outlined.ArrowBack,
@@ -207,6 +207,28 @@ private fun MainNavHost(
             com.mangaos.app.presentation.about.LegalPlaceholderScreen()
         }
         composable(
+            route = Routes.READER,
+            arguments = listOf(
+                navArgument(Routes.ARG_SOURCE_ID) { type = NavType.StringType },
+                navArgument(Routes.ARG_MANGA_ID) { type = NavType.StringType },
+                navArgument(Routes.ARG_CHAPTER_ID) { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val sourceId = Uri.decode(entry.arguments?.getString(Routes.ARG_SOURCE_ID).orEmpty())
+            val mangaId = Uri.decode(entry.arguments?.getString(Routes.ARG_MANGA_ID).orEmpty())
+            val chapterId = Uri.decode(entry.arguments?.getString(Routes.ARG_CHAPTER_ID).orEmpty())
+            com.mangaos.app.presentation.reader.ReaderScreen(
+                sourceId = sourceId,
+                mangaId = mangaId,
+                chapterId = chapterId,
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Routes.READER_SETTINGS) },
+            )
+        }
+        composable(Routes.READER_SETTINGS) {
+            com.mangaos.app.presentation.reader.ReaderSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
             route = Routes.MANGA_DETAIL,
             arguments = listOf(
                 navArgument(Routes.ARG_SOURCE_ID) { type = NavType.StringType },
@@ -220,6 +242,9 @@ private fun MainNavHost(
                 mangaId = mangaId,
                 onBack = { navController.popBackStack() },
                 onOpenSources = { navController.navigate(DrawerDestination.SOURCES.route) },
+                onOpenChapter = { chapter ->
+                    navController.navigate(Routes.reader(sourceId, mangaId, chapter.id))
+                },
             )
         }
     }

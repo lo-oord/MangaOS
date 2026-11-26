@@ -88,26 +88,33 @@ jobs:
             echo "MANGAOS_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
           echo "Keystore restored ($(stat -c%s "$RUNNER_TEMP/mangaos-release.jks") bytes)."
+          mkdir -p artifacts
+          {
+            echo "Package name: com.mangaos.app"
+            keytool -list -v -keystore "$RUNNER_TEMP/mangaos-release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep -E "SHA1:|SHA256:"
+          } > artifacts/signing-fingerprints.txt
+          cat artifacts/signing-fingerprints.txt
 
-      - name: Build signed release APK and AAB
-        run: ./gradlew assembleRelease bundleRelease --console=plain --stacktrace
+      - name: Build signed release APKs
+        run: ./gradlew assembleRelease --console=plain --stacktrace
 
       - name: Verify signatures
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          APK=app/build/outputs/apk/release/app-release.apk
-          AAB=app/build/outputs/bundle/release/app-release.aab
-          test -f "$APK"
-          test -f "$AAB"
-          "$APKSIGNER" verify --verbose --print-certs "$APK"
-          jarsigner -verify "$AAB"
+          ls -la app/build/outputs/apk/release/
+          for apk in app/build/outputs/apk/release/*.apk; do
+            test -f "$apk"
+            "$APKSIGNER" verify --verbose --print-certs "$apk"
+          done
 
       - name: Collect artifacts
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           mkdir -p artifacts
-          cp app/build/outputs/apk/release/app-release.apk "artifacts/MangaOS-${SHORT_SHA}-release.apk"
-          cp app/build/outputs/bundle/release/app-release.aab "artifacts/MangaOS-${SHORT_SHA}-release.aab"
+          for apk in app/build/outputs/apk/release/*.apk; do
+            name=$(basename "$apk")
+            cp "$apk" "artifacts/MangaOS-${SHORT_SHA}-${name}"
+          done
           sha256sum artifacts/* | tee artifacts/checksums-sha256.txt
 
       - name: Upload release artifacts
