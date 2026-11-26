@@ -91,7 +91,8 @@ fun LocalStorageScreen(
                             latestChapter = work.latestChapterNumber,
                         ),
                         onClick = { onOpenWork(work.manga) },
-                        showLatestChapter = true,
+                        // Latest-chapter metadata belongs to the Latest screen only; offline
+                        // cards carry the downloaded-chapter count right below the cover.
                     )
                     Spacer(Modifier.height(Spacing.xxs))
                     Text(
