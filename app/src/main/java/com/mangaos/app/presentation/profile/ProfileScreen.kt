@@ -263,7 +263,7 @@ fun ProfileScreen(
                     if (success) {
                         editTarget = null
                         message(R.string.profile_saved)
-                    } else {
+                    } else if (viewModel.editError == null) {
                         message(R.string.profile_save_failed)
                     }
                 }

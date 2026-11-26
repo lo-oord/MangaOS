@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.presentation.auth.AccountChoiceScreen
 import com.mangaos.app.presentation.auth.ProfileSetupScreen
@@ -25,15 +26,17 @@ fun RootNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val profile by ServiceLocator.user.profile.collectAsStateWithLifecycle()
     val unreadNotifications by ServiceLocator.notifications.unreadCount.collectAsStateWithLifecycle()
+    val reduceMotion = LocalReduceMotion.current
+    val transitionMillis = if (reduceMotion) 0 else 220
 
     NavHost(
         navController = navController,
         startDestination = Routes.SPLASH,
         modifier = modifier,
-        enterTransition = { fadeIn(tween(220)) },
-        exitTransition = { fadeOut(tween(180)) },
-        popEnterTransition = { fadeIn(tween(220)) },
-        popExitTransition = { fadeOut(tween(180)) },
+        enterTransition = { fadeIn(tween(transitionMillis)) },
+        exitTransition = { fadeOut(tween(if (reduceMotion) 0 else 180)) },
+        popEnterTransition = { fadeIn(tween(transitionMillis)) },
+        popExitTransition = { fadeOut(tween(if (reduceMotion) 0 else 180)) },
     ) {
         composable(Routes.SPLASH) {
             SplashScreen(
