@@ -466,7 +466,7 @@
     <string name="downloads_delete_files_title">Delete downloaded files?</string>
     <string name="downloads_delete_files_message">The chapter files for %1$s will be removed from this device, together with their local library entries.</string>
     <string name="downloads_completed_hint">Available in local storage</string>
-    <string name="downloads_delete_chapter_title">Delete this chapter's files?</string>
+    <string name="downloads_delete_chapter_title">Delete this chapter’s files?</string>
     <string name="download_status_partial">Needs retry</string>
     <string name="download_partial_message">Some chapters could not be downloaded. Completed ones are kept.</string>
     <string name="download_error_wifi">Waiting for a Wi-Fi connection</string>
