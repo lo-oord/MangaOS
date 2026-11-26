@@ -48,6 +48,12 @@
             </intent-filter>
         </activity>
 
+        <!-- WorkManager's foreground service needs the dataSync type for downloads. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <receiver
             android:name=".data.notifications.NotificationActionReceiver"
             android:exported="false">
