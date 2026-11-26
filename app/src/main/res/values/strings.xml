@@ -389,6 +389,8 @@
     <string name="reader_previous_chapter">Previous chapter</string>
     <string name="reader_next_chapter">Next chapter</string>
     <string name="reader_next_failed">Next chapter failed · Retry</string>
+    <string name="reader_previous_failed">Previous chapter failed · Retry</string>
+    <string name="reader_loading_previous">Loading previous chapter</string>
     <string name="notif_wifi_required_title">Wi-Fi required</string>
     <string name="notif_wifi_required_message">Downloads are paused because Wi-Fi only is enabled. %1$s · Chapter %2$s</string>
 

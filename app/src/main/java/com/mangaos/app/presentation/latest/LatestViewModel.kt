@@ -258,7 +258,9 @@ class LatestViewModel : ViewModel() {
     }
 
     private suspend fun search(text: String) {
-        val allSources = sources.value
+        // Search the same scope the Manga tab uses (every loaded source from the extension
+        // runtime), not the screen's filtered list, so a query never stays inside one source.
+        val allSources = extensions.sources.value
         if (allSources.isEmpty()) {
             _searchState.value = LatestSearchState.Error(ExtensionFailure.NO_SOURCES)
             return

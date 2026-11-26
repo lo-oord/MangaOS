@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
+import com.mangaos.app.domain.model.ChapterOrder
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.domain.model.PageSequence
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
 import com.mangaos.app.domain.model.ReadingProgress
@@ -12,9 +14,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -35,6 +37,9 @@ sealed interface ImageState {
     data object Success : ImageState
     data object Error : ImageState
 }
+
+/** Outcome of loading one chapter's pages, so callers never mistake "busy" for "failed". */
+private enum class PageLoadResult { LOADED, EMPTY, FAILED, BUSY, STALE }
 
 class ReaderViewModel : ViewModel() {
 
@@ -80,6 +85,12 @@ class ReaderViewModel : ViewModel() {
     private val _nextChapterError = MutableStateFlow(false)
     val nextChapterError: StateFlow<Boolean> = _nextChapterError.asStateFlow()
 
+    private val _previousChapterLoading = MutableStateFlow(false)
+    val previousChapterLoading: StateFlow<Boolean> = _previousChapterLoading.asStateFlow()
+
+    private val _previousChapterError = MutableStateFlow(false)
+    val previousChapterError: StateFlow<Boolean> = _previousChapterError.asStateFlow()
+
     private val _autoWebtoon = MutableStateFlow(false)
     val autoWebtoon: StateFlow<Boolean> = _autoWebtoon.asStateFlow()
 
@@ -99,15 +110,26 @@ class ReaderViewModel : ViewModel() {
     val loadingFraction: StateFlow<Float> = _loadingFraction.asStateFlow()
 
     private val loadedChapterIds = mutableSetOf<String>()
+
+    /** Chapters with a request in flight; the same chapter is never fetched twice at once. */
+    private val inFlightChapterIds = mutableSetOf<String>()
     private val chapterPageCounts = mutableMapOf<String, Int>()
     private var sourceId: String = ""
     private var mangaId: String = ""
     private var currentChapterId: String = ""
     private var nextLoadJob: Job? = null
+    private var previousLoadJob: Job? = null
     private var consecutiveTallImages = 0
     private var webtoonDetectionDone = false
     /** True when the source could not be reached and only downloaded chapters are usable. */
     private var offlineOnly = false
+
+    /**
+     * Bumped whenever the reader is torn down or jumps to another chapter. A load that started
+     * before the jump sees a different value and discards its result instead of appending a
+     * chapter that no longer belongs to the visible sequence.
+     */
+    private var generation = 0
 
     fun load(sourceId: String, mangaId: String, chapterId: String) {
         if (this.sourceId == sourceId && this.mangaId == mangaId &&
@@ -118,18 +140,7 @@ class ReaderViewModel : ViewModel() {
         this.sourceId = sourceId
         this.mangaId = mangaId
         this.currentChapterId = chapterId
-        _pages.value = emptyList()
-        _imageStates.value = emptyMap()
-        _imageRatios.value = emptyMap()
-        loadedChapterIds.clear()
-        chapterPageCounts.clear()
-        _error.value = null
-        _nextChapterError.value = false
-        _autoWebtoon.value = false
-        webtoonDetectionDone = false
-        consecutiveTallImages = 0
-        _readingFraction.value = 0f
-        _loadingFraction.value = 0f
+        resetSequence()
 
         viewModelScope.launch {
             _isLoading.value = true
@@ -145,11 +156,13 @@ class ReaderViewModel : ViewModel() {
 
                 // Offline falls back to exactly the chapters that are stored on the device;
                 // chapters that were never downloaded are never offered as available.
-                val chapters = when {
-                    !remoteChapters.isNullOrEmpty() -> remoteChapters
-                    localWork != null -> localWork.chapters
-                    else -> emptyList()
-                }.sortedBy { it.number.toFloatOrNull() ?: 0f }
+                val chapters = ChapterOrder.ascending(
+                    when {
+                        !remoteChapters.isNullOrEmpty() -> remoteChapters
+                        localWork != null -> localWork.chapters
+                        else -> emptyList()
+                    },
+                )
                 _chapters.value = chapters
 
                 val startIndex = chapters.indexOfFirst { it.id == chapterId }
@@ -183,9 +196,38 @@ class ReaderViewModel : ViewModel() {
         }
     }
 
-    private suspend fun loadChapterPages(chapter: Chapter): Boolean {
-        if (chapter.id in loadedChapterIds) return true
-        return try {
+    private fun resetSequence() {
+        generation++
+        nextLoadJob?.cancel()
+        previousLoadJob?.cancel()
+        _pages.value = emptyList()
+        _imageStates.value = emptyMap()
+        _imageRatios.value = emptyMap()
+        loadedChapterIds.clear()
+        inFlightChapterIds.clear()
+        chapterPageCounts.clear()
+        _error.value = null
+        _nextChapterError.value = false
+        _previousChapterError.value = false
+        _nextChapterLoading.value = false
+        _previousChapterLoading.value = false
+        _autoWebtoon.value = false
+        webtoonDetectionDone = false
+        consecutiveTallImages = 0
+        _readingFraction.value = 0f
+        _loadingFraction.value = 0f
+    }
+
+    /**
+     * Loads one chapter and inserts its pages at the position its chapter index dictates. The
+     * same path serves the forward prefetch, the backward prefetch and the retry button, so the
+     * sequence can never be reordered or duplicated.
+     */
+    private suspend fun loadChapterPages(chapter: Chapter): PageLoadResult {
+        if (chapter.id in loadedChapterIds) return PageLoadResult.LOADED
+        if (!inFlightChapterIds.add(chapter.id)) return PageLoadResult.BUSY
+        val startedIn = generation
+        try {
             // A completed download is authoritative and works without a network connection.
             val localUrls = downloads.localPages("$sourceId/$mangaId", chapter.id)
             val urls = if (localUrls.isNotEmpty()) {
@@ -195,7 +237,7 @@ class ReaderViewModel : ViewModel() {
             } else {
                 mangaRepo.pages(sourceId, mangaId, chapter.id)
             }
-            val headers = if (localUrls.isNotEmpty()) emptyMap() else mangaRepo.imageHeaders(sourceId)
+            if (startedIn != generation) return PageLoadResult.STALE
             if (urls.isEmpty()) {
                 if (chapter.id == currentChapterId) {
                     _error.value = if (offlineOnly) {
@@ -204,48 +246,61 @@ class ReaderViewModel : ViewModel() {
                         "The source returned no pages for chapter ${chapter.number}"
                     }
                 }
-                false
-            } else {
-                val newPages = urls.mapIndexed { index, url ->
-                    ReaderPage(
-                        chapterId = chapter.id,
-                        chapterNumber = chapter.number,
-                        indexInChapter = index,
-                        url = url,
-                        headers = headers,
-                    )
-                }
-                loadedChapterIds += chapter.id
-                chapterPageCounts[chapter.id] = newPages.size
-                _pages.value = _pages.value + newPages
-                val states = _imageStates.value.toMutableMap()
-                newPages.forEach { page -> states.putIfAbsent(page.key, ImageState.Loading) }
-                _imageStates.value = states
-                true
+                return PageLoadResult.EMPTY
             }
+            val headers = if (localUrls.isNotEmpty()) emptyMap() else mangaRepo.imageHeaders(sourceId)
+            val newPages = urls.mapIndexed { index, url ->
+                ReaderPage(
+                    chapterId = chapter.id,
+                    chapterNumber = chapter.number,
+                    indexInChapter = index,
+                    url = url,
+                    headers = headers,
+                )
+            }
+            // Another path may have loaded this chapter while the request was in flight.
+            if (chapter.id in loadedChapterIds || _pages.value.any { it.chapterId == chapter.id }) {
+                return PageLoadResult.STALE
+            }
+            insertPagesInOrder(newPages)
+            loadedChapterIds += chapter.id
+            chapterPageCounts[chapter.id] = newPages.size
+            val states = _imageStates.value.toMutableMap()
+            newPages.forEach { page -> states.putIfAbsent(page.key, ImageState.Loading) }
+            _imageStates.value = states
+            return PageLoadResult.LOADED
         } catch (cancelled: CancellationException) {
-            loadedChapterIds.remove(chapter.id)
             throw cancelled
         } catch (error: Exception) {
-            loadedChapterIds.remove(chapter.id)
-            false
+            return PageLoadResult.FAILED
+        } finally {
+            inFlightChapterIds.remove(chapter.id)
         }
+    }
+
+    /** Inserts by chapter index, so prepending and appending share one ordering rule. */
+    private fun insertPagesInOrder(newPages: List<ReaderPage>) {
+        _pages.value = PageSequence.insertByChapter(
+            existing = _pages.value,
+            incoming = newPages,
+            chapterOrder = _chapters.value.map { it.id },
+            chapterIdOf = ReaderPage::chapterId,
+        )
     }
 
     private fun prefetchNextChapters() {
         nextLoadJob?.cancel()
         nextLoadJob = viewModelScope.launch {
-            val chapters = _chapters.value
             val toPreload = settings.value.preloadChapters.coerceIn(0, 3)
             if (toPreload == 0) return@launch
             var index = _currentChapterIndex.value + 1
             repeat(toPreload) {
-                val chapter = chapters.getOrNull(index) ?: return@launch
-                if (chapter.id !in loadedChapterIds) {
+                val chapter = _chapters.value.getOrNull(index) ?: return@launch
+                if (chapter.id !in loadedChapterIds && chapter.id !in inFlightChapterIds) {
                     _nextChapterLoading.value = true
-                    val loaded = loadChapterPages(chapter)
+                    val result = loadChapterPages(chapter)
                     _nextChapterLoading.value = false
-                    if (!loaded) {
+                    if (result == PageLoadResult.FAILED || result == PageLoadResult.EMPTY) {
                         _nextChapterError.value = true
                         return@launch
                     }
@@ -324,12 +379,25 @@ class ReaderViewModel : ViewModel() {
 
     fun retryNextChapter() {
         _nextChapterError.value = false
-        val chapter = _chapters.value.getOrNull(_currentChapterIndex.value + 1) ?: return
-        viewModelScope.launch {
+        nextLoadJob?.cancel()
+        val chapter = _chapters.value.getOrNull(lastLoadedChapterIndex() + 1) ?: return
+        nextLoadJob = viewModelScope.launch {
             _nextChapterLoading.value = true
-            val loaded = loadChapterPages(chapter)
+            val result = loadChapterPages(chapter)
             _nextChapterLoading.value = false
-            _nextChapterError.value = !loaded
+            _nextChapterError.value = result == PageLoadResult.FAILED || result == PageLoadResult.EMPTY
+        }
+    }
+
+    fun retryPreviousChapter() {
+        _previousChapterError.value = false
+        previousLoadJob?.cancel()
+        val chapter = _chapters.value.getOrNull(firstLoadedChapterIndex() - 1) ?: return
+        previousLoadJob = viewModelScope.launch {
+            _previousChapterLoading.value = true
+            val result = loadChapterPages(chapter)
+            _previousChapterLoading.value = false
+            _previousChapterError.value = result == PageLoadResult.FAILED || result == PageLoadResult.EMPTY
         }
     }
 
@@ -337,25 +405,62 @@ class ReaderViewModel : ViewModel() {
         viewModelScope.launch { readerSettingsRepo.update(transform) }
     }
 
-    /** Called as the user scrolls; loads the next chapter before the end is reached. */
+    /**
+     * Loads the next chapter as the reader approaches the end of the chapter they are in, so
+     * the transition is a continuation of the same list rather than a new screen.
+     */
     fun ensureNextLoaded(pageIndex: Int) {
         if (!settings.value.continuousReading) return
         val pages = _pages.value
-        if (pages.isEmpty()) return
-        val page = pages.getOrNull(pageIndex) ?: pages.last()
-        val index = pages.indexOfFirst { it.chapterId == page.chapterId }
-        val chapterIndex = _chapters.value.indexOfFirst { it.id == page.chapterId }
-        if (chapterIndex < 0) return
-        val next = _chapters.value.getOrNull(chapterIndex + 1) ?: return
-        if (pageIndex < pages.size - 3) return
-        if (next.id in loadedChapterIds || _nextChapterLoading.value) return
-        if (index < 0) return
-        viewModelScope.launch {
+        val page = pages.getOrNull(pageIndex) ?: return
+        val count = chapterPageCounts[page.chapterId] ?: pages.count { it.chapterId == page.chapterId }
+        if (count <= 0 || page.indexInChapter < count - 2) return
+        // A failed neighbour is only retried by the user: no endless background requests.
+        if (_nextChapterError.value) return
+        if (nextLoadJob?.isActive == true || _nextChapterLoading.value) return
+        val chapter = _chapters.value.getOrNull(lastLoadedChapterIndex() + 1) ?: return
+        if (chapter.id in loadedChapterIds || chapter.id in inFlightChapterIds) return
+        nextLoadJob = viewModelScope.launch {
             _nextChapterLoading.value = true
-            val loaded = loadChapterPages(next)
+            val result = loadChapterPages(chapter)
             _nextChapterLoading.value = false
-            _nextChapterError.value = !loaded
+            _nextChapterError.value = result == PageLoadResult.FAILED || result == PageLoadResult.EMPTY
         }
+    }
+
+    /**
+     * Mirror of [ensureNextLoaded]: as the reader returns to the first pages of the chapter at
+     * the top of the sequence, the previous chapter is fetched and inserted before it.
+     */
+    fun ensurePreviousLoaded(pageIndex: Int) {
+        if (!settings.value.continuousReading) return
+        val pages = _pages.value
+        val page = pages.getOrNull(pageIndex) ?: return
+        val firstLoaded = firstLoadedChapterIndex()
+        if (firstLoaded <= 0) return
+        // Only the chapter that sits at the top of the sequence can grow upwards.
+        if (page.chapterId != pages.first().chapterId) return
+        if (page.indexInChapter > PREVIOUS_TRIGGER_PAGES) return
+        if (_previousChapterError.value) return
+        if (previousLoadJob?.isActive == true || _previousChapterLoading.value) return
+        val chapter = _chapters.value.getOrNull(firstLoaded - 1) ?: return
+        if (chapter.id in loadedChapterIds || chapter.id in inFlightChapterIds) return
+        previousLoadJob = viewModelScope.launch {
+            _previousChapterLoading.value = true
+            val result = loadChapterPages(chapter)
+            _previousChapterLoading.value = false
+            _previousChapterError.value = result == PageLoadResult.FAILED || result == PageLoadResult.EMPTY
+        }
+    }
+
+    private fun firstLoadedChapterIndex(): Int {
+        val firstChapterId = _pages.value.firstOrNull()?.chapterId ?: return -1
+        return _chapters.value.indexOfFirst { it.id == firstChapterId }
+    }
+
+    private fun lastLoadedChapterIndex(): Int {
+        val lastChapterId = _pages.value.lastOrNull()?.chapterId ?: return -1
+        return _chapters.value.indexOfFirst { it.id == lastChapterId }
     }
 
     /**
@@ -372,6 +477,7 @@ class ReaderViewModel : ViewModel() {
             _currentChapterIndex.value = chapterIndex
             currentChapterId = page.chapterId
             _chapters.value.getOrNull(chapterIndex)?.let { recordProgress(it) }
+            trimDistantChapters(chapterIndex, pageIndex)
         }
         val count = chapterPageCounts[page.chapterId] ?: pages.count { it.chapterId == page.chapterId }
         _readingFraction.value = if (count > 1) {
@@ -388,21 +494,45 @@ class ReaderViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Keeps only the chapters around the reading position in memory. Runs on chapter changes
+     * (never mid-scroll), never drops the visible chapter, and keeps per-chapter page counts so
+     * progress stays correct for chapters that were unloaded. Reading positions and downloads
+     * are untouched.
+     */
+    private fun trimDistantChapters(chapterIndex: Int, visiblePageIndex: Int) {
+        if (loadedChapterIds.size <= MAX_LOADED_CHAPTERS) return
+        val chapters = _chapters.value
+        if (chapters.isEmpty()) return
+        val from = (chapterIndex - KEEP_CHAPTERS_BEHIND).coerceAtLeast(0)
+        val to = (chapterIndex + KEEP_CHAPTERS_AHEAD).coerceAtMost(chapters.lastIndex)
+        if (from > to) return
+        val keep = chapters.subList(from, to + 1).mapTo(mutableSetOf()) { it.id }
+        val visibleChapterId = _pages.value.getOrNull(visiblePageIndex)?.chapterId
+        if (visibleChapterId != null && visibleChapterId !in keep) return
+        val removed = loadedChapterIds - keep
+        if (removed.isEmpty()) return
+        val pages = _pages.value
+        val remaining = pages.filter { it.chapterId in keep }
+        if (remaining.size == pages.size) return
+        val remainingKeys = remaining.mapTo(mutableSetOf()) { it.key }
+        _pages.value = remaining
+        loadedChapterIds.removeAll(removed)
+        _imageStates.value = _imageStates.value.filterKeys { it in remainingKeys }
+        _imageRatios.value = _imageRatios.value.filterKeys { it in remainingKeys }
+    }
+
     fun goToChapter(chapter: Chapter) {
         val index = _chapters.value.indexOfFirst { it.id == chapter.id }
         if (index < 0 || chapter.id == currentChapterId || _isLoading.value) return
+        nextLoadJob?.cancel()
+        previousLoadJob?.cancel()
         viewModelScope.launch {
             val previous = _chapters.value.getOrNull(_currentChapterIndex.value)
             if (previous != null && previous.id != chapter.id) markRead(previous)
-            currentChapterId = chapter.id
+            resetSequence()
             _currentChapterIndex.value = index
-            _pages.value = emptyList()
-            _imageStates.value = emptyMap()
-            _imageRatios.value = emptyMap()
-            loadedChapterIds.clear()
-            chapterPageCounts.clear()
-            _error.value = null
-            _nextChapterError.value = false
+            currentChapterId = chapter.id
             _initialPage.value = settingsRepo.readerPosition(positionKey(chapter.id)).first() ?: 0
             recordProgress(chapter)
             _isLoading.value = true
@@ -458,4 +588,14 @@ class ReaderViewModel : ViewModel() {
     fun loadedCount(): Int = _imageStates.value.count { it.value is ImageState.Success }
     fun failedCount(): Int = _imageStates.value.count { it.value is ImageState.Error }
     fun totalCount(): Int = _pages.value.size
+
+    private companion object {
+        /** Start fetching the previous chapter while still on one of its first pages. */
+        const val PREVIOUS_TRIGGER_PAGES = 1
+
+        /** Loaded chapters kept on each side of the reading position before trimming. */
+        const val KEEP_CHAPTERS_BEHIND = 3
+        const val KEEP_CHAPTERS_AHEAD = 3
+        const val MAX_LOADED_CHAPTERS = 8
+    }
 }

@@ -364,6 +364,8 @@
     <string name="reader_previous_chapter">前のチャプター</string>
     <string name="reader_next_chapter">次のチャプター</string>
     <string name="reader_next_failed">次のチャプター失敗・再試行</string>
+    <string name="reader_previous_failed">前のチャプター失敗・再試行</string>
+    <string name="reader_loading_previous">前のチャプターを読み込み中</string>
     <string name="notif_wifi_required_title">Wi-Fi が必要です</string>
     <string name="notif_wifi_required_message">Wi-Fi のみが有効なためダウンロードを停止しました。%1$s・第 %2$s 話</string>
 

@@ -60,6 +60,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -130,6 +131,8 @@ fun ReaderScreen(
     val error by viewModel.error.collectAsStateWithLifecycle()
     val nextChapterLoading by viewModel.nextChapterLoading.collectAsStateWithLifecycle()
     val nextChapterError by viewModel.nextChapterError.collectAsStateWithLifecycle()
+    val previousChapterLoading by viewModel.previousChapterLoading.collectAsStateWithLifecycle()
+    val previousChapterError by viewModel.previousChapterError.collectAsStateWithLifecycle()
     val autoWebtoon by viewModel.autoWebtoon.collectAsStateWithLifecycle()
     val initialPage by viewModel.initialPage.collectAsStateWithLifecycle()
     val readingFraction by viewModel.readingFraction.collectAsStateWithLifecycle()
@@ -147,6 +150,11 @@ fun ReaderScreen(
     var restored by remember(sourceId, mangaId, chapterId) { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    // Anchor used to keep the visible page still when a chapter is inserted above it.
+    var anchorKey by remember { mutableStateOf<String?>(null) }
+    var anchorOffset by remember { mutableStateOf(0) }
+    var firstPageKey by remember { mutableStateOf<String?>(null) }
+    val latestPages = rememberUpdatedState(pages)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = context as? Activity
@@ -217,6 +225,33 @@ fun ReaderScreen(
         }
     }
 
+    // Remembers the exact page and pixel offset the user is looking at, independent of the
+    // list index, so it survives content being inserted or removed above it.
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            latestPages.value.getOrNull(index)?.let { page ->
+                anchorKey = page.key
+                anchorOffset = offset
+            }
+        }
+    }
+
+    // A chapter inserted above shifts every index. Re-anchor on the same page before the next
+    // remeasure: the reader continues from the same image instead of jumping to a new place.
+    LaunchedEffect(pages) {
+        val newFirstKey = pages.firstOrNull()?.key
+        val anchor = anchorKey
+        if (firstPageKey != null && newFirstKey != firstPageKey && anchor != null) {
+            val target = pages.indexOfFirst { it.key == anchor }
+            if (target >= 0) {
+                listState.requestScrollToItem(target, anchorOffset)
+            }
+        }
+        firstPageKey = newFirstKey
+    }
+
     LaunchedEffect(mode, pages.size) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collectLatest { visible ->
@@ -224,6 +259,7 @@ fun ReaderScreen(
                 val pageIndex = if (mode == ReaderMode.DOUBLE_PAGE) visible * 2 else visible
                 viewModel.onPageChanged(pageIndex)
                 viewModel.ensureNextLoaded(pageIndex)
+                viewModel.ensurePreviousLoaded(pageIndex)
             }
     }
 
@@ -415,6 +451,41 @@ fun ReaderScreen(
             )
         }
 
+        // A small, unobtrusive marker at the top of the content while the previous chapter is
+        // being fetched. It never covers the middle of the page being read.
+        AnimatedVisibility(
+            visible = previousChapterLoading,
+            enter = fadeIn(enterSpec),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 130)),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 52.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = Color.Black.copy(alpha = 0.62f),
+                contentColor = Color.White,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        color = Color.White,
+                        strokeWidth = 1.5.dp,
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        text = stringResource(R.string.reader_loading_previous),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.9f),
+                    )
+                }
+            }
+        }
+
         AnimatedVisibility(
             visible = controlsVisible && settings.showBottomBar,
             enter = fadeIn(enterSpec) + slideInVertically(slideSpec) { it / 4 },
@@ -460,11 +531,15 @@ fun ReaderScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.78f),
-                        )
+                        CompositionLocalProvider(
+                            LocalLayoutDirection provides LayoutDirection.Ltr,
+                        ) {
+                            Text(
+                                text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.78f),
+                            )
+                        }
                         if (settings.showProgressPercent) {
                             Text(
                                 text = "${(readingFraction * 100).toInt()}%",
@@ -546,7 +621,7 @@ fun ReaderScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (nextChapterLoading) {
+                            if (nextChapterLoading || previousChapterLoading) {
                                 Spacer(Modifier.width(Spacing.xs))
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(12.dp),
@@ -554,15 +629,24 @@ fun ReaderScreen(
                                     strokeWidth = 1.5.dp,
                                 )
                             }
-                            if (nextChapterError) {
+                            if (nextChapterError || previousChapterError) {
                                 Spacer(Modifier.width(Spacing.xxs))
                                 IconButton(
-                                    onClick = { viewModel.retryNextChapter() },
+                                    onClick = {
+                                        if (previousChapterError) {
+                                            viewModel.retryPreviousChapter()
+                                        } else {
+                                            viewModel.retryNextChapter()
+                                        }
+                                    },
                                     modifier = Modifier.size(32.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = stringResource(R.string.reader_next_failed),
+                                        contentDescription = stringResource(
+                                            if (previousChapterError) R.string.reader_previous_failed
+                                            else R.string.reader_next_failed,
+                                        ),
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp),
                                     )

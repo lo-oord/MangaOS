@@ -244,7 +244,7 @@ fun LatestScreen(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .navigationBarsPadding()
-                    .padding(start = Spacing.screen, bottom = Spacing.lg),
+                    .padding(start = Spacing.screen, bottom = Spacing.lg + Spacing.xs),
                 onClick = {
                     vibrate()
                     showSourcePicker = true

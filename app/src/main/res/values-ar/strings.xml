@@ -364,6 +364,8 @@
     <string name="reader_previous_chapter">الفصل السابق</string>
     <string name="reader_next_chapter">الفصل التالي</string>
     <string name="reader_next_failed">فشل الفصل التالي · إعادة</string>
+    <string name="reader_previous_failed">فشل الفصل السابق · إعادة</string>
+    <string name="reader_loading_previous">جارٍ تحميل الفصل السابق</string>
     <string name="notif_wifi_required_title">Wi-Fi مطلوب</string>
     <string name="notif_wifi_required_message">التنزيلات متوقفة لأن خيار Wi-Fi فقط مفعّل. %1$s · الفصل %2$s</string>
 
