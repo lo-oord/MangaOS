@@ -136,7 +136,7 @@ object MihonRuntime {
             val application = context.applicationContext as Application
             val sharedPreferences: SharedPreferences =
                 PreferenceManager.getDefaultSharedPreferences(context)
-            val preferenceStore = AndroidPreferenceStore(context, sharedPreferences)
+            val preferenceStore = AndroidPreferenceStore(sharedPreferences)
             val networkPreferences = NetworkPreferences(preferenceStore, isDebugBuild = false)
             // Do not force a DoH provider. Mihon leaves this at the user's/default choice; forcing
             // Cloudflare DoH makes every source unreachable on networks where it is blocked.
