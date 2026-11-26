@@ -1,6 +1,6 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.0.21"
+agp = "8.13.0"
+kotlin = "2.4.21"
 coreKtx = "1.13.1"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
@@ -8,8 +8,21 @@ composeBom = "2024.10.01"
 navigation = "2.8.4"
 datastore = "1.1.1"
 coil = "2.7.0"
-coroutines = "1.9.0"
+coroutines = "1.11.0"
 junit = "4.13.2"
+mihonApi = "1.1.0"
+okhttp = "5.5.1"
+okio = "3.18.2"
+jsoup = "1.23.2"
+injekt = "1.16.1"
+rxjava = "1.3.8"
+serialization = "1.12.0"
+preference = "1.2.1"
+desugar = "2.1.5"
+quickjs = "547f5b1597"
+webkit = "1.18.0"
+logcat = "0.4"
+mokoResources = "0.27.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -26,9 +39,28 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+androidx-preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preference" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+# Mihon extension API + host runtime. Extensions are compiled against this API and resolve
+# every shared class (source API, network helpers, OkHttp, Jsoup, Injekt) from the host app.
+mihon-source-api = { group = "com.github.verizonkert", name = "source-api", version.ref = "mihonApi" }
+mihon-core-common = { group = "com.github.verizonkert", name = "core-common", version.ref = "mihonApi" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-brotli = { group = "com.squareup.okhttp3", name = "okhttp-brotli", version.ref = "okhttp" }
+okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverhttps", version.ref = "okhttp" }
+okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+injekt = { group = "uy.kohesive.injekt", name = "injekt-core", version.ref = "injekt" }
+rxjava = { group = "io.reactivex", name = "rxjava", version.ref = "rxjava" }
+quickjs-android = { group = "com.github.zhanghai.quickjs-java", name = "quickjs-android", version.ref = "quickjs" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugar" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
+logcat = { group = "com.squareup.logcat", name = "logcat", version.ref = "logcat" }
+moko-resources = { group = "dev.icerock.moko", name = "resources", version.ref = "mokoResources" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -80,8 +80,12 @@ object MihonIndexParser {
 
     const val INDEX_URL = "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"
     private const val ICON_BASE = "https://raw.githubusercontent.com/keiyoushi/extensions/repo/icon/"
-    private const val REPO_NAME_FIELD = 1
     private const val EXTENSION_FIELD = 101
+
+    // The repository wraps its entries in a repeated field: ExtensionRepo.extensions (101)
+    // is itself a message whose field 1 repeats for every extension. Older index revisions
+    // emitted one 101 per entry directly, so both layouts are accepted.
+    private const val EXTENSION_ENTRY_FIELD = 1
 
     fun parse(payload: ByteArray): List<ManagedExtension> = runCatching {
         parseOrThrow(payload)
@@ -93,8 +97,21 @@ object MihonIndexParser {
         ProtoReader.walk(raw) { reader ->
             when (reader.field) {
                 EXTENSION_FIELD -> {
-                    val extension = parseExtension(reader.readLengthDelimited())
-                    if (extension != null) found[extension.pkgName] = extension
+                    val container = reader.readLengthDelimited()
+                    val before = found.size
+                    ProtoReader.walk(container) { entry ->
+                        if (entry.field == EXTENSION_ENTRY_FIELD) {
+                            parseExtension(entry.readLengthDelimited())
+                                ?.let { found[it.pkgName] = it }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    if (found.size == before) {
+                        // Legacy layout: the 101 payload is a single extension message.
+                        parseExtension(container)?.let { found[it.pkgName] = it }
+                    }
                     true
                 }
                 else -> false

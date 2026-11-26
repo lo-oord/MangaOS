@@ -49,7 +49,7 @@ import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.ExtensionsState
-import com.mangaos.app.domain.model.InstalledExtension
+import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.presentation.common.SourcePickerSheet
@@ -63,7 +63,7 @@ fun LatestScreen(
 ) {
     val viewModel: LatestViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val sources by viewModel.installedSources.collectAsStateWithLifecycle()
+    val sources by viewModel.sources.collectAsStateWithLifecycle()
     val selectedSourceId by viewModel.selectedSourceId.collectAsStateWithLifecycle()
     val extensionState by ServiceLocator.extensions.state.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
@@ -75,7 +75,7 @@ fun LatestScreen(
         val content = extensionState as? ExtensionsState.Content
         content?.entries.orEmpty().associate { it.extension.pkgName to it.extension.iconUrl }
     }
-    val selectedSource = sources.firstOrNull { it.pkgName == selectedSourceId } ?: sources.firstOrNull()
+    val selectedSource = sources.firstOrNull { it.id == selectedSourceId } ?: sources.firstOrNull()
 
     Column(modifier = modifier.fillMaxSize()) {
         MangaSearchField(
@@ -91,6 +91,12 @@ fun LatestScreen(
                 LatestUiState.NoSources -> EmptyState(
                     icon = Icons.Outlined.Extension,
                     title = stringResource(R.string.state_no_source_title),
+                    actionLabel = stringResource(R.string.state_no_source_action),
+                    onAction = onOpenSources,
+                )
+                LatestUiState.NoUsableSources -> EmptyState(
+                    icon = Icons.Outlined.Extension,
+                    title = stringResource(R.string.state_no_usable_sources),
                     actionLabel = stringResource(R.string.state_no_source_action),
                     onAction = onOpenSources,
                 )
@@ -152,7 +158,7 @@ fun LatestScreen(
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     Text(
-                        text = selectedSource?.label ?: stringResource(R.string.source_choose),
+                        text = selectedSource?.name ?: stringResource(R.string.source_choose),
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -166,7 +172,7 @@ fun LatestScreen(
         SourcePickerSheet(
             sources = sources,
             icons = icons,
-            selectedId = selectedSource?.pkgName,
+            selectedId = selectedSource?.id,
             onSelect = {
                 viewModel.selectSource(it)
                 showSourcePicker = false
@@ -181,7 +187,7 @@ fun LatestScreen(
 }
 
 @Composable
-private fun SourceBadge(source: InstalledExtension?, iconUrl: String?) {
+private fun SourceBadge(source: SourceInfo?, iconUrl: String?) {
     if (iconUrl != null) {
         AsyncImage(
             model = iconUrl,

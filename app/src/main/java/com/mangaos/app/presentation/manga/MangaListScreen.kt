@@ -47,7 +47,7 @@ fun MangaListScreen(
     val viewModel: MangaListViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val libraryIds by ServiceLocator.library.ids.collectAsStateWithLifecycle()
-    val installed by ServiceLocator.extensions.installed.collectAsStateWithLifecycle()
+    val sources by ServiceLocator.extensions.sources.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
 
@@ -67,12 +67,12 @@ fun MangaListScreen(
         when (val current = state) {
             UiState.Loading -> MangaGridSkeleton()
             UiState.Empty -> EmptyState(
-                icon = if (installed.isEmpty()) Icons.Outlined.Extension else Icons.Outlined.MenuBook,
+                icon = if (sources.isEmpty()) Icons.Outlined.Extension else Icons.Outlined.MenuBook,
                 title = stringResource(
-                    if (installed.isEmpty()) R.string.state_no_source_title else R.string.state_empty_title,
+                    if (sources.isEmpty()) R.string.state_no_source_title else R.string.state_empty_title,
                 ),
-                actionLabel = if (installed.isEmpty()) stringResource(R.string.state_no_source_action) else null,
-                onAction = if (installed.isEmpty()) onOpenSources else null,
+                actionLabel = if (sources.isEmpty()) stringResource(R.string.state_no_source_action) else null,
+                onAction = if (sources.isEmpty()) onOpenSources else null,
             )
             is UiState.Error -> EmptyState(
                 icon = Icons.Outlined.MenuBook,
@@ -81,7 +81,7 @@ fun MangaListScreen(
                 onAction = viewModel::load,
             )
             is UiState.Content -> {
-                val visible = filterByQuery(current.data, viewModel.query)
+                val visible = current.data
                 if (visible.isEmpty()) {
                     EmptyState(
                         icon = Icons.Outlined.SearchOff,

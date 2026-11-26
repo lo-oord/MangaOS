@@ -34,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import okhttp3.Headers
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.domain.model.ImageFit
@@ -87,6 +89,7 @@ fun ReaderScreen(
     val chapters by viewModel.chapters.collectAsStateWithLifecycle()
     val currentChapterIndex by viewModel.currentChapterIndex.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
 
     var controlsVisible by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
@@ -239,6 +242,25 @@ fun ReaderScreen(
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
+
+        if (!isLoading && pages.isEmpty() && error != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(Spacing.lg),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.reader_chapter_error),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                TextButton(onClick = { viewModel.retry() }) {
+                    Text(stringResource(R.string.state_error_retry), color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
     }
 }
 
@@ -270,16 +292,22 @@ private fun ReaderImage(
             ImageState.Error -> Text(text = "Retry", color = Color.White, modifier = Modifier.clickable { onRetry() })
             ImageState.Success -> {}
         }
-                    val colorFilter = if (settings.grayscale) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null
-            AsyncImage(
-                model = ImageRequest.Builder(context).data(page.url).crossfade(true).build(),
+        val colorFilter = if (settings.grayscale) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null
+        val headerBuilder = Headers.Builder()
+        page.headers.forEach { (name, value) -> headerBuilder.add(name, value) }
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(page.url)
+                .httpHeaders(headerBuilder.build())
+                .crossfade(true)
+                .build(),
                 contentDescription = null,
                 contentScale = contentScale,
                 colorFilter = colorFilter,
-                modifier = Modifier.fillMaxWidth(),
-                onSuccess = { onSuccess() },
-                onError = { onError() },
-            )
+            modifier = Modifier.fillMaxWidth(),
+            onSuccess = { onSuccess() },
+            onError = { onError() },
+        )
     }
 }
 

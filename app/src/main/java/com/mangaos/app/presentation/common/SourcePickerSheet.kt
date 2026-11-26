@@ -27,11 +27,11 @@ import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
-import com.mangaos.app.domain.model.InstalledExtension
+import com.mangaos.app.domain.model.SourceInfo
 
 @Composable
 fun SourcePickerSheet(
-    sources: List<InstalledExtension>,
+    sources: List<SourceInfo>,
     icons: Map<String, String?>,
     selectedId: String?,
     onSelect: (String) -> Unit,
@@ -46,12 +46,12 @@ fun SourcePickerSheet(
             modifier = Modifier.padding(bottom = Spacing.sm),
         )
         sources.forEach { source ->
-            val selected = source.pkgName == selectedId
+            val selected = source.id == selectedId
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { onSelect(source.pkgName) }
+                    .clickable { onSelect(source.id) }
                     .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -74,14 +74,20 @@ fun SourcePickerSheet(
                 }
                 Spacer(Modifier.width(Spacing.md))
                 Text(
-                    text = source.label,
+                    text = source.name,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                Text(
+                    text = source.lang.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (selected) {
+                    Spacer(Modifier.width(Spacing.xs))
                     Icon(
                         imageVector = Icons.Outlined.Check,
                         contentDescription = null,

@@ -7,14 +7,26 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The index is real protobuf, so the parser is tested against hand-built messages. */
+/**
+ * The index shipped by the extension repository wraps its entries:
+ *
+ *   message Index { repeated Extension extensions = 101; }  // payload is a container
+ *   message Container { repeated Extension extension = 1; }
+ *
+ * The parser is tested against both that layout and the legacy flat layout so a repository
+ * format change cannot silently empty the Sources screen again.
+ */
 class MihonIndexParserTest {
 
     @Test
-    fun `parses a repository message into extensions`() {
+    fun `parses the nested repository container into extensions`() {
         val repo = bytes(
             stringField(1, "Keiyoushi"),
-            messageField(EXTENSION_FIELD, extensionMessage()),
+            stringField(2, "KEI"),
+            messageField(
+                EXTENSION_FIELD,
+                bytes(messageField(EXTENSION_ENTRY_FIELD, extensionMessage())),
+            ),
         )
 
         val result = MihonIndexParser.parse(repo)
@@ -35,11 +47,36 @@ class MihonIndexParserTest {
     }
 
     @Test
-    fun `accepts a gzipped index`() {
-        val source = bytes(
-            stringField(1, "Keiyoushi"),
+    fun `parses every entry in the container`() {
+        val repo = repository(
+            extensionMessage(),
+            extensionMessage(name = "Second", pkgName = "eu.kanade.tachiyomi.extension.en.second"),
+        )
+
+        val result = MihonIndexParser.parse(repo)
+
+        assertEquals(2, result.size)
+        assertEquals(
+            setOf(
+                "eu.kanade.tachiyomi.extension.zh.zerobyw",
+                "eu.kanade.tachiyomi.extension.en.second",
+            ),
+            result.map { it.pkgName }.toSet(),
+        )
+    }
+
+    @Test
+    fun `still accepts the legacy flat layout`() {
+        val repo = bytes(
             messageField(EXTENSION_FIELD, extensionMessage()),
         )
+
+        assertEquals(1, MihonIndexParser.parse(repo).size)
+    }
+
+    @Test
+    fun `accepts a gzipped index`() {
+        val source = repository(extensionMessage())
         val gzipped = ByteArrayOutputStream().also { output ->
             GZIPOutputStream(output).use { it.write(source) }
         }.toByteArray()
@@ -54,7 +91,7 @@ class MihonIndexParserTest {
             stringField(2, "eu.kanade.tachiyomi.extension.all.noapk"),
             messageField(4, bytes()),
         )
-        val repo = bytes(messageField(EXTENSION_FIELD, broken))
+        val repo = repository(broken)
 
         assertTrue(MihonIndexParser.parse(repo).isEmpty())
     }
@@ -63,10 +100,7 @@ class MihonIndexParserTest {
     fun `keeps the last entry when a package is listed twice`() {
         val newer = extensionMessage(versionCode = 200, versionName = "2.0")
         val older = extensionMessage(versionCode = 100, versionName = "1.0")
-        val repo = bytes(
-            messageField(EXTENSION_FIELD, older),
-            messageField(EXTENSION_FIELD, newer),
-        )
+        val repo = repository(older, newer)
 
         val result = MihonIndexParser.parse(repo)
 
@@ -78,7 +112,10 @@ class MihonIndexParserTest {
     fun `ignores unrelated top level fields and malformed payloads`() {
         val repo = bytes(
             stringField(2, "KEI"),
-            messageField(EXTENSION_FIELD, extensionMessage()),
+            messageField(
+                EXTENSION_FIELD,
+                bytes(messageField(EXTENSION_ENTRY_FIELD, extensionMessage())),
+            ),
         )
 
         assertEquals(1, MihonIndexParser.parse(repo).size)
@@ -94,13 +131,23 @@ class MihonIndexParserTest {
             messageField(3, apk),
         )
 
-        val result = MihonIndexParser.parse(bytes(messageField(EXTENSION_FIELD, entry)))
+        val result = MihonIndexParser.parse(repository(entry))
 
         assertTrue(result.first().iconUrl!!.endsWith("/icon/eu.kanade.tachiyomi.extension.all.noicon.png"))
         assertNull(result.first().apkUrl.takeIf { it.isBlank() })
     }
 
+    private fun repository(vararg entries: ByteArray): ByteArray = bytes(
+        stringField(1, "Keiyoushi"),
+        messageField(
+            EXTENSION_FIELD,
+            bytes(*entries.map { messageField(EXTENSION_ENTRY_FIELD, it) }.toTypedArray()),
+        ),
+    )
+
     private fun extensionMessage(
+        name: String = "Zerobyw",
+        pkgName: String = "eu.kanade.tachiyomi.extension.zh.zerobyw",
         versionCode: Long = 106002,
         versionName: String = "1.6.2",
     ): ByteArray {
@@ -111,19 +158,19 @@ class MihonIndexParserTest {
         )
         val source = bytes(
             varintField(1, 42),
-            stringField(2, "Zerobyw"),
+            stringField(2, name),
             stringField(3, "zh"),
             stringField(4, "https://example.test"),
         )
         val sourceEnglish = bytes(
             varintField(1, 43),
-            stringField(2, "Zerobyw"),
+            stringField(2, name),
             stringField(3, "en"),
             stringField(4, "https://example.test"),
         )
         return bytes(
-            stringField(1, "Zerobyw"),
-            stringField(2, "eu.kanade.tachiyomi.extension.zh.zerobyw"),
+            stringField(1, name),
+            stringField(2, pkgName),
             messageField(3, apk),
             stringField(4, "1.6"),
             varintField(5, versionCode),
@@ -165,5 +212,6 @@ class MihonIndexParserTest {
 
     private companion object {
         const val EXTENSION_FIELD = 101
+        const val EXTENSION_ENTRY_FIELD = 1
     }
 }

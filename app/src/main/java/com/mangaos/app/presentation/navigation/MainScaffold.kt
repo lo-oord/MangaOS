@@ -143,6 +143,7 @@ private fun MainNavHost(
     viewMode: MangaViewMode,
     modifier: Modifier,
 ) {
+    val navScope = rememberCoroutineScope()
     androidx.navigation.compose.NavHost(
         navController = navController,
         startDestination = DrawerDestination.startRoute,
@@ -180,7 +181,16 @@ private fun MainNavHost(
             )
         }
         composable(DrawerDestination.SOURCES.route) {
-            com.mangaos.app.presentation.sources.SourcesScreen()
+            com.mangaos.app.presentation.sources.SourcesScreen(
+                onOpenSource = { source ->
+                    navScope.launch { ServiceLocator.settings.setLatestSourceId(source.id) }
+                    navController.navigate(DrawerDestination.LATEST.route) {
+                        popUpTo(DrawerDestination.startRoute) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+            )
         }
         composable(DrawerDestination.DOWNLOADS.route) {
             com.mangaos.app.presentation.downloads.DownloadsScreen()

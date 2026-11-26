@@ -9,15 +9,19 @@ import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.ReaderSettings
+import com.mangaos.app.domain.model.ReadingProgress
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-data class ReaderPage(val chapterId: String, val url: String)
+data class ReaderPage(
+    val chapterId: String,
+    val url: String,
+    val headers: Map<String, String> = emptyMap(),
+)
 
 sealed interface ImageState { data object Loading : ImageState; data object Success : ImageState; data object Error : ImageState }
 
@@ -54,63 +58,80 @@ class ReaderViewModel : ViewModel() {
     private val loadedChapterIds = mutableSetOf<String>()
     private var sourceId: String = ""
     private var mangaId: String = ""
+    private var currentChapterId: String = ""
 
     fun load(sourceId: String, mangaId: String, chapterId: String) {
-        if (this.sourceId == sourceId && this.mangaId == mangaId && _pages.value.isNotEmpty()) return
+        if (this.sourceId == sourceId && this.mangaId == mangaId &&
+            currentChapterId == chapterId && _pages.value.isNotEmpty()
+        ) {
+            return
+        }
         this.sourceId = sourceId
         this.mangaId = mangaId
+        this.currentChapterId = chapterId
+        _pages.value = emptyList()
+        _imageStates.value = emptyMap()
+        loadedChapterIds.clear()
+        _error.value = null
+
         viewModelScope.launch {
             _isLoading.value = true
-            _error.value = null
             try {
                 val manga = mangaRepo.byId(sourceId, mangaId)
                 _manga.value = manga
-                val chs = mangaRepo.chapters(sourceId, mangaId)
-                // reading order: oldest first
-                val sorted = chs.sortedBy { it.number.toFloatOrNull() ?: 0f }
-                _chapters.value = sorted
-                val startIndex = sorted.indexOfFirst { it.id == chapterId }.coerceAtLeast(0)
+                val chapters = mangaRepo.chapters(sourceId, mangaId)
+                    .sortedBy { it.number.toFloatOrNull() ?: 0f }
+                _chapters.value = chapters
+                val startIndex = chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0)
                 _currentChapterIndex.value = startIndex
-                // load initial + maybe continuous
-                loadChapterPages(sorted.getOrNull(startIndex))
-                if (settings.value.continuousReading) {
-                    prefetchNext()
+                val startChapter = chapters.getOrNull(startIndex)
+                if (startChapter == null) {
+                    _error.value = "The chapter is not part of this source's chapter list"
+                } else {
+                    recordProgress(startChapter)
+                    loadChapterPages(startChapter)
+                    if (settings.value.continuousReading) prefetchNext()
+                    if (_pages.value.isEmpty() && _error.value == null) {
+                        _error.value = "The source returned no pages for this chapter"
+                    }
                 }
-            } catch (e: Exception) {
-                _error.value = e.message
+            } catch (error: Exception) {
+                _error.value = error.message ?: error.javaClass.simpleName
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    private suspend fun loadChapterPages(chapter: Chapter?) {
-        if (chapter == null) return
+    private suspend fun loadChapterPages(chapter: Chapter) {
         if (chapter.id in loadedChapterIds) return
-        loadedChapterIds.add(chapter.id)
         try {
             val urls = mangaRepo.pages(sourceId, mangaId, chapter.id)
-            val newPages = urls.map { ReaderPage(chapter.id, it) }
+            val headers = mangaRepo.imageHeaders(sourceId)
+            val newPages = urls.map { ReaderPage(chapter.id, it, headers) }
+            if (newPages.isEmpty()) {
+                _error.value = "The source returned no pages for chapter ${chapter.number}"
+                return
+            }
+            loadedChapterIds += chapter.id
             _pages.value = _pages.value + newPages
-            // init image states
             val states = _imageStates.value.toMutableMap()
-            newPages.forEach { if (it.url !in states) states[it.url] = ImageState.Loading }
+            newPages.forEach { page -> states.putIfAbsent(page.url, ImageState.Loading) }
             _imageStates.value = states
-        } catch (e: Exception) {
-            // mark failed? keep
+        } catch (error: Exception) {
+            // Keep the chapter unloaded so the retry path is real.
+            loadedChapterIds.remove(chapter.id)
+            _error.value = error.message ?: "Could not load chapter pages"
         }
     }
 
     private fun prefetchNext() {
         viewModelScope.launch {
-            val sorted = _chapters.value
-            var idx = _currentChapterIndex.value + 1
+            val chapters = _chapters.value
+            val nextIndex = _currentChapterIndex.value + 1
             val toPreload = settings.value.preloadChapters.coerceAtLeast(1)
-            repeat(toPreload) {
-                if (idx < sorted.size) {
-                    loadChapterPages(sorted[idx])
-                    idx++
-                }
+            repeat(toPreload) { offset ->
+                chapters.getOrNull(nextIndex + offset)?.let { loadChapterPages(it) }
             }
         }
     }
@@ -127,35 +148,63 @@ class ReaderViewModel : ViewModel() {
         _imageStates.value = _imageStates.value.toMutableMap().apply { this[url] = ImageState.Loading }
     }
 
+    fun retry() {
+        val chapter = _chapters.value.getOrNull(_currentChapterIndex.value) ?: return
+        loadedChapterIds.remove(chapter.id)
+        _pages.value = _pages.value.filterNot { it.chapterId == chapter.id }
+        _error.value = null
+        viewModelScope.launch {
+            _isLoading.value = true
+            loadChapterPages(chapter)
+            _isLoading.value = false
+        }
+    }
+
     fun updateSettings(transform: (ReaderSettings) -> ReaderSettings) {
         viewModelScope.launch { readerSettingsRepo.update(transform) }
     }
 
-    // Continuous: call when user near end
+    /** Loads the next chapter when the reader approaches the end of the current one. */
     fun ensureNextLoaded(currentIndex: Int) {
         val pages = _pages.value
         if (pages.isEmpty()) return
-        if (currentIndex >= pages.size - 3) {
-            viewModelScope.launch {
-                val sorted = _chapters.value
-                val loadedChapters = loadedChapterIds.size
-                if (loadedChapters < sorted.size) {
-                    val nextChapter = sorted.getOrNull(loadedChapters)
-                    loadChapterPages(nextChapter)
-                }
-            }
+        if (currentIndex < pages.size - 3) return
+        val chapterId = pages.getOrNull(currentIndex)?.chapterId ?: return
+        val chapter = _chapters.value.firstOrNull { it.id == chapterId } ?: return
+        val next = _chapters.value.getOrNull(_chapters.value.indexOf(chapter) + 1) ?: return
+        if (next.id !in loadedChapterIds) {
+            viewModelScope.launch { loadChapterPages(next) }
         }
     }
 
     fun goToChapter(chapter: Chapter) {
+        val index = _chapters.value.indexOf(chapter)
+        if (index < 0) return
         viewModelScope.launch {
+            currentChapterId = chapter.id
+            _currentChapterIndex.value = index
             _pages.value = emptyList()
             _imageStates.value = emptyMap()
             loadedChapterIds.clear()
-            _currentChapterIndex.value = _chapters.value.indexOf(chapter).coerceAtLeast(0)
+            _error.value = null
+            recordProgress(chapter)
+            _isLoading.value = true
             loadChapterPages(chapter)
+            _isLoading.value = false
             if (settings.value.continuousReading) prefetchNext()
         }
+    }
+
+    private fun recordProgress(chapter: Chapter) {
+        val manga = _manga.value ?: return
+        library.setProgress(
+            manga.key,
+            ReadingProgress(
+                chapterId = chapter.id,
+                chapterNumber = chapter.number,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
     }
 
     fun loadedCount(): Int = _imageStates.value.count { it.value is ImageState.Success }

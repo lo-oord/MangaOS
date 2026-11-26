@@ -28,13 +28,13 @@ class ModelRulesTest {
     }
 
     @Test
-    fun `the all filter only lists arabic english and japanese sources`() {
+    fun `the all filter lists every source language`() {
         assertTrue(LanguageFilter.ALL.matches(listOf("ar")))
         assertTrue(LanguageFilter.ALL.matches(listOf("en")))
         assertTrue(LanguageFilter.ALL.matches(listOf("ja")))
         assertTrue(LanguageFilter.ALL.matches(listOf("all")))
-        assertFalse(LanguageFilter.ALL.matches(listOf("fr")))
-        assertFalse(LanguageFilter.ALL.matches(listOf("pt-BR", "es")))
+        assertTrue(LanguageFilter.ALL.matches(listOf("fr")))
+        assertTrue(LanguageFilter.ALL.matches(listOf("pt-BR", "es")))
     }
 
     @Test
@@ -43,6 +43,8 @@ class ModelRulesTest {
         assertTrue(LanguageFilter.ARABIC.matches(listOf("ar", "en")))
         assertFalse(LanguageFilter.ARABIC.matches(listOf("en")))
         assertTrue(LanguageFilter.JAPANESE.matches(listOf("ja")))
+        assertTrue(LanguageFilter.ARABIC.matches(listOf("ar-EG")))
+        assertFalse(LanguageFilter.JAPANESE.matches(listOf("en")))
     }
 
     @Test

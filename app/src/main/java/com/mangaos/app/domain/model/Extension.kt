@@ -34,7 +34,34 @@ data class InstalledExtension(
     val sourceDir: String,
 )
 
-enum class ExtensionFailure { OFFLINE, NETWORK, INVALID_INDEX, EMPTY, PERMISSION, INSTALL, UNSUPPORTED }
+/**
+ * A source that was actually instantiated from an installed extension. This is the unit the
+ * Sources screen lists and every browse/search/read operation targets.
+ */
+data class SourceInfo(
+    val id: String,
+    val name: String,
+    val lang: String,
+    val pkgName: String,
+    val extensionName: String,
+    val versionName: String,
+    val isNsfw: Boolean,
+    val supportsLatest: Boolean,
+) {
+    val language: String get() = lang
+}
+
+enum class ExtensionFailure {
+    OFFLINE,
+    NETWORK,
+    INVALID_INDEX,
+    EMPTY,
+    PERMISSION,
+    INSTALL,
+    UNSUPPORTED,
+    INCOMPATIBLE,
+    NO_SOURCES,
+}
 
 /** Progress of one install job, keyed by package name. */
 sealed interface TransferState {
@@ -66,14 +93,15 @@ enum class LanguageFilter(val code: String) {
     ENGLISH("en"),
     JAPANESE("ja");
 
+    /**
+     * "All" lists every source regardless of language. A concrete filter accepts sources in
+     * that language and extension entries that cannot report a language.
+     */
     fun matches(languages: List<String>): Boolean {
-        val actual = languages.ifEmpty { listOf("all") }
-        if (this == ALL) return actual.any { it == "all" || it.lowercase() in SUPPORTED }
-        return "all" in actual || code in actual.map { it.lowercase() }
-    }
-
-    companion object {
-        private val SUPPORTED = setOf("ar", "en", "ja")
+        if (this == ALL) return true
+        val normalized = languages.map { it.lowercase() }.filter { it.isNotBlank() }
+        if (normalized.isEmpty() || "all" in normalized) return true
+        return normalized.any { it == code || it.startsWith("$code-") }
     }
 }
 

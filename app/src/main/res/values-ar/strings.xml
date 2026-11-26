@@ -194,7 +194,6 @@
     <string name="library_not_saved">غير موجود في مكتبتك</string>
     <string name="sources_filter_all">الكل</string>
     <string name="sources_refresh">تحديث المصادر</string>
-    <string name="sources_runtime_notice">يمكن تثبيت الإضافات وتحديثها. تشغيل شيفرتها يحتاج وقت تشغيل مصادر Mihon، وهو غير مضاف في هذا البناء بعد.</string>
     <string name="sources_install">تثبيت</string>
     <string name="sources_update">تحديث</string>
     <string name="sources_installed">مثبّت</string>
@@ -223,4 +222,17 @@
     <string name="error_age_min">يجب أن يكون عمرك ١٣ عاماً على الأقل</string>
     <string name="action_continue">متابعة</string>
     <string name="action_sign_in">تسجيل الدخول</string>
+    <string name="sources_section_sources">المصادر</string>
+    <string name="sources_section_extensions">الإضافات</string>
+    <string name="sources_open">فتح</string>
+    <string name="sources_incompatible_title">تعذر تشغيل الإضافات المثبتة</string>
+    <string name="sources_incompatible_body">إضافة غير متوافقة</string>
+    <string name="sources_no_usable_title">الإضافات المثبتة لا توفر مصادر قابلة للاستخدام</string>
+    <string name="sources_refresh_done">تم تحديث المصادر</string>
+    <string name="sources_refresh_failed">فشل التحديث: %1$s. تم الاحتفاظ بالقائمة الحالية.</string>
+    <string name="sources_refresh_failed_short">فشل التحديث. تم الاحتفاظ بالقائمة الحالية.</string>
+    <string name="state_no_usable_sources">لا توجد مصادر قابلة للاستخدام</string>
+    <string name="reader_chapter_error">تعذر تحميل صفحات الفصل</string>
+    <string name="info_webview_required">يتطلب هذا المصدر Android System WebView. ثبّته أو فعّله ثم أعد المحاولة.</string>
+    <string name="info_cloudflare_bypass_failure">تعذر على المصدر تجاوز حماية Cloudflare. حاول مرة أخرى لاحقًا.</string>
 </resources>

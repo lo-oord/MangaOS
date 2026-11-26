@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,10 +33,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
 import com.mangaos.app.core.ui.components.EmptyState
@@ -66,14 +68,23 @@ import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.ExtensionsState
 import com.mangaos.app.domain.model.LanguageFilter
 import com.mangaos.app.domain.model.ManagedExtension
+import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.TransferState
 
 @Composable
-fun SourcesScreen(modifier: Modifier = Modifier) {
+fun SourcesScreen(
+    onOpenSource: (SourceInfo) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val viewModel: SourcesViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sources by viewModel.sources.collectAsStateWithLifecycle()
     val transfers by viewModel.transfers.collectAsStateWithLifecycle()
+    val failures by viewModel.failures.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val refreshFailure by viewModel.failureState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbar = LocalSnackbarHostState.current
 
     var permissionDismissed by remember { mutableStateOf(false) }
     var pendingInstall by remember { mutableStateOf<ManagedExtension?>(null) }
@@ -93,6 +104,25 @@ fun SourcesScreen(modifier: Modifier = Modifier) {
         viewModel.reloadInstalled()
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            val message = when (event) {
+                SourcesEvent.Refreshed -> context.getString(R.string.sources_refresh_done)
+                is SourcesEvent.Failed -> context.getString(
+                    R.string.sources_refresh_failed,
+                    context.getString(
+                        when (event.failure) {
+                            ExtensionFailure.OFFLINE -> R.string.state_offline
+                            ExtensionFailure.INVALID_INDEX -> R.string.sources_index_error
+                            else -> R.string.state_source_unavailable
+                        },
+                    ),
+                )
+            }
+            snackbar.showSnackbar(message)
+        }
+    }
+
     fun requestInstall(extension: ManagedExtension) {
         if (viewModel.canInstallPackages()) {
             viewModel.install(extension)
@@ -106,6 +136,7 @@ fun SourcesScreen(modifier: Modifier = Modifier) {
         LanguageFilterRow(
             selected = viewModel.languageFilter,
             onSelect = viewModel::changeLanguageFilter,
+            refreshing = refreshing,
             onRefresh = viewModel::refresh,
         )
 
@@ -116,8 +147,8 @@ fun SourcesScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.sm),
         )
 
-        if (!viewModel.runtimeAvailable) {
-            RuntimeNotice()
+        refreshFailure?.let { failure ->
+            RefreshFailureBanner(failure = failure, onRetry = viewModel::refresh)
         }
 
         when (val current = state) {
@@ -135,32 +166,83 @@ fun SourcesScreen(modifier: Modifier = Modifier) {
                 )
             }
             is ExtensionsState.Content -> {
-                val entries = viewModel.visibleEntries(current.entries)
-                if (entries.isEmpty()) {
-                    EmptyState(
+                val visibleSources = viewModel.visibleSources(sources)
+                val visibleExtensions = viewModel.visibleExtensions(current.entries)
+                val installedExtensions = visibleExtensions.filter { it.isInstalled }
+                val failedExtensions = failures.filterKeys { pkg ->
+                    visibleExtensions.any { it.extension.pkgName == pkg }
+                }
+
+                when {
+                    visibleSources.isEmpty() && visibleExtensions.isEmpty() -> EmptyState(
                         icon = Icons.Outlined.SearchOff,
                         title = stringResource(
                             if (viewModel.query.isBlank()) R.string.sources_empty else R.string.search_no_results,
                         ),
                     )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            start = Spacing.screen,
-                            end = Spacing.screen,
-                            top = Spacing.xs,
-                            bottom = Spacing.xl,
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        items(entries, key = { it.extension.pkgName }) { entry ->
-                            SourceRow(
-                                entry = entry,
-                                transfer = transfers[entry.extension.pkgName],
-                                onInstall = { requestInstall(entry.extension) },
-                                onUninstall = { viewModel.uninstall(entry.extension.pkgName) },
-                            )
+
+                    visibleSources.isEmpty() && installedExtensions.isNotEmpty() &&
+                        failedExtensions.isNotEmpty() -> EmptyState(
+                        icon = Icons.Outlined.ErrorOutline,
+                        title = stringResource(R.string.sources_incompatible_title),
+                        actionLabel = stringResource(R.string.sources_refresh),
+                        onAction = viewModel::refresh,
+                    )
+
+                    visibleSources.isEmpty() && installedExtensions.isNotEmpty() -> EmptyState(
+                        icon = Icons.Outlined.Extension,
+                        title = stringResource(R.string.sources_no_usable_title),
+                        actionLabel = stringResource(R.string.sources_refresh),
+                        onAction = viewModel::refresh,
+                    )
+
+                    else -> {
+                        val iconByPackage = current.entries.associate {
+                            it.extension.pkgName to it.extension.iconUrl
+                        }
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                start = Spacing.screen,
+                                end = Spacing.screen,
+                                top = Spacing.xs,
+                                bottom = Spacing.xl,
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            if (visibleSources.isNotEmpty()) {
+                                item(key = "sources-header") {
+                                    SectionHeader(
+                                        title = stringResource(R.string.sources_section_sources),
+                                        count = visibleSources.size,
+                                    )
+                                }
+                                items(visibleSources, key = { "source:${it.id}" }) { source ->
+                                    SourceRow(
+                                        source = source,
+                                        iconUrl = iconByPackage[source.pkgName],
+                                        onOpen = { onOpenSource(source) },
+                                    )
+                                }
+                            }
+
+                            if (visibleExtensions.isNotEmpty()) {
+                                item(key = "extensions-header") {
+                                    SectionHeader(
+                                        title = stringResource(R.string.sources_section_extensions),
+                                        count = visibleExtensions.size,
+                                    )
+                                }
+                                items(visibleExtensions, key = { "extension:${it.extension.pkgName}" }) { entry ->
+                                    ExtensionRow(
+                                        entry = entry,
+                                        transfer = transfers[entry.extension.pkgName],
+                                        loadFailure = failures[entry.extension.pkgName],
+                                        onInstall = { requestInstall(entry.extension) },
+                                        onUninstall = { viewModel.uninstall(entry.extension.pkgName) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -194,12 +276,14 @@ fun SourcesScreen(modifier: Modifier = Modifier) {
             },
         )
     }
+
 }
 
 @Composable
 private fun LanguageFilterRow(
     selected: LanguageFilter,
     onSelect: (LanguageFilter) -> Unit,
+    refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
     Row(
@@ -230,44 +314,128 @@ private fun LanguageFilterRow(
             )
         }
         Spacer(Modifier.weight(1f))
-        AppIconButton(
-            icon = Icons.Outlined.Refresh,
-            contentDescription = stringResource(R.string.sources_refresh),
-            onClick = onRefresh,
-        )
+        if (refreshing) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .padding(horizontal = Spacing.md)
+                    .size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            AppIconButton(
+                icon = Icons.Outlined.Refresh,
+                contentDescription = stringResource(R.string.sources_refresh),
+                onClick = onRefresh,
+            )
+        }
     }
 }
 
 @Composable
-private fun RuntimeNotice() {
+private fun SectionHeader(title: String, count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.screen, vertical = Spacing.xs)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(Spacing.sm),
+            .padding(top = Spacing.sm, bottom = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Info,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp),
-        )
-        Spacer(Modifier.width(Spacing.sm))
         Text(
-            text = stringResource(R.string.sources_runtime_notice),
-            style = MaterialTheme.typography.labelSmall,
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
+private fun RefreshFailureBanner(failure: ExtensionFailure, onRetry: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen, vertical = Spacing.xs)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = stringResource(
+                if (failure == ExtensionFailure.OFFLINE) R.string.state_offline else R.string.sources_refresh_failed_short,
+            ),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetry) {
+            Text(stringResource(R.string.state_error_retry), color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
 private fun SourceRow(
+    source: SourceInfo,
+    iconUrl: String?,
+    onOpen: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onOpen)
+            .padding(vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ExtensionIcon(iconUrl)
+        Spacer(Modifier.width(Spacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = source.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = buildString {
+                    append(languageName(source.lang))
+                    append(" · ").append(source.extensionName)
+                    if (source.versionName.isNotBlank()) append(" · v").append(source.versionName)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        TextButton(onClick = onOpen) {
+            Text(stringResource(R.string.sources_open), color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun ExtensionRow(
     entry: ExtensionEntry,
     transfer: TransferState?,
+    loadFailure: String?,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
 ) {
@@ -278,28 +446,7 @@ private fun SourceRow(
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (extension.iconUrl != null) {
-                AsyncImage(
-                    model = extension.iconUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.Extension,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
+        ExtensionIcon(extension.iconUrl)
 
         Spacer(Modifier.width(Spacing.md))
 
@@ -316,7 +463,7 @@ private fun SourceRow(
             Text(
                 text = buildString {
                     append(languageLabel(extension.languages))
-                    append(" · v").append(extension.versionName)
+                    if (extension.versionName.isNotBlank()) append(" · v").append(extension.versionName)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -328,6 +475,14 @@ private fun SourceRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 1,
+                )
+            } else if (entry.isInstalled && loadFailure != null) {
+                Text(
+                    text = stringResource(R.string.sources_incompatible_body),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -372,6 +527,32 @@ private fun SourceRow(
 }
 
 @Composable
+private fun ExtensionIcon(iconUrl: String?) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (iconUrl != null) {
+            AsyncImage(
+                model = iconUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.Extension,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun StatusPill(label: String, loading: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (loading) {
@@ -406,19 +587,4 @@ private fun languageName(code: String): String = when (code.lowercase()) {
     "ja" -> stringResource(R.string.language_japanese)
     "en" -> stringResource(R.string.language_english)
     else -> code.uppercase()
-}
-
-@Composable
-private fun StatusPillText(text: String) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 1.dp),
-        )
-    }
 }

@@ -16,6 +16,7 @@ import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.ExtensionsState
 import com.mangaos.app.domain.model.InstalledExtension
 import com.mangaos.app.domain.model.ManagedExtension
+import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.TransferState
 import com.mangaos.app.domain.repository.ExtensionRepository
 import java.io.File
@@ -32,6 +33,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -45,13 +48,8 @@ import kotlinx.coroutines.withContext
  * The extension catalogue and its lifecycle: fetch the index, detect what is installed,
  * download an APK, verify it, hand it to the system installer, update and remove.
  *
- * The repository index itself is an implementation detail: it is embedded here so the
- * Sources screen can only ever show sources.
- *
- * Note on execution: Keiyoushi extensions are compiled against the Mihon extension API
- * with every shared library marked `compileOnly`, so their code needs a host that
- * implements `HttpSource` and the network helpers. This build manages (installs,
- * updates, removes) extensions but does not execute them yet, and says so in the UI.
+ * Installed extensions are executed by [MihonRuntime]; this class owns discovery, the
+ * catalogue, install state and the source/extension state the Sources screen renders.
  */
 class ExtensionStore(
     private val context: Context,
@@ -64,14 +62,26 @@ class ExtensionStore(
 
     private val catalogue = MutableStateFlow<List<ManagedExtension>?>(null)
     private val failure = MutableStateFlow<ExtensionFailure?>(null)
+    private val refreshFailure = MutableStateFlow<ExtensionFailure?>(null)
 
     private val _installed = MutableStateFlow<Map<String, InstalledExtension>>(emptyMap())
-    override val installed: StateFlow<Map<String, InstalledExtension>> = _installed
+    override val installed: StateFlow<Map<String, InstalledExtension>> = _installed.asStateFlow()
 
     private val _transfers = MutableStateFlow<Map<String, TransferState>>(emptyMap())
-    override val transfers: StateFlow<Map<String, TransferState>> = _transfers
+    override val transfers: StateFlow<Map<String, TransferState>> = _transfers.asStateFlow()
 
-    override val runtimeAvailable: Boolean = false
+    private val _sources = MutableStateFlow<List<SourceInfo>>(emptyList())
+    override val sources: StateFlow<List<SourceInfo>> = _sources.asStateFlow()
+
+    private val _failures = MutableStateFlow<Map<String, String>>(emptyMap())
+    override val failures: StateFlow<Map<String, String>> = _failures.asStateFlow()
+
+    private val _refreshing = MutableStateFlow(false)
+    override val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    override val failureState: StateFlow<ExtensionFailure?> = refreshFailure.asStateFlow()
+
+    override val runtimeAvailable: Boolean = true
 
     override val state: StateFlow<ExtensionsState> =
         combine(catalogue, _installed, failure) { entries, installedNow, failed ->
@@ -86,6 +96,12 @@ class ExtensionStore(
 
     init {
         scope.launch {
+            MihonRuntime.sources.collect { _sources.value = it }
+        }
+        scope.launch {
+            MihonRuntime.failures.collect { _failures.value = it }
+        }
+        scope.launch {
             refreshInstalled()
             refresh(force = false)
         }
@@ -96,33 +112,48 @@ class ExtensionStore(
             val fresh = System.currentTimeMillis() - lastRefreshAt < CACHE_TTL_MS
             if (!force && fresh && catalogue.value != null) return
             if (catalogue.value == null) failure.value = null
+            _refreshing.value = true
+            try {
+                val online = runCatching { withContext(Dispatchers.IO) { fetchBytes(MihonIndexParser.INDEX_URL) } }
+                val payload = online.getOrNull() ?: runCatching { indexFile.takeIf { it.exists() }?.readBytes() }.getOrNull()
 
-            val online = runCatching { withContext(Dispatchers.IO) { fetchBytes(MihonIndexParser.INDEX_URL) } }
-            val payload = online.getOrNull() ?: runCatching { indexFile.takeIf { it.exists() }?.readBytes() }.getOrNull()
-
-            if (payload == null) {
-                failure.value = classify(online.exceptionOrNull())
-                return
-            }
-
-            val parsed = runCatching { MihonIndexParser.parse(payload) }
-            val entries = parsed.getOrNull()
-            if (entries.isNullOrEmpty()) {
-                failure.value = ExtensionFailure.INVALID_INDEX
-                return
-            }
-
-            if (online.isSuccess) {
-                runCatching {
-                    indexFile.parentFile?.mkdirs()
-                    indexFile.writeBytes(payload)
+                if (payload == null) {
+                    val classified = classify(online.exceptionOrNull())
+                    if (catalogue.value == null) {
+                        failure.value = classified
+                    } else {
+                        refreshFailure.value = classified
+                    }
+                    return
                 }
-            }
 
-            lastRefreshAt = System.currentTimeMillis()
-            failure.value = null
-            catalogue.value = entries
-            refreshInstalled()
+                val parsed = runCatching { MihonIndexParser.parse(payload) }
+                val entries = parsed.getOrNull()
+                if (entries.isNullOrEmpty()) {
+                    val classified = ExtensionFailure.INVALID_INDEX
+                    if (catalogue.value == null) {
+                        failure.value = classified
+                    } else {
+                        refreshFailure.value = classified
+                    }
+                    return
+                }
+
+                if (online.isSuccess) {
+                    runCatching {
+                        indexFile.parentFile?.mkdirs()
+                        indexFile.writeBytes(payload)
+                    }
+                }
+
+                lastRefreshAt = System.currentTimeMillis()
+                failure.value = null
+                refreshFailure.value = null
+                catalogue.value = entries
+                refreshInstalled()
+            } finally {
+                _refreshing.value = false
+            }
         }
     }
 
@@ -154,10 +185,12 @@ class ExtensionStore(
                 return@launch
             }
 
-            delay(400)
+            delay(600)
             refreshInstalled()
             setTransfer(extension.pkgName, TransferState.Installed)
-            delay(4000)
+            delay(1500)
+            refreshInstalled()
+            delay(2500)
             clearTransfer(extension.pkgName)
         }
     }
@@ -183,6 +216,9 @@ class ExtensionStore(
     private suspend fun refreshInstalled() {
         val map = withContext(Dispatchers.IO) { queryInstalled() }
         _installed.value = map
+        // The runtime re-instantiates only packages that changed; unchanged sources keep
+        // their state (cookies, filter state) across a refresh.
+        runCatching { MihonRuntime.reload(context, map.mapValues { it.value.versionCode }) }
         // Drop finished install entries so the list returns to its normal actions.
         _transfers.update { transfers ->
             transfers.filterValues { it !is TransferState.Installed }
@@ -206,6 +242,10 @@ class ExtensionStore(
         val unlisted = installedNow.values
             .filter { it.pkgName !in known }
             .map { info ->
+                val languages = _sources.value
+                    .filter { it.pkgName == info.pkgName }
+                    .map { it.lang }
+                    .distinct()
                 ExtensionEntry(
                     extension = ManagedExtension(
                         name = info.label,
@@ -215,7 +255,7 @@ class ExtensionStore(
                         libVersion = "",
                         versionCode = info.versionCode,
                         versionName = info.versionName,
-                        languages = emptyList(),
+                        languages = languages,
                         contentWarning = 0,
                     ),
                     installed = info,
@@ -228,12 +268,16 @@ class ExtensionStore(
     private fun queryInstalled(): Map<String, InstalledExtension> {
         val pm = context.packageManager
         return runCatching {
-            pm.getInstalledPackages(PackageManager.GET_META_DATA)
+            pm.getInstalledPackages(PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS)
                 .mapNotNull { info ->
                     val app = info.applicationInfo ?: return@mapNotNull null
                     val metadata = app.metaData
-                    val isExtension = info.packageName.startsWith(EXTENSION_PACKAGE_PREFIX) ||
-                        metadata?.containsKey(METADATA_SOURCE_CLASS) == true
+                    val declaresExtensionFeature = info.reqFeatures
+                        ?.any { it.name == EXTENSION_FEATURE } == true
+                    val isExtension = declaresExtensionFeature ||
+                        info.packageName.startsWith(EXTENSION_PACKAGE_PREFIX) ||
+                        metadata?.containsKey(METADATA_SOURCE_CLASS) == true ||
+                        metadata?.containsKey(METADATA_SOURCE_FACTORY) == true
                     if (!isExtension) return@mapNotNull null
                     val label = metadata?.getString(METADATA_NAME)
                         ?: runCatching { app.loadLabel(pm).toString() }.getOrDefault(info.packageName)
@@ -270,8 +314,8 @@ class ExtensionStore(
         val archiveCode = PackageInfoCompat.getLongVersionCode(info)
         require(archiveCode >= extension.versionCode) { "APK is older than the catalogue entry" }
 
-        // No per-APK hash is published in the index; the digest is only used to make a
-        // corrupted download detectable by file size and install verification.
+        // The index does not publish a per-APK digest; the download is validated by size,
+        // package name, version and the system installer's signature/verification pass.
         require(bytes.sha256().isNotEmpty()) { "Empty APK" }
         destination
     }
@@ -375,8 +419,10 @@ class ExtensionStore(
     }
 
     companion object {
+        private const val EXTENSION_FEATURE = "tachiyomi.extension"
         private const val EXTENSION_PACKAGE_PREFIX = "eu.kanade.tachiyomi.extension."
         private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
+        private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
         private const val METADATA_NAME = "tachiyomix.name"
         private const val ACTION_INSTALL_RESULT = "com.mangaos.app.extension.INSTALL_RESULT"
         private const val CONNECT_TIMEOUT_MS = 20_000

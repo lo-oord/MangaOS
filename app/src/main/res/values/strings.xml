@@ -207,7 +207,6 @@
     <string name="library_not_saved">Not in your library</string>
     <string name="sources_filter_all">All</string>
     <string name="sources_refresh">Refresh sources</string>
-    <string name="sources_runtime_notice">Extensions can be installed and kept up to date. Running their code needs the Mihon source runtime, which is not part of this build yet.</string>
     <string name="sources_install">Install</string>
     <string name="sources_update">Update</string>
     <string name="sources_installed">Installed</string>
@@ -236,4 +235,17 @@
     <string name="error_age_min">You must be at least 13 years old</string>
     <string name="action_continue">Continue</string>
     <string name="action_sign_in">Sign in</string>
+    <string name="sources_section_sources">Sources</string>
+    <string name="sources_section_extensions">Extensions</string>
+    <string name="sources_open">Open</string>
+    <string name="sources_incompatible_title">Installed extensions could not be started</string>
+    <string name="sources_incompatible_body">Incompatible extension</string>
+    <string name="sources_no_usable_title">Installed extensions provide no usable sources</string>
+    <string name="sources_refresh_done">Sources refreshed</string>
+    <string name="sources_refresh_failed">Refresh failed: %1$s. The current list was kept.</string>
+    <string name="sources_refresh_failed_short">Refresh failed. Current list kept.</string>
+    <string name="state_no_usable_sources">No usable sources</string>
+    <string name="reader_chapter_error">Chapter pages could not be loaded</string>
+    <string name="info_webview_required">Android System WebView is required to open this source. Install or enable it, then retry.</string>
+    <string name="info_cloudflare_bypass_failure">The source could not get past Cloudflare protection. Try again later.</string>
 </resources>

@@ -7,14 +7,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.ExtensionEntry
+import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.ExtensionsState
 import com.mangaos.app.domain.model.LanguageFilter
 import com.mangaos.app.domain.model.ManagedExtension
+import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.TransferState
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+sealed interface SourcesEvent {
+    data object Refreshed : SourcesEvent
+    data class Failed(val failure: ExtensionFailure) : SourcesEvent
+}
 
 class SourcesViewModel : ViewModel() {
 
@@ -23,10 +33,25 @@ class SourcesViewModel : ViewModel() {
     val state: StateFlow<ExtensionsState> = extensions.state
         .stateIn(viewModelScope, SharingStarted.Eagerly, ExtensionsState.Loading)
 
+    val sources: StateFlow<List<SourceInfo>> = extensions.sources
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val transfers: StateFlow<Map<String, TransferState>> = extensions.transfers
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
+    val failures: StateFlow<Map<String, String>> = extensions.failures
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val refreshing: StateFlow<Boolean> = extensions.refreshing
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val failureState: StateFlow<ExtensionFailure?> = extensions.failureState
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     val runtimeAvailable: Boolean = extensions.runtimeAvailable
+
+    private val _events = MutableSharedFlow<SourcesEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<SourcesEvent> = _events.asSharedFlow()
 
     var query by mutableStateOf("")
         private set
@@ -43,7 +68,17 @@ class SourcesViewModel : ViewModel() {
     }
 
     fun refresh() {
-        viewModelScope.launch { extensions.refresh(force = true) }
+        if (refreshing.value) return
+        viewModelScope.launch {
+            runCatching { extensions.refresh(force = true) }
+            val failure = extensions.failureState.value
+                ?: (extensions.state.value as? ExtensionsState.Error)?.failure
+            if (failure != null) {
+                _events.emit(SourcesEvent.Failed(failure))
+            } else {
+                _events.emit(SourcesEvent.Refreshed)
+            }
+        }
     }
 
     fun reloadInstalled() = extensions.reloadInstalled()
@@ -54,13 +89,24 @@ class SourcesViewModel : ViewModel() {
 
     fun uninstall(pkgName: String) = extensions.uninstall(pkgName)
 
-    fun visibleEntries(entries: List<ExtensionEntry>): List<ExtensionEntry> {
+    fun visibleSources(all: List<SourceInfo>): List<SourceInfo> {
+        val trimmed = query.trim()
+        return all.filter { source ->
+            languageFilter.matches(listOf(source.lang)) &&
+                (trimmed.isEmpty() ||
+                    source.name.contains(trimmed, ignoreCase = true) ||
+                    source.extensionName.contains(trimmed, ignoreCase = true))
+        }
+    }
+
+    fun visibleExtensions(entries: List<ExtensionEntry>): List<ExtensionEntry> {
         val trimmed = query.trim()
         return entries.filter { entry ->
-            val matchesQuery = trimmed.isEmpty() ||
-                entry.extension.name.contains(trimmed, ignoreCase = true) ||
-                entry.extension.baseUrls.any { it.contains(trimmed, ignoreCase = true) }
-            matchesQuery && languageFilter.matches(entry.extension.languages)
+            languageFilter.matches(entry.extension.languages) &&
+                (trimmed.isEmpty() ||
+                    entry.extension.name.contains(trimmed, ignoreCase = true) ||
+                    entry.extension.pkgName.contains(trimmed, ignoreCase = true) ||
+                    entry.extension.baseUrls.any { it.contains(trimmed, ignoreCase = true) })
         }
     }
 }

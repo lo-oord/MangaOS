@@ -194,7 +194,6 @@
     <string name="library_not_saved">ライブラリにありません</string>
     <string name="sources_filter_all">すべて</string>
     <string name="sources_refresh">ソースを更新</string>
-    <string name="sources_runtime_notice">拡張機能のインストールと更新はできます。実行には Mihon のソースランタイムが必要で、このビルドにはまだ含まれていません。</string>
     <string name="sources_install">インストール</string>
     <string name="sources_update">更新</string>
     <string name="sources_installed">インストール済み</string>
@@ -223,4 +222,17 @@
     <string name="error_age_min">13 歳以上である必要があります</string>
     <string name="action_continue">続ける</string>
     <string name="action_sign_in">ログイン</string>
+    <string name="sources_section_sources">ソース</string>
+    <string name="sources_section_extensions">拡張機能</string>
+    <string name="sources_open">開く</string>
+    <string name="sources_incompatible_title">インストール済みの拡張機能を開始できませんでした</string>
+    <string name="sources_incompatible_body">互換性のない拡張機能</string>
+    <string name="sources_no_usable_title">インストール済みの拡張機能に使用できるソースがありません</string>
+    <string name="sources_refresh_done">ソースを更新しました</string>
+    <string name="sources_refresh_failed">更新に失敗しました: %1$s。現在の一覧は保持されています。</string>
+    <string name="sources_refresh_failed_short">更新に失敗しました。現在の一覧は保持されています。</string>
+    <string name="state_no_usable_sources">使用できるソースがありません</string>
+    <string name="reader_chapter_error">チャプターのページを読み込めませんでした</string>
+    <string name="info_webview_required">このソースを開くには Android System WebView が必要です。インストールまたは有効化してから再試行してください。</string>
+    <string name="info_cloudflare_bypass_failure">ソースが Cloudflare の保護を通過できませんでした。しばらくしてから再試行してください。</string>
 </resources>

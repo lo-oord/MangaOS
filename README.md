@@ -47,10 +47,11 @@ app/src/main/java/com/mangaos/app/
 - المستخدم يرى المصادر فقط: لا يظهر اسم المستودع ولا رابطه ولا صيغة الفهرس في أي مكان.
 - التثبيت يمرّ عبر `PackageInstaller` بعد فحص اسم الحزمة وإصدار الـ APK، وبعد موافقة المستخدم
   على «تثبيت التطبيقات غير المعروفة» (`ACTION_MANAGE_UNKNOWN_APP_SOURCES`).
-- **قيود وقت التشغيل**: إضافات Mihon تُبنى مقابل `source-api` بـ `compileOnly`، أي أن التطبيق
-  المضيف يجب أن يوفّر تنفيذ `HttpSource` وشبكته. هذا البناء يدير دورة حياة الإضافات وينفّذ
-  التثبيت والتحديث والحذف فعلياً، لكنه لا يشغّل شيفرة الإضافات بعد؛ لذلك تعرض شاشات التصفح
-  حالة «المصدر غير متاح» مع إعادة المحاولة بدلاً من بيانات وهمية.
+- **وقت التشغيل**: التطبيق يضمّ تنفيذ Mihon الحقيقي (`source-api` + `core-common`) ويسجّل
+  الخدمات التي تحقنها الإضافات (Context، `NetworkHelper`، OkHttp، Jsoup، RxJava، Injekt،
+  QuickJS). تُحمَّل حزم الإضافات المثبتة بـ `DelegateLastClassLoader`، وتُقرأ الفئات المعلنة في
+  بيان الإضافة فقط. كل طلب بحث/تفاصيل/فصول/صور يمر عبر `MihonRuntime`، والفشل في إضافة واحدة
+  لا يعطّل البقية. راجع «Sources and Mihon extensions» أدناه للتفاصيل.
 
 ## البناء والتوقيع
 
@@ -80,7 +81,37 @@ tools/setup-signing.sh owner/repo # أو حدّد المستودع صراحةً
 ## ما لا يزال ناقصاً
 
 - لا مصادقة حقيقية (Firebase/Google)؛ التحقق من البريد محلي بوضوح.
-- لا تنفيذ لشيفرة إضافات Mihon (انظر «قيود وقت التشغيل» أعلاه)، وبالتالي لا قراءة صفحات
-  ولا تنزيل فعلي بعد.
+- بعض المصادر تحتاج تسجيل دخول تفاعلي أو WebView؛ لا توجد شاشة تسجيل دخول بعد، لذلك تعمل
+  المصادر التي لا تتطلب ذلك فقط.
 - الإشعارات داخل التطبيق فقط، وليست إشعارات نظام.
 - لا بيانات تجريبية: التطبيق لا يعرض أي مانجا من صنعه.
+
+## Sources and Mihon extensions
+
+MangaOS loads the same extension APKs that Mihon/Keiyoushi publish and runs their source code
+inside the app; it does not scrape the sites itself.
+
+- The extension catalogue is the Keiyoushi `index.pb`. The parser reads the repository's
+  nested container (`field 101 -> repeated field 1`) and still accepts the older flat layout.
+- Installing/updating downloads the APK, verifies package name, version and size, and hands it
+  to Android's `PackageInstaller`. Removing uses the system uninstall dialog.
+- Installed APKs are loaded with a delegate-last class loader (child-first below Android 8).
+  Extensions resolve the real Mihon API (`source-api` + `core-common`), OkHttp, Jsoup, RxJava
+  and Injekt from the host, exactly as they do inside Mihon.
+- Only classes declared in the extension manifest (`tachiyomi.extension.class` /
+  `tachiyomi.extension.factory`) are instantiated. A broken extension is reported in the
+  Sources screen and never stops the other extensions from loading.
+- Every browse/search/detail/chapter/page call goes through `MihonRuntime`, serialized per
+  source because extension sources are stateful. Images are fetched by the reader with the
+  headers the source requires (Referer/User-Agent/cookies).
+
+The Sources screen lists the sources that actually loaded, plus the extension catalogue with
+install/update/remove actions, language filters, live search and distinct loading, empty,
+offline, error, incompatible and no-usable-source states.
+
+### Known limits
+
+- Extension installation requires the "install unknown apps" permission for MangaOS.
+- Some extensions need a WebView (Cloudflare) or a source login; sign-in screens are not
+  implemented, so only sources that work without interactive login are usable.
+- The size of the extension index and APK downloads is capped (4 MiB / 40 MiB).

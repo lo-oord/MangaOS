@@ -12,6 +12,7 @@ import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.NotificationType
 import com.mangaos.app.domain.model.ReadingProgress
+import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.StoredWork
 import com.mangaos.app.domain.model.TransferState
 import com.mangaos.app.domain.model.UserProfile
@@ -27,9 +28,15 @@ interface MangaRepository {
     /** Aggregated across every installed source, used by the "Manga" tab. */
     suspend fun catalogue(): List<Manga>
 
+    /** Aggregated search across every installed source. */
+    suspend fun searchAll(query: String, page: Int = 1): List<Manga>
+
     suspend fun byId(sourceId: String, mangaId: String): Manga?
     suspend fun chapters(sourceId: String, mangaId: String): List<Chapter>
     suspend fun pages(sourceId: String, mangaId: String, chapterId: String): List<String>
+
+    /** Headers the source requires when fetching its images (Referer/User-Agent/cookies). */
+    fun imageHeaders(sourceId: String): Map<String, String>
 }
 
 /** A failure that belongs to the source itself, never to the screen. */
@@ -42,6 +49,18 @@ interface ExtensionRepository {
     val state: StateFlow<ExtensionsState>
     val installed: StateFlow<Map<String, InstalledExtension>>
     val transfers: StateFlow<Map<String, TransferState>>
+
+    /** Sources instantiated from installed extensions by the Mihon runtime. */
+    val sources: StateFlow<List<SourceInfo>>
+
+    /** Installed extension package -> load failure, so broken extensions stay isolated. */
+    val failures: StateFlow<Map<String, String>>
+
+    /** True while the extension index is being refreshed (force refresh included). */
+    val refreshing: StateFlow<Boolean>
+
+    /** Last refresh failure; the previously loaded catalogue is kept when this is set. */
+    val failureState: StateFlow<ExtensionFailure?>
 
     /** True when this build can execute extension code, not only install it. */
     val runtimeAvailable: Boolean
@@ -128,7 +147,7 @@ interface SettingsRepository {
     val darkMode: Flow<Boolean?>
     val onboardingCompleted: Flow<Boolean>
     val viewMode: Flow<MangaViewMode>
-    /** Package name of the source shown in the Latest tab, or null for the first usable one. */
+    /** Source id shown in the Latest tab, or null for the first usable source. */
     val latestSourceId: Flow<String?>
 
     suspend fun setLanguage(language: String)
