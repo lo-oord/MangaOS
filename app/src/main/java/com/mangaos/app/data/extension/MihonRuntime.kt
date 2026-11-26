@@ -1,20 +1,24 @@
 package com.mangaos.app.data.extension
 
+import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.preference.PreferenceManager
 import com.mangaos.app.domain.model.SourceInfo
-import dalvik.system.DelegateLastClassLoader
 import dalvik.system.PathClassLoader
+import eu.kanade.tachiyomi.network.AndroidCookieJar
 import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
-import eu.kanade.tachiyomi.network.PREF_DOH_CLOUDFLARE
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 import eu.kanade.tachiyomi.source.online.HttpSource
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.net.URL
 import java.util.Collections
 import java.util.Enumeration
@@ -27,9 +31,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialFormat
+import kotlinx.serialization.StringFormat
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.protobuf.ProtoBuf
+import nl.adaptivity.xmlutil.XmlDeclMode
+import nl.adaptivity.xmlutil.core.XmlVersion
+import nl.adaptivity.xmlutil.serialization.XML
+import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import tachiyomi.core.common.preference.AndroidPreferenceStore
+import tachiyomi.core.common.preference.PreferenceStore
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.addSingleton
 
@@ -104,37 +116,56 @@ object MihonRuntime {
         if (hostReady) return
         synchronized(this) {
             if (hostReady) return
-            val app = context.applicationContext
-            appContext = app
-            Injekt.addSingleton(app)
-            (app as? android.app.Application)?.let { Injekt.addSingleton(it) }
+            val application = context.applicationContext as Application
+            appContext = application
+            Injekt.addSingleton<Application>(application)
+            Injekt.addSingleton<Context>(application)
             hostReady = true
         }
     }
 
-    private fun requireContext(): Context =
-        appContext ?: throw IllegalStateException("MihonRuntime.initialize() was not called")
-
     /**
-     * Builds the shared services extensions inject. Must run off the main thread because it
-     * creates the cookie jar and the OkHttp client.
+     * Builds every service a Mihon extension may inject. Keiyoushi sources resolve all of these
+     * from the host: a missing binding fails the first source call even though the APK loaded.
+     * This mirrors DropSauce's host bridge instead of registering only [NetworkHelper].
      */
     private fun ensureHostNetwork(context: Context) {
         if (networkReady) return
         synchronized(this) {
             if (networkReady) return
-            val preferenceStore = AndroidPreferenceStore(context)
+            val application = context.applicationContext as Application
+            val sharedPreferences: SharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(context)
+            val preferenceStore = AndroidPreferenceStore(context, sharedPreferences)
             val networkPreferences = NetworkPreferences(preferenceStore, isDebugBuild = false)
-            if (networkPreferences.dohProvider.get() == -1) {
-                // Resolve through a public DoH provider instead of the device resolver,
-                // which is what Mihon does when DoH is unset.
-                networkPreferences.dohProvider.set(PREF_DOH_CLOUDFLARE)
-            }
+            // Do not force a DoH provider. Mihon leaves this at the user's/default choice; forcing
+            // Cloudflare DoH makes every source unreachable on networks where it is blocked.
             val networkHelper = NetworkHelper(GlobalScope, context, networkPreferences)
-            Injekt.addSingleton(networkHelper)
-            Injekt.addSingleton(networkHelper.client)
-            Injekt.addSingleton(Json { ignoreUnknownKeys = true })
-            Injekt.addSingleton(JavaScriptEngine(context))
+            val json = Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+            }
+            val xml = XML.v1 {
+                policy {
+                    ignoreUnknownChildren()
+                    autoPolymorphic = true
+                }
+                xmlDeclMode = XmlDeclMode.Charset
+                xmlVersion = XmlVersion.XML10
+                setIndent(2)
+            }
+            Injekt.addSingleton<NetworkHelper>(networkHelper)
+            Injekt.addSingleton<OkHttpClient>(networkHelper.client)
+            Injekt.addSingleton<CookieJar>(networkHelper.client.cookieJar)
+            Injekt.addSingleton<AndroidCookieJar>(networkHelper.cookieJar)
+            Injekt.addSingleton<SharedPreferences>(sharedPreferences)
+            Injekt.addSingleton<PreferenceStore>(preferenceStore)
+            Injekt.addSingleton<Json>(json)
+            Injekt.addSingleton<StringFormat>(json)
+            Injekt.addSingleton<SerialFormat>(json)
+            Injekt.addSingleton<ProtoBuf>(ProtoBuf)
+            Injekt.addSingleton<XML>(xml)
+            Injekt.addSingleton<JavaScriptEngine>(JavaScriptEngine(application))
             networkReady = true
         }
     }
@@ -235,12 +266,12 @@ object MihonRuntime {
         val metaData = appInfo.metaData ?: error("Extension has no manifest metadata")
 
         val classNameList = metaData.getString(METADATA_SOURCE_CLASS)
-            ?.split(";")
+            ?.split(';', ':', ',')
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
             .orEmpty()
         val factoryList = metaData.getString(METADATA_SOURCE_FACTORY)
-            ?.split(";")
+            ?.split(';', ':', ',')
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
             .orEmpty()
@@ -343,52 +374,61 @@ private fun createExtensionClassLoader(
     dexPath: String,
     librarySearchPath: String?,
     parent: ClassLoader,
-): ClassLoader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-    DelegateLastClassLoader(dexPath, librarySearchPath, parent)
-} else {
-    DelegateLastPathClassLoader(dexPath, librarySearchPath, parent)
-}
+): ClassLoader = ChildFirstPathClassLoader(dexPath, librarySearchPath, parent)
 
-private class DelegateLastPathClassLoader(
+/**
+ * Loads framework/host classes from the app first, then the extension's own DEX, then the
+ * remaining parent classes. The source APK references the Mihon API as compileOnly, so host
+ * types must stay single-instance while the extension's generated source class must win over
+ * any same-named class elsewhere.
+ */
+private class ChildFirstPathClassLoader(
     dexPath: String,
     librarySearchPath: String?,
     parent: ClassLoader,
 ) : PathClassLoader(dexPath, librarySearchPath, parent) {
 
-    private val bootClassLoader: ClassLoader? = Any::class.java.classLoader
+    private val systemClassLoader: ClassLoader? = getSystemClassLoader()
 
-    override fun loadClass(name: String?, resolve: Boolean): Class<*> {
-        val className = name ?: throw ClassNotFoundException("null class name")
-        findLoadedClass(className)?.let { return it }
-        val boot = bootClassLoader
-        if (boot != null) {
-            try {
-                return boot.loadClass(className)
-            } catch (_: ClassNotFoundException) {
-                // Fall through to the extension DEX.
+    override fun loadClass(name: String, resolve: Boolean): Class<*> {
+        var loadedClass = findLoadedClass(name)
+
+        val systemLoader = systemClassLoader
+        if (loadedClass == null && systemLoader != null) {
+            loadedClass = runCatching { systemLoader.loadClass(name) }.getOrNull()
+        }
+
+        if (loadedClass == null) {
+            loadedClass = runCatching { findClass(name) }.getOrElse {
+                super.loadClass(name, resolve)
             }
         }
-        return try {
-            findClass(className)
-        } catch (dexError: ClassNotFoundException) {
-            try {
-                parent.loadClass(className)
-            } catch (_: ClassNotFoundException) {
-                throw dexError
-            }
+
+        if (resolve) {
+            resolveClass(loadedClass)
         }
+
+        return loadedClass
     }
 
-    override fun getResource(name: String?): URL? =
-        bootClassLoader?.getResource(name) ?: findResource(name) ?: parent?.getResource(name)
+    override fun getResource(name: String): URL? =
+        systemClassLoader?.getResource(name) ?: findResource(name) ?: super.getResource(name)
 
-    override fun getResources(name: String?): Enumeration<URL> {
-        val resourceName = name ?: return Collections.emptyEnumeration()
-        val resources = buildList {
-            bootClassLoader?.getResources(resourceName)?.let { addAll(it.toList()) }
-            findResources(resourceName)?.let { addAll(it.toList()) }
-            parent?.getResources(resourceName)?.let { addAll(it.toList()) }
+    override fun getResources(name: String): Enumeration<URL> {
+        val systemUrls = systemClassLoader?.getResources(name)
+        val localUrls = findResources(name)
+        val parentUrls = parent?.getResources(name)
+        val urls = buildList {
+            while (systemUrls?.hasMoreElements() == true) add(systemUrls.nextElement())
+            while (localUrls?.hasMoreElements() == true) add(localUrls.nextElement())
+            while (parentUrls?.hasMoreElements() == true) add(parentUrls.nextElement())
         }
-        return Collections.enumeration(resources)
+        return Collections.enumeration(urls)
+    }
+
+    override fun getResourceAsStream(name: String): InputStream? = try {
+        getResource(name)?.openStream()
+    } catch (_: IOException) {
+        null
     }
 }

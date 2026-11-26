@@ -163,11 +163,20 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.brotli)
     implementation(libs.okhttp.dnsoverhttps)
+    // Modern Keiyoushi extensions reference OkHttp's zstd codecs directly. The extension
+    // APK compiles them as host-provided classes, so the host must ship this artifact.
+    implementation(libs.okhttp.zstd)
     implementation(libs.okio)
     implementation(libs.jsoup)
     implementation(libs.injekt)
     implementation(libs.rxjava)
     implementation(libs.kotlinx.serialization.json)
+    // Extensions use the okio bridge for page/list JSON and the protobuf/XML formats when
+    // their source declares them. These are host dependencies, not bundled in the APK.
+    implementation(libs.kotlinx.serialization.json.okio)
+    implementation(libs.kotlinx.serialization.protobuf)
+    implementation(libs.xmlutil.core)
+    implementation(libs.xmlutil.serialization)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.quickjs.android)
     // Loaded by core-common's Cloudflare/WebView interceptors at runtime.

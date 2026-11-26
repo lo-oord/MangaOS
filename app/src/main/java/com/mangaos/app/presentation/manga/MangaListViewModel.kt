@@ -10,7 +10,9 @@ import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,7 +78,10 @@ class MangaListViewModel : ViewModel() {
                     _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
                 }
             } catch (error: CancellationException) {
-                throw error
+                // Only a real scope cancellation should terminate the job. A source timeout
+                // arrives as TimeoutCancellationException while this coroutine is still active.
+                if (!currentCoroutineContext().isActive) throw error
+                if (query.trim() == trimmed) _state.value = UiState.Error()
             } catch (_: Throwable) {
                 if (query.trim() == trimmed) _state.value = UiState.Error()
             }
@@ -101,7 +106,8 @@ class MangaListViewModel : ViewModel() {
                     _state.value = if (list.isEmpty()) UiState.Empty else UiState.Content(list)
                 }
             } catch (error: CancellationException) {
-                throw error
+                if (!currentCoroutineContext().isActive) throw error
+                if (query.isBlank()) _state.value = UiState.Error()
             } catch (_: Throwable) {
                 if (query.isBlank()) _state.value = UiState.Error()
             }

@@ -1,7 +1,9 @@
 package com.mangaos.app.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.mangaos.app.data.extension.MihonRuntime
+import com.mangaos.app.data.extension.MihonSourceMetadataStore
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.Manga
@@ -24,9 +26,12 @@ import java.util.Collections
 import java.util.Locale
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -43,25 +48,22 @@ import kotlinx.coroutines.withTimeout
  */
 class ExtensionMangaRepository(
     private val extensions: ExtensionRepository,
+    context: Context,
 ) : MangaRepository {
 
+    private val metadata = MihonSourceMetadataStore(context)
+
     override suspend fun latest(sourceId: String, page: Int): List<Manga> = call(sourceId) { source ->
-        source.getLatestUpdates(page).mangas.mapNotNull { manga ->
-            manga.toDomain(source).takeIf { !it.isExplicit() }
-        }
+        source.getLatestUpdates(page).toDomainList(source)
     }
 
     override suspend fun popular(sourceId: String, page: Int): List<Manga> = call(sourceId) { source ->
-        source.getPopularManga(page).mangas.mapNotNull { manga ->
-            manga.toDomain(source).takeIf { !it.isExplicit() }
-        }
+        source.getPopularManga(page).toDomainList(source)
     }
 
     override suspend fun search(sourceId: String, query: String, page: Int): List<Manga> =
         call(sourceId) { source ->
-            source.getSearchManga(page, query, source.filters()).mangas.mapNotNull { manga ->
-                manga.toDomain(source).takeIf { !it.isExplicit() }
-            }
+            source.getSearchManga(page, query, source.filters()).toDomainList(source)
         }
 
     override suspend fun catalogue(): List<Manga> {
@@ -81,7 +83,11 @@ class ExtensionMangaRepository(
             url = mangaId
             title = ""
         }
+        // Modern sources keep their site id in memo; restore it before details or the request
+        // can be rejected with "refresh manga details".
+        metadata.restore(source.id, mangaId, placeholder)
         val updated = source.getMangaUpdate(placeholder, emptyList(), true, false).manga
+        metadata.save(source.id, mangaId, updated)
         if (updated.title.isBlank() && updated.url.isBlank()) {
             null
         } else {
@@ -95,13 +101,22 @@ class ExtensionMangaRepository(
                 url = mangaId
                 title = ""
             }
-            source.getMangaUpdate(placeholder, emptyList(), false, true)
-                .chapters.map { it.toDomain(mangaId) }
+            metadata.restore(source.id, mangaId, placeholder)
+            val update = source.getMangaUpdate(placeholder, emptyList(), false, true)
+            metadata.save(source.id, mangaId, update.manga)
+            val chapters = update.chapters
+            metadata.saveChapterMemos(
+                source.id,
+                mangaId,
+                chapters.filter { it.memo.isNotEmpty() }.associate { it.url to it.memo },
+            )
+            chapters.map { it.toDomain(mangaId) }
         }
 
     override suspend fun pages(sourceId: String, mangaId: String, chapterId: String): List<String> =
         call(sourceId) { source ->
             val placeholder = SChapter.create().apply { url = chapterId }
+            metadata.restoreChapter(source.id, mangaId, placeholder)
             val baseUrl = (source as? HttpSource)?.baseUrl.orEmpty()
             source.getPageList(placeholder)
                 .sortedBy { it.index }
@@ -152,16 +167,28 @@ class ExtensionMangaRepository(
                     try {
                         semaphore.withPermit {
                             val source = MihonRuntime.source(info.id) ?: return@withPermit emptyList()
-                            withTimeout(SOURCE_TIMEOUT_MS) {
+                            val page = withTimeout(SOURCE_TIMEOUT_MS) {
                                 MihonRuntime.withSourceLock(info.id) { block(source) }
-                            }.mangas.mapNotNull { manga ->
+                            }
+                            // Persist memo immediately: every later details/chapter request is
+                            // keyed by the source URL and needs the extension's own id.
+                            metadata.saveMemos(source.id, page.mangas)
+                            page.mangas.mapNotNull { manga ->
                                 manga.toDomain(source).takeIf {
                                     it.id.isNotBlank() && !it.isExplicit()
                                 }
                             }
                         }
+                    } catch (error: TimeoutCancellationException) {
+                        // A source timeout is a per-source failure, not cancellation of the
+                        // whole aggregate. Rethrowing this used to tear down viewModelScope
+                        // and close the Manga tab.
+                        failures += error
+                        emptyList()
                     } catch (error: CancellationException) {
-                        throw error
+                        if (!currentCoroutineContext().isActive) throw error
+                        failures += error
+                        emptyList()
                     } catch (error: Throwable) {
                         failures += error
                         emptyList()
@@ -182,6 +209,13 @@ class ExtensionMangaRepository(
 
     private fun Source.filters(): FilterList =
         runCatching { getFilterList() }.getOrNull() ?: FilterList()
+
+    private fun MangasPage.toDomainList(source: Source): List<Manga> {
+        metadata.saveMemos(source.id, mangas)
+        return mangas.mapNotNull { manga ->
+            manga.toDomain(source).takeIf { !it.isExplicit() }
+        }
+    }
 
     private fun SManga.toDomain(source: Source): Manga {
         val baseUrl = (source as? HttpSource)?.baseUrl.orEmpty()
@@ -245,14 +279,14 @@ class ExtensionMangaRepository(
     private fun Throwable.toFailure(): ExtensionFailure = when (this) {
         is UnknownHostException, is ConnectException -> ExtensionFailure.OFFLINE
         is SocketTimeoutException, is InterruptedIOException -> ExtensionFailure.NETWORK
-        is NoClassDefFoundError, is ClassNotFoundException -> ExtensionFailure.INCOMPATIBLE
+        is NoClassDefFoundError, is ClassNotFoundException, is LinkageError -> ExtensionFailure.INCOMPATIBLE
         is UnsupportedOperationException -> ExtensionFailure.UNSUPPORTED
         is IOException -> ExtensionFailure.NETWORK
         else -> ExtensionFailure.NETWORK
     }
 
     private companion object {
-        private const val SOURCE_TIMEOUT_MS = 30_000L
+        private const val SOURCE_TIMEOUT_MS = 20_000L
         private const val MAX_CONCURRENT_SOURCES = 6
         private val NUMBER_PATTERN = Regex("""(\d+(?:\.\d+)?)""")
         private val EXPLICIT_GENRES = setOf(

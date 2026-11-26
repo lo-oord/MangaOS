@@ -64,7 +64,7 @@ object ServiceLocator {
         user = DataStoreUserRepository(dataStore, appScope)
         library = DataStoreLibraryRepository(dataStore, appScope)
         extensions = ExtensionStore(appContext, appScope, settings)
-        manga = ExtensionMangaRepository(extensions)
+        manga = ExtensionMangaRepository(extensions, appContext)
         localStorage = InMemoryLocalStorageRepository()
         notifications = InMemoryNotificationRepository(appScope)
         downloads = LocalDownloadRepository(appScope, localStorage, notifications, appContext, settings)
