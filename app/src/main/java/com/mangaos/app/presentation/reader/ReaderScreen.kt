@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -65,6 +66,7 @@ import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReaderScreen(
