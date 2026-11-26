@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
 import com.mangaos.app.core.designsystem.AppTheme
+import com.mangaos.app.core.designsystem.ThemeMode
 import com.mangaos.app.core.util.LocaleManager
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.AppSettings
@@ -35,10 +36,10 @@ class SettingsViewModel : ViewModel() {
         AppTheme.DEFAULT,
     )
 
-    val darkMode: StateFlow<Boolean?> = settings.darkMode.stateIn(
+    val themeMode: StateFlow<ThemeMode> = settings.themeMode.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        null,
+        ThemeMode.SYSTEM,
     )
 
     val appSettings: StateFlow<AppSettings> = settings.appSettings.stateIn(
@@ -71,8 +72,8 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { settings.setTheme(theme) }
     }
 
-    fun setDarkMode(darkMode: Boolean?) {
-        viewModelScope.launch { settings.setDarkMode(darkMode) }
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settings.setThemeMode(mode) }
     }
 
     fun setViewMode(mode: MangaViewMode) {

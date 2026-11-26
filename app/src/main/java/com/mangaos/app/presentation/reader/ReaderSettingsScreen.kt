@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.util.Numbers
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.SettingsOptionRow
@@ -119,21 +120,21 @@ fun ReaderSettingsScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {})
         SettingsSection(title = stringResource(R.string.reader_group_image)) {
             SliderRow(
                 title = stringResource(R.string.reader_brightness),
-                value = "%.2f".format(s.brightness),
+                value = Numbers.decimal(s.brightness, 2),
                 sliderValue = s.brightness,
                 range = 0.5f..2f,
                 onValue = { value -> viewModel.update { it.copy(brightness = value) } },
             )
             SliderRow(
                 title = stringResource(R.string.reader_contrast),
-                value = "%.2f".format(s.contrast),
+                value = Numbers.decimal(s.contrast, 2),
                 sliderValue = s.contrast,
                 range = 0.5f..2f,
                 onValue = { value -> viewModel.update { it.copy(contrast = value) } },
             )
             SliderRow(
                 title = stringResource(R.string.reader_saturation),
-                value = "%.2f".format(s.saturation),
+                value = Numbers.decimal(s.saturation, 2),
                 sliderValue = s.saturation,
                 range = 0f..2f,
                 onValue = { value -> viewModel.update { it.copy(saturation = value) } },
@@ -163,7 +164,7 @@ fun ReaderSettingsScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {})
             )
             SliderRow(
                 title = stringResource(R.string.reader_auto_scroll_speed),
-                value = "%.1fx".format(s.autoScrollSpeed),
+                value = Numbers.decimal(s.autoScrollSpeed) + "x",
                 sliderValue = s.autoScrollSpeed,
                 range = 0.5f..3f,
                 onValue = { value -> viewModel.update { it.copy(autoScrollSpeed = value) } },

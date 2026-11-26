@@ -50,6 +50,7 @@ import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.BrandColors
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.relativeTime
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
@@ -81,7 +82,7 @@ fun MangaCard(
             MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
             if (showLatestChapter && manga.latestChapter != null) {
                 ChapterBadge(
-                    text = stringResource(R.string.chapter_short, manga.latestChapter),
+                    text = appString(R.string.chapter_short, manga.latestChapter),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp),
@@ -207,7 +208,7 @@ fun MangaListRow(
             if (showLatestChapter && manga.latestChapter != null) {
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = stringResource(R.string.chapter_number, manga.latestChapter),
+                    text = appString(R.string.chapter_number, manga.latestChapter),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
@@ -275,7 +276,7 @@ fun CoverImage(
     coverUrl: String?,
     modifier: Modifier = Modifier,
 ) {
-    val contentDescription = stringResource(R.string.cd_cover, title)
+    val contentDescription = appString(R.string.cd_cover, title)
     AsyncImage(
         model = coverUrl,
         contentDescription = contentDescription,

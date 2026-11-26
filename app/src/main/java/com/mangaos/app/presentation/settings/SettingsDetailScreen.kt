@@ -1,23 +1,30 @@
 package com.mangaos.app.presentation.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Animation
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Download
@@ -49,8 +56,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -59,7 +72,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.Spacing
-import com.mangaos.app.core.designsystem.colorSchemeFor
+import com.mangaos.app.core.designsystem.ThemeMode
+import com.mangaos.app.core.designsystem.ThemeReveal
+import com.mangaos.app.core.designsystem.themeSwatches
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.AppDialog
@@ -67,6 +82,7 @@ import com.mangaos.app.core.ui.components.SettingsOptionRow
 import com.mangaos.app.core.ui.components.SettingsRow
 import com.mangaos.app.core.ui.components.SettingsSection as SettingsGroup
 import com.mangaos.app.core.ui.components.SettingsSwitchRow
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.formatBytes
 import com.mangaos.app.domain.model.LibraryFilter
 import com.mangaos.app.domain.model.LibrarySort
@@ -89,7 +105,7 @@ fun SettingsDetailScreen(
     val app by viewModel.appSettings.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
-    val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
     val cacheBytes by viewModel.cacheBytes.collectAsStateWithLifecycle()
     val clearingCache by viewModel.clearingCache.collectAsStateWithLifecycle()
@@ -97,7 +113,7 @@ fun SettingsDetailScreen(
     val context = LocalContext.current
     val snackbar = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
-    val darkTheme = darkMode ?: isSystemInDarkTheme()
+    val darkTheme = themeMode.resolveDark(isSystemInDarkTheme())
 
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
@@ -134,23 +150,30 @@ fun SettingsDetailScreen(
                 }
                 item {
                     SettingsGroup(title = stringResource(R.string.settings_dark_mode)) {
-                        SettingsOptionRow(
+                        ThemeModeOption(
                             label = stringResource(R.string.settings_dark_mode_system),
-                            selected = darkMode == null,
-                            onClick = { viewModel.setDarkMode(null) },
-                            leading = { Icon(Icons.Outlined.SettingsBrightness, contentDescription = null) },
+                            selected = themeMode == ThemeMode.SYSTEM,
+                            icon = Icons.Outlined.SettingsBrightness,
+                            onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) },
                         )
-                        SettingsOptionRow(
+                        ThemeModeOption(
                             label = stringResource(R.string.settings_dark_mode_light),
-                            selected = darkMode == false,
-                            onClick = { viewModel.setDarkMode(false) },
-                            leading = { Icon(Icons.Outlined.LightMode, contentDescription = null) },
+                            selected = themeMode == ThemeMode.LIGHT,
+                            icon = Icons.Outlined.LightMode,
+                            onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) },
                         )
-                        SettingsOptionRow(
+                        ThemeModeOption(
                             label = stringResource(R.string.settings_dark_mode_dark),
-                            selected = darkMode == true,
-                            onClick = { viewModel.setDarkMode(true) },
-                            leading = { Icon(Icons.Outlined.DarkMode, contentDescription = null) },
+                            selected = themeMode == ThemeMode.DARK,
+                            icon = Icons.Outlined.DarkMode,
+                            onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
+                        )
+                        ThemeModeOption(
+                            label = stringResource(R.string.settings_mode_amoled),
+                            subtitle = stringResource(R.string.settings_mode_amoled_desc),
+                            selected = themeMode == ThemeMode.AMOLED,
+                            icon = Icons.Outlined.Contrast,
+                            onClick = { viewModel.setThemeMode(ThemeMode.AMOLED) },
                         )
                     }
                 }
@@ -384,20 +407,14 @@ fun SettingsDetailScreen(
                 modifier = Modifier.padding(start = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
             )
             AppTheme.entries.forEach { option ->
-                SettingsOptionRow(
+                ThemeOptionRow(
+                    theme = option,
                     label = themeLabel(option),
                     selected = theme == option,
+                    dark = darkTheme,
                     onClick = {
                         showThemeSheet = false
                         viewModel.setTheme(option)
-                    },
-                    leading = {
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(colorSchemeFor(option, darkTheme).primary),
-                        )
                     },
                 )
             }
@@ -416,7 +433,7 @@ fun SettingsDetailScreen(
                 viewModel.clearCache { freed ->
                     scope.launch {
                         snackbar.showSnackbar(
-                            context.getString(R.string.settings_performance_freed, formatBytes(freed)),
+                            context.appString(R.string.settings_performance_freed, formatBytes(freed)),
                         )
                     }
                 }
@@ -439,11 +456,108 @@ private fun languageLabel(code: String): String = stringResource(
 private fun themeLabel(theme: AppTheme): String = stringResource(
     when (theme) {
         AppTheme.DEFAULT -> R.string.theme_default
+        AppTheme.SAKURA -> R.string.theme_sakura
+        AppTheme.SHANA -> R.string.theme_shana
         AppTheme.MIKU -> R.string.theme_miku
         AppTheme.NEON -> R.string.theme_neon
         AppTheme.SKY -> R.string.theme_sky
     },
 )
+
+/**
+ * A mode row that records where it was tapped, so the new palette can spread from that exact
+ * spot. The click itself is unchanged.
+ */
+@Composable
+private fun ThemeModeOption(
+    label: String,
+    selected: Boolean,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+) {
+    var center by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = Modifier.onGloballyPositioned { coordinates ->
+            val bounds = coordinates.boundsInWindow()
+            center = Offset(bounds.center.x, bounds.center.y)
+        },
+    ) {
+        SettingsOptionRow(
+            label = label,
+            subtitle = subtitle,
+            selected = selected,
+            onClick = {
+                ThemeReveal.setOrigin(center)
+                onClick()
+            },
+            leading = { Icon(imageVector = icon, contentDescription = null) },
+        )
+    }
+}
+
+/** Compact theme row: three colour swatches, the name and a single selection mark. */
+@Composable
+private fun ThemeOptionRow(
+    theme: AppTheme,
+    label: String,
+    selected: Boolean,
+    dark: Boolean,
+    onClick: () -> Unit,
+) {
+    var center by remember { mutableStateOf(Offset.Zero) }
+    val swatches = themeSwatches(theme, dark)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                val bounds = coordinates.boundsInWindow()
+                center = Offset(bounds.center.x, bounds.center.y)
+            }
+            .clip(MaterialTheme.shapes.medium)
+            .clickable {
+                ThemeReveal.setOrigin(center)
+                onClick()
+            }
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            )
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ThemeSwatch(color = swatches.background)
+        Spacer(Modifier.width(4.dp))
+        ThemeSwatch(color = swatches.surface)
+        Spacer(Modifier.width(4.dp))
+        ThemeSwatch(color = swatches.accent)
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeSwatch(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+    )
+}
 
 @Composable
 private fun librarySortLabel(sort: LibrarySort): String = stringResource(

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
@@ -153,7 +154,7 @@ fun DownloadsScreen(
     pendingDeleteChapter?.let { (task, chapter) ->
         AppDialog(
             title = stringResource(R.string.downloads_delete_chapter_title),
-            message = stringResource(R.string.chapter_number, chapter.number),
+            message = appString(R.string.chapter_number, chapter.number),
             confirmLabel = stringResource(R.string.action_delete),
             dismissLabel = stringResource(R.string.action_cancel),
             destructive = true,
@@ -252,7 +253,7 @@ private fun DownloadCard(
                                 task.chapters.firstOrNull()?.number.orEmpty(),
                             )
                         } else {
-                            stringResource(R.string.downloads_task_chapters, task.totalChapters)
+                            appString(R.string.downloads_task_chapters, task.totalChapters)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -437,7 +438,7 @@ private fun ChapterStatusRow(chapter: DownloadChapter, onDelete: () -> Unit) {
         )
         Spacer(Modifier.width(Spacing.sm))
         Text(
-            text = stringResource(R.string.chapter_number, chapter.number),
+            text = appString(R.string.chapter_number, chapter.number),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,

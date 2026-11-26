@@ -7,10 +7,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+/*
+ * The whole palette lives here. Every screen reads MaterialTheme.colorScheme (plus
+ * MangaTheme.tokens for the handful of semantic colours Material does not model), so adding a
+ * theme means adding two schemes below and one entry in AppTheme — no screen changes.
+ *
+ * Design rule for every theme: calm, low-chroma backgrounds; the identity lives in primary,
+ * containers and accents. Nothing is a full-screen wash of a character colour.
+ */
 
 private val DefaultLight: ColorScheme = lightColorScheme(
     primary = BrandColors.Primary,
@@ -80,6 +92,146 @@ private val DefaultDark: ColorScheme = darkColorScheme(
     onErrorContainer = Color(0xFFFFDAD6),
     inverseSurface = Color(0xFFE7EBF0),
     inverseOnSurface = Color(0xFF20262F),
+)
+
+private val SakuraLight: ColorScheme = lightColorScheme(
+    primary = Color(0xFFB83F66),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFCE1E9),
+    onPrimaryContainer = Color(0xFF3E0A1C),
+    inversePrimary = Color(0xFFF4A0BC),
+    secondary = Color(0xFF6B5862),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFF3E3E8),
+    onSecondaryContainer = Color(0xFF25151C),
+    tertiary = Color(0xFF2F8C86),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFD6F0ED),
+    onTertiaryContainer = Color(0xFF002523),
+    background = Color(0xFFFDF7F9),
+    onBackground = Color(0xFF1D1418),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1D1418),
+    surfaceVariant = Color(0xFFF5E7EC),
+    onSurfaceVariant = Color(0xFF6B5560),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFDF7F9),
+    surfaceContainer = Color(0xFFFAF0F3),
+    surfaceContainerHigh = Color(0xFFF7E9EE),
+    surfaceContainerHighest = Color(0xFFF3E3E9),
+    outline = Color(0xFFDCC4CE),
+    outlineVariant = Color(0xFFEFDDE4),
+    error = Color(0xFFC1352C),
+    onError = Color.White,
+    errorContainer = Color(0xFFFBE4E1),
+    onErrorContainer = Color(0xFF410E0A),
+    inverseSurface = Color(0xFF33262B),
+    inverseOnSurface = Color(0xFFFDF7F9),
+)
+
+private val SakuraDark: ColorScheme = darkColorScheme(
+    primary = Color(0xFFF4A0BC),
+    onPrimary = Color(0xFF4A0E24),
+    primaryContainer = Color(0xFF6B2340),
+    onPrimaryContainer = Color(0xFFFCE1E9),
+    inversePrimary = Color(0xFFB83F66),
+    secondary = Color(0xFFD6BCC6),
+    onSecondary = Color(0xFF2A1A21),
+    secondaryContainer = Color(0xFF3A2830),
+    onSecondaryContainer = Color(0xFFF3E3E8),
+    tertiary = Color(0xFF7FD6CD),
+    onTertiary = Color(0xFF00332F),
+    tertiaryContainer = Color(0xFF12433F),
+    onTertiaryContainer = Color(0xFFD6F0ED),
+    background = Color(0xFF130E11),
+    onBackground = Color(0xFFF0E4E9),
+    surface = Color(0xFF1A1317),
+    onSurface = Color(0xFFF0E4E9),
+    surfaceVariant = Color(0xFF2A1F25),
+    onSurfaceVariant = Color(0xFFBCA7B1),
+    surfaceContainerLowest = Color(0xFF0C080A),
+    surfaceContainerLow = Color(0xFF191216),
+    surfaceContainer = Color(0xFF1E161A),
+    surfaceContainerHigh = Color(0xFF251B20),
+    surfaceContainerHighest = Color(0xFF2C2027),
+    outline = Color(0xFF45333C),
+    outlineVariant = Color(0xFF34262D),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF4E1512),
+    onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF0E4E9),
+    inverseOnSurface = Color(0xFF2A1F25),
+)
+
+private val ShanaLight: ColorScheme = lightColorScheme(
+    primary = Color(0xFFBE4324),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE0D5),
+    onPrimaryContainer = Color(0xFF3D0D00),
+    inversePrimary = Color(0xFFFFB59B),
+    secondary = Color(0xFF6C574E),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFF3E4DA),
+    onSecondaryContainer = Color(0xFF241510),
+    tertiary = Color(0xFFA5731C),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFBEBC7),
+    onTertiaryContainer = Color(0xFF2C1E00),
+    background = Color(0xFFFDF8F6),
+    onBackground = Color(0xFF1F1512),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1F1512),
+    surfaceVariant = Color(0xFFF4E6DF),
+    onSurfaceVariant = Color(0xFF6A574E),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFDF7F4),
+    surfaceContainer = Color(0xFFFAF1EC),
+    surfaceContainerHigh = Color(0xFFF7EAE3),
+    surfaceContainerHighest = Color(0xFFF2E2D9),
+    outline = Color(0xFFDCC7BC),
+    outlineVariant = Color(0xFFEEDED6),
+    error = Color(0xFFC1352C),
+    onError = Color.White,
+    errorContainer = Color(0xFFFBE4E1),
+    onErrorContainer = Color(0xFF410E0A),
+    inverseSurface = Color(0xFF352A25),
+    inverseOnSurface = Color(0xFFFDF7F4),
+)
+
+private val ShanaDark: ColorScheme = darkColorScheme(
+    primary = Color(0xFFFFA97F),
+    onPrimary = Color(0xFF4C1200),
+    primaryContainer = Color(0xFF6B2410),
+    onPrimaryContainer = Color(0xFFFFE0D5),
+    inversePrimary = Color(0xFFBE4324),
+    secondary = Color(0xFFDCC2B6),
+    onSecondary = Color(0xFF2A1A14),
+    secondaryContainer = Color(0xFF3B2822),
+    onSecondaryContainer = Color(0xFFF3E4DA),
+    tertiary = Color(0xFFE8C37A),
+    onTertiary = Color(0xFF3A2A00),
+    tertiaryContainer = Color(0xFF55401A),
+    onTertiaryContainer = Color(0xFFFBEBC7),
+    background = Color(0xFF130E0C),
+    onBackground = Color(0xFFF2E5DF),
+    surface = Color(0xFF1A1310),
+    onSurface = Color(0xFFF2E5DF),
+    surfaceVariant = Color(0xFF2A1F1A),
+    onSurfaceVariant = Color(0xFFC0A99E),
+    surfaceContainerLowest = Color(0xFF0C0806),
+    surfaceContainerLow = Color(0xFF191210),
+    surfaceContainer = Color(0xFF1E1613),
+    surfaceContainerHigh = Color(0xFF251B17),
+    surfaceContainerHighest = Color(0xFF2C211C),
+    outline = Color(0xFF46332B),
+    outlineVariant = Color(0xFF352620),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF4E1512),
+    onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF2E5DF),
+    inverseOnSurface = Color(0xFF2A1F1A),
 )
 
 private val MikuLight: ColorScheme = lightColorScheme(
@@ -292,34 +444,115 @@ private val SkyDark: ColorScheme = darkColorScheme(
     inverseOnSurface = Color(0xFF1D2A35),
 )
 
-fun colorSchemeFor(theme: AppTheme, darkTheme: Boolean): ColorScheme = when (theme) {
-    AppTheme.DEFAULT -> if (darkTheme) DefaultDark else DefaultLight
-    AppTheme.MIKU -> if (darkTheme) MikuDark else MikuLight
-    AppTheme.NEON -> if (darkTheme) NeonDark else NeonLight
-    AppTheme.SKY -> if (darkTheme) SkyDark else SkyLight
+/**
+ * AMOLED variant of any dark scheme: a true #000000 canvas with barely-there surface steps so
+ * cards still read as separate layers. The theme's accent, text colours and errors are kept,
+ * so every theme works on an AMOLED screen with its own identity.
+ */
+private fun ColorScheme.toAmoled(): ColorScheme = copy(
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceVariant = Color(0xFF141414),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF070707),
+    surfaceContainer = Color(0xFF0D0D0D),
+    surfaceContainerHigh = Color(0xFF141414),
+    surfaceContainerHighest = Color(0xFF1B1B1B),
+    outline = Color(0xFF2E2E2E),
+    outlineVariant = Color(0xFF1E1E1E),
+    inverseSurface = onSurface,
+    inverseOnSurface = Color(0xFF141414),
+)
+
+/** Resolves the scheme for a theme and mode pair, including the AMOLED override. */
+fun colorSchemeFor(theme: AppTheme, dark: Boolean, amoled: Boolean = false): ColorScheme {
+    val scheme = when (theme) {
+        AppTheme.DEFAULT -> if (dark) DefaultDark else DefaultLight
+        AppTheme.SAKURA -> if (dark) SakuraDark else SakuraLight
+        AppTheme.SHANA -> if (dark) ShanaDark else ShanaLight
+        AppTheme.MIKU -> if (dark) MikuDark else MikuLight
+        AppTheme.NEON -> if (dark) NeonDark else NeonLight
+        AppTheme.SKY -> if (dark) SkyDark else SkyLight
+    }
+    return if (amoled) scheme.toAmoled() else scheme
+}
+
+/** The three swatches shown on a theme preview: canvas, elevated surface and accent. */
+data class ThemeSwatches(val background: Color, val surface: Color, val accent: Color)
+
+fun themeSwatches(theme: AppTheme, dark: Boolean): ThemeSwatches =
+    colorSchemeFor(theme, dark).let { ThemeSwatches(it.background, it.surfaceContainerHigh, it.primary) }
+
+/**
+ * Semantic colours Material's ColorScheme does not model. Everything is derived from the
+ * active scheme, so a new theme cannot forget one of them.
+ */
+data class ThemeTokens(
+    val success: Color,
+    val warning: Color,
+    val rating: Color,
+    val elevatedSurface: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val divider: Color,
+    val disabled: Color,
+    val readerBackground: Color,
+    val readerControls: Color,
+    val selection: Color,
+    val progress: Color,
+)
+
+fun themeTokens(scheme: ColorScheme, dark: Boolean, amoled: Boolean): ThemeTokens = ThemeTokens(
+    success = if (dark) Color(0xFF4DCB8C) else BrandColors.Ongoing,
+    warning = if (dark) Color(0xFFE6BE6A) else BrandColors.Hiatus,
+    rating = BrandColors.Rating,
+    elevatedSurface = scheme.surfaceContainerHigh,
+    textPrimary = scheme.onSurface,
+    textSecondary = scheme.onSurfaceVariant,
+    divider = scheme.outlineVariant,
+    disabled = scheme.onSurface.copy(alpha = 0.38f),
+    readerBackground = if (amoled) Color.Black else scheme.background,
+    readerControls = if (amoled) Color(0xFF111111) else scheme.surfaceContainerHigh,
+    selection = scheme.primary.copy(alpha = 0.16f),
+    progress = scheme.primary,
+)
+
+val LocalThemeTokens = staticCompositionLocalOf {
+    themeTokens(DefaultLight, dark = false, amoled = false)
+}
+
+/** Short accessor so screens read `MangaTheme.tokens.success` next to MaterialTheme colours. */
+object MangaTheme {
+    val tokens: ThemeTokens
+        @Composable
+        get() = LocalThemeTokens.current
 }
 
 @Composable
 fun MangaOsTheme(
     theme: AppTheme = AppTheme.DEFAULT,
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    dark: Boolean = isSystemInDarkTheme(),
+    amoled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = colorSchemeFor(theme, darkTheme)
+    val colorScheme = remember(theme, dark, amoled) { colorSchemeFor(theme, dark, amoled) }
+    val tokens = remember(colorScheme, dark, amoled) { themeTokens(colorScheme, dark, amoled) }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
             }
         }
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = MangaTypography,
-        shapes = MangaShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalThemeTokens provides tokens) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = MangaTypography,
+            shapes = MangaShapes,
+            content = content,
+        )
+    }
 }

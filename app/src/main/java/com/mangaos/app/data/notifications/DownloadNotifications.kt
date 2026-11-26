@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.mangaos.app.MainActivity
 import com.mangaos.app.R
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.domain.model.Download
 import com.mangaos.app.domain.model.DownloadState
 import com.mangaos.app.domain.model.AppSettings
@@ -71,36 +72,36 @@ class DownloadNotifications(private val context: Context) {
             DownloadState.QUEUED, DownloadState.DOWNLOADING -> {
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_pause),
+                    context.appString(R.string.notif_action_pause),
                     action(task.id, NotificationIntents.ACTION_PAUSE, 1),
                 )
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_cancel),
+                    context.appString(R.string.notif_action_cancel),
                     action(task.id, NotificationIntents.ACTION_CANCEL, 2),
                 )
             }
             DownloadState.PAUSED -> {
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_resume),
+                    context.appString(R.string.notif_action_resume),
                     action(task.id, NotificationIntents.ACTION_RESUME, 3),
                 )
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_cancel),
+                    context.appString(R.string.notif_action_cancel),
                     action(task.id, NotificationIntents.ACTION_CANCEL, 4),
                 )
             }
             DownloadState.FAILED, DownloadState.PARTIAL -> {
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_retry),
+                    context.appString(R.string.notif_action_retry),
                     action(task.id, NotificationIntents.ACTION_RETRY, 5),
                 )
                 builder.addAction(
                     R.mipmap.ic_stat_mangaos,
-                    context.getString(R.string.notif_action_cancel),
+                    context.appString(R.string.notif_action_cancel),
                     action(task.id, NotificationIntents.ACTION_CANCEL, 6),
                 )
             }
@@ -127,36 +128,36 @@ class DownloadNotifications(private val context: Context) {
     }
 
     private fun contentText(task: Download): String {
-        val stateLabel = context.getString(stateLabel(task.state))
+        val stateLabel = context.appString(stateLabel(task.state))
         val percent = (task.progress * 100f).roundToInt().coerceIn(0, 100)
         return when {
             task.totalChapters <= 1 -> {
                 val chapter = task.chapters.firstOrNull()?.number.orEmpty()
                 when (task.state) {
-                    DownloadState.DOWNLOADING -> context.getString(
+                    DownloadState.DOWNLOADING -> context.appString(
                         R.string.notif_download_progress_single,
                         chapter,
                         percent,
                     )
-                    DownloadState.COMPLETED -> context.getString(
+                    DownloadState.COMPLETED -> context.appString(
                         R.string.notif_download_completed_single,
                         chapter,
                     )
-                    else -> context.getString(R.string.notif_download_chapter_state, chapter, stateLabel)
+                    else -> context.appString(R.string.notif_download_chapter_state, chapter, stateLabel)
                 }
             }
             else -> when (task.state) {
-                DownloadState.DOWNLOADING, DownloadState.PAUSED -> context.getString(
+                DownloadState.DOWNLOADING, DownloadState.PAUSED -> context.appString(
                     R.string.notif_download_progress_multi,
                     task.completedChapters,
                     task.totalChapters,
                     percent,
                 )
-                DownloadState.COMPLETED -> context.getString(
+                DownloadState.COMPLETED -> context.appString(
                     R.string.notif_download_completed_multi,
                     task.totalChapters,
                 )
-                else -> context.getString(
+                else -> context.appString(
                     R.string.notif_download_task_state,
                     task.completedChapters,
                     task.totalChapters,

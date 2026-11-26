@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.mangaos.app.MainActivity
 import com.mangaos.app.R
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.AppSettings
@@ -34,12 +35,12 @@ class NewChapterNotifications(private val context: Context) {
         val style = NotificationCompat.InboxStyle()
         chapters.take(MAX_LINES).forEach { chapter ->
             style.addLine(
-                context.getString(R.string.notif_new_chapter_line, chapter.number),
+                context.appString(R.string.notif_new_chapter_line, chapter.number),
             )
         }
         if (chapters.size > MAX_LINES) {
             style.setSummaryText(
-                context.getString(R.string.notif_new_chapter_more, chapters.size - MAX_LINES),
+                context.appString(R.string.notif_new_chapter_more, chapters.size - MAX_LINES),
             )
         }
 
@@ -47,9 +48,9 @@ class NewChapterNotifications(private val context: Context) {
             .setSmallIcon(R.mipmap.ic_stat_mangaos)
             .setColor(0xFF018AFE.toInt())
             .setContentTitle(manga.title)
-            .setSubText(context.getString(R.string.notif_new_chapter_available))
+            .setSubText(context.appString(R.string.notif_new_chapter_available))
             .setContentText(
-                context.getString(R.string.notif_new_chapter_line, chapters.first().number),
+                context.appString(R.string.notif_new_chapter_line, chapters.first().number),
             )
             .setStyle(style)
             .setAutoCancel(true)
@@ -71,8 +72,8 @@ class NewChapterNotifications(private val context: Context) {
                 NotificationCompat.Builder(context, NotificationIntents.CHANNEL_NEW_CHAPTERS)
                     .setSmallIcon(R.mipmap.ic_stat_mangaos)
                     .setColor(0xFF018AFE.toInt())
-                    .setContentTitle(context.getString(R.string.notif_new_chapter_available))
-                    .setContentText(context.getString(R.string.notif_new_chapter_group_text))
+                    .setContentTitle(context.appString(R.string.notif_new_chapter_available))
+                    .setContentText(context.appString(R.string.notif_new_chapter_group_text))
                     .setGroup(NotificationIntents.GROUP_NEW_CHAPTERS)
                     .setGroupSummary(true)
                     .setAutoCancel(true)

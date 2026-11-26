@@ -120,11 +120,13 @@
     <string name="settings_appearance">الثيم والظهور</string>
     <string name="settings_language">اللغة</string>
     <string name="settings_theme">الثيم</string>
-    <string name="settings_dark_mode">الوضع الداكن</string>
+    <string name="settings_dark_mode">وضع العرض</string>
     <string name="language_arabic">العربية</string>
     <string name="language_english">English</string>
     <string name="language_japanese">日本語</string>
     <string name="theme_default">الافتراضي</string>
+    <string name="theme_sakura">ساكورا</string>
+    <string name="theme_shana">شانا</string>
     <string name="theme_miku">ميكو</string>
     <string name="theme_neon">نيون</string>
     <string name="theme_sky">Sky</string>
@@ -263,6 +265,8 @@
     <string name="settings_dark_mode_system">اتباع النظام</string>
     <string name="settings_dark_mode_light">فاتح</string>
     <string name="settings_dark_mode_dark">داكن</string>
+    <string name="settings_mode_amoled">أسود قاتم</string>
+    <string name="settings_mode_amoled_desc">موصى به للشاشات AMOLED.</string>
     <string name="settings_notifications_enabled">تفعيل الإشعارات</string>
     <string name="settings_notifications_new_chapters">الفصول الجديدة</string>
     <string name="settings_notifications_downloads">اكتمال التنزيلات</string>

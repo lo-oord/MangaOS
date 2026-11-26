@@ -88,6 +88,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.mangaos.app.R
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.ui.LocalReduceMotion
@@ -406,7 +407,7 @@ fun ReaderScreen(
                 title = manga?.title.orEmpty(),
                 chapterLabel = chapters.getOrNull(currentChapterIndex)?.let { chapter ->
                     buildString {
-                        append(stringResource(R.string.chapter_number, chapter.number))
+                        append(appString(R.string.chapter_number, chapter.number))
                         chapter.title?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                     }
                 }.orEmpty(),
@@ -539,7 +540,7 @@ fun ReaderScreen(
                         ) {
                             Text(
                                 text = currentChapter?.number?.let {
-                                    stringResource(R.string.chapter_number, it)
+                                    appString(R.string.chapter_number, it)
                                 }.orEmpty(),
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,

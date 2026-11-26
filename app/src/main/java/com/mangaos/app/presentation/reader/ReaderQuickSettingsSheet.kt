@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
+import com.mangaos.app.core.util.Numbers
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
@@ -174,7 +175,7 @@ fun ReaderQuickSettingsSheet(
             )
             SheetSlider(
                 title = stringResource(R.string.reader_brightness),
-                value = "%.2f".format(settings.brightness),
+                value = Numbers.decimal(settings.brightness, 2),
                 current = settings.brightness,
                 range = 0.5f..1.8f,
                 onChange = { value -> onUpdate { it.copy(brightness = value) } },

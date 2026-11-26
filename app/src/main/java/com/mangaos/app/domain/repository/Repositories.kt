@@ -1,6 +1,7 @@
 package com.mangaos.app.domain.repository
 
 import com.mangaos.app.core.designsystem.AppTheme
+import com.mangaos.app.core.designsystem.ThemeMode
 import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.AppNotification
 import com.mangaos.app.domain.model.Chapter
@@ -196,8 +197,8 @@ interface UserRepository {
 interface SettingsRepository {
     val language: Flow<String>
     val theme: Flow<AppTheme>
-    /** null means "follow the system". */
-    val darkMode: Flow<Boolean?>
+    /** System / light / dark / AMOLED, independent of the colour theme. */
+    val themeMode: Flow<ThemeMode>
     val onboardingCompleted: Flow<Boolean>
     val viewMode: Flow<MangaViewMode>
     /** Source id shown in the Latest tab, or null for the first usable source. */
@@ -211,7 +212,7 @@ interface SettingsRepository {
 
     suspend fun setLanguage(language: String)
     suspend fun setTheme(theme: AppTheme)
-    suspend fun setDarkMode(darkMode: Boolean?)
+    suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setViewMode(viewMode: MangaViewMode)
     suspend fun setLatestSourceId(sourceId: String?)

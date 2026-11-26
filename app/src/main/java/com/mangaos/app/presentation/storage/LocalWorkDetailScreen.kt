@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppDialog
@@ -134,7 +135,7 @@ fun LocalWorkDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(R.string.local_detail_chapters, work.chapters.size),
+                    text = appString(R.string.local_detail_chapters, work.chapters.size),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -298,7 +299,7 @@ private fun LocalDetailBody(work: StoredWork) {
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             manga.rating?.let {
-                LocalFact(stringResource(R.string.detail_rating, it))
+                LocalFact(appString(R.string.detail_rating, it))
             }
             if (manga.status != MangaStatus.UNKNOWN) {
                 LocalFact(stringResource(localStatusLabel(manga.status)))
@@ -388,7 +389,7 @@ private fun LocalChapterRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = buildString {
-                    append(stringResource(R.string.chapter_number, chapter.number))
+                    append(appString(R.string.chapter_number, chapter.number))
                     chapter.title?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 },
                 style = MaterialTheme.typography.bodyLarge,

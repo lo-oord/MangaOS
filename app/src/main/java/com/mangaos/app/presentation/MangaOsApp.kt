@@ -6,7 +6,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -21,17 +26,40 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.MangaOsTheme
+import com.mangaos.app.core.designsystem.ThemeMode
+import com.mangaos.app.core.designsystem.ThemeReveal
+import com.mangaos.app.core.designsystem.colorSchemeFor
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.util.LocaleManager
-import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.presentation.navigation.RootNavHost
+import kotlin.math.hypot
+
+/** The palette actually on screen; it catches up with the preference at the end of a reveal. */
+private data class AppliedTheme(
+    val theme: AppTheme,
+    val dark: Boolean,
+    val amoled: Boolean,
+)
+
+private data class RevealOverlay(
+    val center: Offset,
+    val color: Color,
+    val accent: Color,
+)
 
 @Composable
 fun MangaOsApp() {
@@ -59,10 +87,47 @@ fun MangaOsApp() {
         initialValue = LocaleManager.readLanguage(context),
     )
     val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.DEFAULT)
-    val darkModePreference by settings.darkMode.collectAsStateWithLifecycle(initialValue = null)
+    val themeMode by settings.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
     val appSettings by settings.appSettings.collectAsStateWithLifecycle(initialValue = AppSettings())
 
-    val darkTheme = darkModePreference ?: isSystemInDarkTheme()
+    val systemDark = isSystemInDarkTheme()
+    val target = AppliedTheme(
+        theme = theme,
+        dark = themeMode.resolveDark(systemDark),
+        amoled = themeMode.isAmoled,
+    )
+
+    // The theme is switched in composition, never by recreating the Activity, so every screen,
+    // scroll position, field and open sheet survives the change.
+    var applied by remember { mutableStateOf(target) }
+    var overlay by remember { mutableStateOf<RevealOverlay?>(null) }
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+    val expansion = remember { Animatable(0f) }
+    val overlayAlpha = remember { Animatable(1f) }
+
+    LaunchedEffect(target) {
+        // The origin is only set by a theme/mode row tap. Anything else (the value arriving from
+        // storage at launch, the system switching to dark) applies instantly, without a reveal.
+        val origin = ThemeReveal.consume()
+        if (target == applied) return@LaunchedEffect
+        if (origin == null || appSettings.reduceMotion || overlay != null) {
+            // No tap origin, reduced motion, or a second tap while a reveal is running: settle
+            // immediately rather than play two transitions on top of each other.
+            applied = target
+            overlay = null
+            return@LaunchedEffect
+        }
+        val scheme = colorSchemeFor(target.theme, target.dark, target.amoled)
+        val center = origin
+        overlay = RevealOverlay(center = center, color = scheme.background, accent = scheme.primary)
+        expansion.snapTo(0f)
+        overlayAlpha.snapTo(1f)
+        expansion.animateTo(1f, tween(durationMillis = 360, easing = FastOutSlowInEasing))
+        // Swap the palette while the new canvas fully covers the old one, then fade the cover.
+        applied = target
+        overlayAlpha.animateTo(0f, tween(durationMillis = 140))
+        overlay = null
+    }
 
     // Language changes rebuild the Activity so every resource and the layout direction
     // switch together; the preference itself is already persisted.
@@ -74,21 +139,52 @@ fun MangaOsApp() {
         }
     }
 
-    MangaOsTheme(theme = theme, darkTheme = darkTheme) {
+    MangaOsTheme(theme = applied.theme, dark = applied.dark, amoled = applied.amoled) {
         val snackbarHostState = remember { SnackbarHostState() }
         CompositionLocalProvider(
             LocalSnackbarHostState provides snackbarHostState,
             LocalReduceMotion provides appSettings.reduceMotion,
         ) {
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-            ) { innerPadding ->
-                RootNavHost(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { rootSize = it },
+            ) {
+                Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                ) { innerPadding ->
+                    RootNavHost(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                    )
+                }
+
+                val reveal = overlay
+                if (reveal != null) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val farthestX = maxOf(reveal.center.x, size.width - reveal.center.x)
+                        val farthestY = maxOf(reveal.center.y, size.height - reveal.center.y)
+                        val maxRadius = hypot(farthestX.toDouble(), farthestY.toDouble()).toFloat()
+                        val radius = expansion.value * maxRadius
+                        val alpha = overlayAlpha.value
+                        drawCircle(
+                            color = reveal.color.copy(alpha = alpha),
+                            radius = radius,
+                            center = reveal.center,
+                        )
+                        if (expansion.value < 1f) {
+                            // A thin accent edge makes the spreading palette legible.
+                            drawCircle(
+                                color = reveal.accent.copy(alpha = 0.45f * (1f - expansion.value) * alpha),
+                                radius = radius,
+                                center = reveal.center,
+                                style = Stroke(width = 2.dp.toPx()),
+                            )
+                        }
+                    }
+                }
             }
         }
     }

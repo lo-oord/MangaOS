@@ -131,11 +131,13 @@
     <string name="settings_appearance">Theme and appearance</string>
     <string name="settings_language">Language</string>
     <string name="settings_theme">Theme</string>
-    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_dark_mode">Display mode</string>
     <string name="language_arabic">العربية</string>
     <string name="language_english">English</string>
     <string name="language_japanese">日本語</string>
     <string name="theme_default">Default</string>
+    <string name="theme_sakura">Sakura</string>
+    <string name="theme_shana">Shana</string>
     <string name="theme_miku">Miku</string>
     <string name="theme_neon">Neon</string>
     <string name="theme_sky">Sky</string>
@@ -288,6 +290,8 @@
     <string name="settings_dark_mode_system">Follow system</string>
     <string name="settings_dark_mode_light">Light</string>
     <string name="settings_dark_mode_dark">Dark</string>
+    <string name="settings_mode_amoled">AMOLED black</string>
+    <string name="settings_mode_amoled_desc">Recommended for AMOLED screens.</string>
     <string name="settings_notifications_enabled">Enable notifications</string>
     <string name="settings_notifications_new_chapters">New chapters</string>
     <string name="settings_notifications_downloads">Download complete</string>

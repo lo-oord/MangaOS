@@ -22,9 +22,15 @@ object BrandColors {
     val Cancelled = Color(0xFFB2564F)
 }
 
-/** The four visual identities offered in Settings → Theme. */
+/**
+ * The visual identities offered in Settings → Appearance. Order is the order shown to the
+ * user: the calm default first, then the themed accents. Every entry is a complete,
+ * balanced palette — never a single accent applied over everything.
+ */
 enum class AppTheme(val storageKey: String) {
     DEFAULT("default"),
+    SAKURA("sakura"),
+    SHANA("shana"),
     MIKU("miku"),
     NEON("neon"),
     SKY("sky");
@@ -32,5 +38,30 @@ enum class AppTheme(val storageKey: String) {
     companion object {
         fun fromStorage(value: String?): AppTheme =
             entries.firstOrNull { it.storageKey == value } ?: DEFAULT
+    }
+}
+
+/**
+ * Light / dark / AMOLED choice, independent of [AppTheme] so any theme can be combined with
+ * any mode. Stored under the legacy `dark_mode` key, whose old values ("light"/"dark")
+ * already map onto the new entries, so upgrades keep the previous selection.
+ */
+enum class ThemeMode(val storageKey: String) {
+    SYSTEM("system"),
+    LIGHT("light"),
+    DARK("dark"),
+    AMOLED("amoled");
+
+    fun resolveDark(systemDark: Boolean): Boolean = when (this) {
+        LIGHT -> false
+        DARK, AMOLED -> true
+        SYSTEM -> systemDark
+    }
+
+    val isAmoled: Boolean get() = this == AMOLED
+
+    companion object {
+        fun fromStorage(value: String?): ThemeMode =
+            entries.firstOrNull { it.storageKey == value } ?: SYSTEM
     }
 }

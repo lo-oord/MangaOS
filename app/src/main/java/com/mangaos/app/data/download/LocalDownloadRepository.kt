@@ -602,7 +602,7 @@ class LocalDownloadRepository(
         val path = url.substringBefore('?').substringAfterLast('/')
         val extension = path.substringAfterLast('.', "").lowercase()
         val suffix = if (extension in IMAGE_EXTENSIONS) ".$extension" else ".img"
-        return "%04d%s".format(index, suffix)
+        return String.format(java.util.Locale.US, "%04d%s", index, suffix)
     }
 
     private fun hash(value: String): String =

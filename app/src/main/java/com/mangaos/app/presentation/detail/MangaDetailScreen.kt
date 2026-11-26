@@ -84,6 +84,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.AppIconButton
@@ -312,7 +313,7 @@ private fun DetailContent(
                 if (progress != null) {
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        text = stringResource(R.string.detail_last_read, progress.chapterNumber),
+                        text = appString(R.string.detail_last_read, progress.chapterNumber),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -720,11 +721,11 @@ private fun MangaFacts(manga: Manga, chapterCount: Int?) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        manga.rating?.let { FactChip(stringResource(R.string.detail_rating, it)) }
+        manga.rating?.let { FactChip(appString(R.string.detail_rating, it)) }
         if (manga.status != MangaStatus.UNKNOWN) {
             FactChip(stringResource(statusLabel(manga.status)))
         }
-        chapterCount?.let { FactChip(stringResource(R.string.detail_chapter_count, it)) }
+        chapterCount?.let { FactChip(appString(R.string.detail_chapter_count, it)) }
         facts.forEach { (label, value) -> FactChip("$label: $value") }
     }
 }
@@ -786,7 +787,7 @@ private fun ChapterSectionHeader(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = stringResource(R.string.detail_chapters, count),
+                text = appString(R.string.detail_chapters, count),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -794,7 +795,7 @@ private fun ChapterSectionHeader(
             )
             if (selectionMode) {
                 Text(
-                    text = stringResource(R.string.selected_count, selectedCount),
+                    text = appString(R.string.selected_count, selectedCount),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -813,7 +814,7 @@ private fun ChapterSectionHeader(
             }
         }
         Text(
-            text = stringResource(R.string.detail_chapters_stats, readCount, downloadedCount),
+            text = appString(R.string.detail_chapters_stats, readCount, downloadedCount),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = Spacing.sm, bottom = Spacing.xs),
@@ -1094,7 +1095,7 @@ private fun ChapterActionsSheet(
 ) {
     AppBottomSheet(onDismiss = onDismiss) {
         Text(
-            text = stringResource(R.string.chapter_number, chapter.number),
+            text = appString(R.string.chapter_number, chapter.number),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,

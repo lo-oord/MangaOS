@@ -46,9 +46,17 @@ object LocaleManager {
             .apply()
     }
 
+    /**
+     * The chosen language with an explicit Latin numbering system, so Android formats dates,
+     * percentages and numbers with 0-9 while still using the Arabic resources and RTL layout.
+     * This is the process-wide default; [com.mangaos.app.core.util.appString] covers resources
+     * that are formatted with arguments.
+     */
+    fun displayLocale(language: String): Locale = Locale.forLanguageTag("$language-u-nu-latn")
+
     fun applyTo(context: Context): Context {
         val language = readLanguage(context)
-        val locale = Locale.forLanguageTag(language)
+        val locale = displayLocale(language)
         Locale.setDefault(locale)
         val configuration = Configuration(context.resources.configuration)
         configuration.setLocale(locale)
