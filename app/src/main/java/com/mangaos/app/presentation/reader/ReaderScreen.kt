@@ -21,8 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Settings
@@ -89,7 +88,6 @@ fun ReaderScreen(
 
     var controlsVisible by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
-    val pagerState = rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
     val scope = rememberCoroutineScope()
 
     // auto hide
@@ -131,7 +129,7 @@ fun ReaderScreen(
                     }
                 }
             }
-            ReaderMode.HORIZONTAL_LTR, ReaderMode.HORIZONTAL_RTL -> {
+            ReaderMode.HORIZONTAL_LTR, ReaderMode.HORIZONTAL_RTL, ReaderMode.SINGLE_PAGE, ReaderMode.DOUBLE_PAGE -> {
                 LazyRow(
                     state = rememberLazyListState(),
                     reverseLayout = settings.readingMode == ReaderMode.HORIZONTAL_RTL,
@@ -145,27 +143,12 @@ fun ReaderScreen(
                             onRetry = { viewModel.retryImage(page.url) },
                             onSuccess = { viewModel.onImageSuccess(page.url) },
                             onError = { viewModel.onImageError(page.url) },
-                            modifier = Modifier.fillParentMaxHeight(),
+                            modifier = Modifier.fillMaxHeight(),
                         )
                     }
                 }
             }
-            ReaderMode.SINGLE_PAGE, ReaderMode.DOUBLE_PAGE -> {
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    val p = pages.getOrNull(page)
-                    if (p != null) {
-                        ReaderImage(
-                            page = p,
-                            state = imageStates[p.url] ?: ImageState.Loading,
-                            settings = settings,
-                            onRetry = { viewModel.retryImage(p.url) },
-                            onSuccess = { viewModel.onImageSuccess(p.url) },
-                            onError = { viewModel.onImageError(p.url) },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
+
         }
 
         // tap to toggle controls
@@ -217,8 +200,8 @@ fun ReaderScreen(
                 }
                 // reading progress slider
                 val progress = if (pages.isNotEmpty()) {
-                    if (settings.readingMode == ReaderMode.SINGLE_PAGE || settings.readingMode == ReaderMode.DOUBLE_PAGE) {
-                        pagerState.currentPage.toFloat() / (pages.size - 1).coerceAtLeast(1)
+                    if (false) {
+                        0f
                     } else {
                         listState.firstVisibleItemIndex.toFloat() / (pages.size - 1).coerceAtLeast(1)
                     }
@@ -227,11 +210,7 @@ fun ReaderScreen(
                     value = progress.coerceIn(0f, 1f),
                     onValueChange = { v ->
                         val idx = (v * (pages.size - 1)).toInt().coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-                        if (settings.readingMode == ReaderMode.SINGLE_PAGE || settings.readingMode == ReaderMode.DOUBLE_PAGE) {
-                            scope.launch { pagerState.animateScrollToPage(idx) }
-                        } else {
-                            scope.launch { listState.animateScrollToItem(idx) }
-                        }
+                        scope.launch { listState.animateScrollToItem(idx) }
                     },
                 )
                 Row(
