@@ -986,7 +986,7 @@ private fun ChapterRow(
                 if (isLastRead) {
                     Spacer(Modifier.height(Spacing.xxs))
                     Text(
-                        text = stringResource(R.string.detail_jump_resume),
+                        text = stringResource(R.string.detail_last_read_marker),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
