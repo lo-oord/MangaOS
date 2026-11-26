@@ -25,6 +25,16 @@ object DemoCatalogue {
     private fun hours(value: Long): Long = TimeUnit.HOURS.toMillis(value)
     private fun days(value: Long): Long = TimeUnit.DAYS.toMillis(value)
 
+    /** Declared before [works]: [entry] reads it while the object is being initialised. */
+    private val covers = listOf(
+        R.drawable.demo_cover_01, R.drawable.demo_cover_02, R.drawable.demo_cover_03,
+        R.drawable.demo_cover_04, R.drawable.demo_cover_05, R.drawable.demo_cover_06,
+        R.drawable.demo_cover_07, R.drawable.demo_cover_08, R.drawable.demo_cover_09,
+        R.drawable.demo_cover_10, R.drawable.demo_cover_11, R.drawable.demo_cover_12,
+        R.drawable.demo_cover_13, R.drawable.demo_cover_14, R.drawable.demo_cover_15,
+        R.drawable.demo_cover_16, R.drawable.demo_cover_17, R.drawable.demo_cover_18,
+    )
+
     val works: List<Manga> = listOf(
         entry("m01", "Azure Blade", MangaType.MANHWA, MangaStatus.ONGOING, 9.4, "128", minutes(2), 1),
         entry("m02", "Tide Walker", MangaType.MANHWA, MangaStatus.ONGOING, 8.9, "64", minutes(3), 2),
@@ -44,15 +54,6 @@ object DemoCatalogue {
         entry("m16", "Scarlet Ledger", MangaType.MANHWA, MangaStatus.COMPLETED, 9.0, "140", days(25), 16),
         entry("m17", "Soft Thunder", MangaType.MANGA, MangaStatus.ONGOING, 8.8, "51", days(40), 17),
         entry("m18", "Echo District", MangaType.MANHWA, MangaStatus.ONGOING, 9.5, "85", days(70), 18),
-    )
-
-    private val covers = listOf(
-        R.drawable.demo_cover_01, R.drawable.demo_cover_02, R.drawable.demo_cover_03,
-        R.drawable.demo_cover_04, R.drawable.demo_cover_05, R.drawable.demo_cover_06,
-        R.drawable.demo_cover_07, R.drawable.demo_cover_08, R.drawable.demo_cover_09,
-        R.drawable.demo_cover_10, R.drawable.demo_cover_11, R.drawable.demo_cover_12,
-        R.drawable.demo_cover_13, R.drawable.demo_cover_14, R.drawable.demo_cover_15,
-        R.drawable.demo_cover_16, R.drawable.demo_cover_17, R.drawable.demo_cover_18,
     )
 
     private fun entry(
