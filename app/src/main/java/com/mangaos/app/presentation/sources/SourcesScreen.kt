@@ -173,6 +173,10 @@ fun SourcesScreen(
                 val visible = viewModel.visibleExtensions(current.entries)
                 val available = visible.filterNot { it.isInstalled }
                 val installed = visible.filter { it.isInstalled }
+                // Installed extensions with a newer version in the index get their own section,
+                // and are not repeated in the installed list.
+                val updates = installed.filter { it.hasUpdate }
+                val installedRows = installed.filterNot { it.hasUpdate }
                 val iconByPackage = current.entries.associate {
                     it.extension.pkgName to it.extension.iconUrl
                 }
@@ -226,18 +230,43 @@ fun SourcesScreen(
                             )
                         }
 
-                        item(key = "installed-header") {
-                            SectionHeader(
-                                title = stringResource(R.string.sources_section_installed),
-                                count = installed.size,
-                            )
+                        if (updates.isNotEmpty()) {
+                            item(key = "updates-header") {
+                                SectionHeader(
+                                    title = stringResource(R.string.sources_section_updates),
+                                    count = updates.size,
+                                )
+                            }
+                            items(updates, key = { "update:${it.extension.pkgName}" }) { entry ->
+                                ExtensionRow(
+                                    entry = entry,
+                                    iconUrl = iconByPackage[entry.extension.pkgName],
+                                    transfer = transfers[entry.extension.pkgName],
+                                    loadFailure = failures[entry.extension.pkgName],
+                                    source = sourceByPackage[entry.extension.pkgName],
+                                    onOpen = {
+                                        sourceByPackage[entry.extension.pkgName]?.let(onOpenSource)
+                                    },
+                                    onInstall = { requestInstall(entry.extension) },
+                                    onUninstall = { pendingUninstall = entry.extension },
+                                )
+                            }
                         }
-                        if (installed.isEmpty()) {
+
+                        if (installedRows.isNotEmpty() || updates.isEmpty()) {
+                            item(key = "installed-header") {
+                                SectionHeader(
+                                    title = stringResource(R.string.sources_section_installed),
+                                    count = installedRows.size,
+                                )
+                            }
+                        }
+                        if (installedRows.isEmpty() && updates.isEmpty()) {
                             item(key = "installed-empty") {
                                 SectionNote(stringResource(R.string.sources_no_installed))
                             }
                         }
-                        items(installed, key = { "installed:${it.extension.pkgName}" }) { entry ->
+                        items(installedRows, key = { "installed:${it.extension.pkgName}" }) { entry ->
                             ExtensionRow(
                                 entry = entry,
                                 iconUrl = iconByPackage[entry.extension.pkgName],

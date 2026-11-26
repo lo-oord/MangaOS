@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -94,6 +96,7 @@ import com.mangaos.app.core.ui.components.MangaDetailSkeleton
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
+import com.mangaos.app.domain.model.ChapterOrder
 import com.mangaos.app.domain.model.ChapterSort
 import com.mangaos.app.domain.model.Download
 import com.mangaos.app.domain.model.DownloadChapter
@@ -178,11 +181,9 @@ private fun DetailContent(
         state.chapters.firstOrNull { it.id == saved.chapterId }
             ?: state.chapters.firstOrNull { it.number == saved.chapterNumber }
     }
-    val firstChapter = state.chapters.minWithOrNull(
-        compareBy<Chapter> { it.number.toFloatOrNull() ?: Float.MAX_VALUE }
-            .thenBy { it.publishedAt ?: Long.MAX_VALUE }
-            .thenBy { it.id },
-    ) ?: state.chapters.lastOrNull()
+    val firstChapter = remember(state.chapters) {
+        ChapterOrder.ascending(state.chapters).firstOrNull()
+    }
     val readingChapter = resumeChapter ?: firstChapter
     val downloadedChapterIds = remember(downloads) {
         downloads.flatMapTo(HashSet()) { task ->
@@ -424,10 +425,44 @@ private fun DetailContent(
             else -> {
                 item {
                     if (selectionMode) {
+                        val chosen = state.chapters.filter { it.id in selectedIds }
+                        val chosenStates = chosen.mapNotNull { chapter ->
+                            downloads.findChapter(manga.key, chapter.id)?.second?.state
+                        }
                         SelectionActions(
                             selectedCount = selectedIds.size,
                             allSelected = visibleChapters.isNotEmpty() &&
                                 visibleChapters.all { it.id in selectedIds },
+                            canDownload = chosen.any { chapter ->
+                                downloads.findChapter(manga.key, chapter.id) == null
+                            },
+                            canRetry = chosenStates.any {
+                                it == DownloadChapterState.FAILED ||
+                                    it == DownloadChapterState.CANCELLED
+                            },
+                            canCancel = chosenStates.any {
+                                it == DownloadChapterState.QUEUED ||
+                                    it == DownloadChapterState.DOWNLOADING ||
+                                    it == DownloadChapterState.PAUSED
+                            },
+                            canDelete = chosen.any { it.id in downloadedChapterIds },
+                            onRetry = {
+                                chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
+                                    .distinctBy { it.id }
+                                    .forEach { ServiceLocator.downloads.retry(it.id) }
+                            },
+                            onCancel = {
+                                chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
+                                    .distinctBy { it.id }
+                                    .forEach { ServiceLocator.downloads.cancel(it.id) }
+                            },
+                            onMarkUnread = {
+                                chosen.forEach { chapter ->
+                                    ServiceLocator.library.markChapterUnread(manga.key, chapter.id)
+                                }
+                                selectionMode = false
+                                selectedIds = emptySet()
+                            },
                             onSelectAll = {
                                 val allChosen = visibleChapters.isNotEmpty() &&
                                     visibleChapters.all { it.id in selectedIds }
@@ -438,7 +473,6 @@ private fun DetailContent(
                                 }
                             },
                             onDownload = {
-                                val chosen = state.chapters.filter { it.id in selectedIds }
                                 ServiceLocator.downloads.enqueue(manga, chosen)
                                 selectionMode = false
                                 selectedIds = emptySet()
@@ -447,7 +481,6 @@ private fun DetailContent(
                                 }
                             },
                             onDelete = {
-                                val chosen = state.chapters.filter { it.id in selectedIds }
                                 chosen.forEach { chapter ->
                                     ServiceLocator.downloads.deleteLocalChapter(manga.key, chapter.id)
                                 }
@@ -458,7 +491,7 @@ private fun DetailContent(
                                 }
                             },
                             onMarkRead = {
-                                state.chapters.filter { it.id in selectedIds }.forEach { chapter ->
+                                chosen.forEach { chapter ->
                                     ServiceLocator.library.markChapterRead(manga.key, chapter.id)
                                 }
                                 selectionMode = false
@@ -556,6 +589,8 @@ private fun DetailContent(
         val pair = downloads.findChapter(manga.key, chapter.id)
         ChapterActionsSheet(
             chapter = chapter,
+            mangaKey = manga.key,
+            isRead = readChapterKey(manga.key, chapter.id) in readChapters,
             task = pair?.first,
             downloadChapter = pair?.second,
             onDismiss = { actionChapter = null },
@@ -851,10 +886,17 @@ private fun ChapterFilters(selected: ChapterFilter, onSelect: (ChapterFilter) ->
 private fun SelectionActions(
     selectedCount: Int,
     allSelected: Boolean,
+    canDownload: Boolean,
+    canRetry: Boolean,
+    canCancel: Boolean,
+    canDelete: Boolean,
     onSelectAll: () -> Unit,
     onDownload: () -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
     onDelete: () -> Unit,
     onMarkRead: () -> Unit,
+    onMarkUnread: () -> Unit,
     onClear: () -> Unit,
 ) {
     Surface(
@@ -868,10 +910,7 @@ private fun SelectionActions(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = allSelected, onCheckedChange = { onSelectAll() })
                 Text(
-                    text = stringResource(
-                        if (selectedCount == 0) R.string.action_select_all else R.string.selected_count,
-                        selectedCount,
-                    ),
+                    text = stringResource(R.string.selected_count, selectedCount),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
@@ -881,26 +920,64 @@ private fun SelectionActions(
                 }
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                modifier = Modifier.padding(bottom = Spacing.xxs),
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = Spacing.xxs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDownload, enabled = selectedCount > 0) {
-                    Icon(Icons.Outlined.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(Spacing.xxs))
-                    Text(stringResource(R.string.action_download_selected))
-                }
-                TextButton(onClick = onDelete, enabled = selectedCount > 0) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(Spacing.xxs))
-                    Text(stringResource(R.string.action_delete_selected))
-                }
-                TextButton(onClick = onMarkRead, enabled = selectedCount > 0) {
-                    Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(Spacing.xxs))
-                    Text(stringResource(R.string.action_mark_selected_read))
-                }
+                SelectionAction(
+                    icon = Icons.Outlined.Download,
+                    labelRes = R.string.action_download_selected,
+                    enabled = selectedCount > 0 && canDownload,
+                    onClick = onDownload,
+                )
+                SelectionAction(
+                    icon = Icons.Outlined.Refresh,
+                    labelRes = R.string.action_retry_selected,
+                    enabled = canRetry,
+                    onClick = onRetry,
+                )
+                SelectionAction(
+                    icon = Icons.Outlined.Close,
+                    labelRes = R.string.action_cancel_selected,
+                    enabled = canCancel,
+                    onClick = onCancel,
+                )
+                SelectionAction(
+                    icon = Icons.Outlined.DeleteOutline,
+                    labelRes = R.string.action_delete_selected,
+                    enabled = canDelete,
+                    onClick = onDelete,
+                )
+                SelectionAction(
+                    icon = Icons.Outlined.CheckCircle,
+                    labelRes = R.string.action_mark_selected_read,
+                    enabled = selectedCount > 0,
+                    onClick = onMarkRead,
+                )
+                SelectionAction(
+                    icon = Icons.Outlined.VisibilityOff,
+                    labelRes = R.string.action_mark_selected_unread,
+                    enabled = selectedCount > 0,
+                    onClick = onMarkUnread,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun SelectionAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    labelRes: Int,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Spacing.xxs))
+        Text(stringResource(labelRes), maxLines = 1)
     }
 }
 
@@ -937,9 +1014,12 @@ private fun ChapterRow(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(
+            // One fixed height for every state (plain, downloading, downloaded, selected), so
+            // the list visually stays on a single rhythm and never jumps while states change.
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = Spacing.screen, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.xs),
+                .height(ChapterRowHeight)
+                .padding(start = Spacing.screen, end = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionMode) {
@@ -1007,13 +1087,18 @@ private fun ChapterRow(
                 }
             }
             Spacer(Modifier.width(Spacing.sm))
-            Icon(
-                imageVector = if (isRead) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
-                contentDescription = stringResource(R.string.detail_read),
-                tint = if (isRead) ReadGreen
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(16.dp),
-            )
+            // Read marker only, and only when the chapter is really read. The space is reserved
+            // in both states so the title column keeps the same width.
+            Box(modifier = Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                if (isRead) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = stringResource(R.string.detail_read),
+                        tint = ReadGreen,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
             Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
                 when (downloadChapter?.state) {
                     DownloadChapterState.QUEUED, DownloadChapterState.PAUSED -> IconButton(
@@ -1085,6 +1170,8 @@ private fun ChapterRow(
 @Composable
 private fun ChapterActionsSheet(
     chapter: Chapter,
+    mangaKey: String,
+    isRead: Boolean,
     task: Download?,
     downloadChapter: DownloadChapter?,
     onDismiss: () -> Unit,
@@ -1138,6 +1225,22 @@ private fun ChapterActionsSheet(
                 ChapterActionRow(Icons.Outlined.PlayArrow, R.string.chapter_action_open, onOpen)
                 ChapterActionRow(Icons.Outlined.DeleteOutline, R.string.chapter_action_delete_local, onDeleteLocal)
             }
+        }
+        // Reading state is independent of the download state, so it is always available.
+        ChapterActionRow(
+            icon = if (isRead) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+            labelRes = if (isRead) {
+                R.string.chapter_action_mark_unread
+            } else {
+                R.string.chapter_action_mark_read
+            },
+        ) {
+            if (isRead) {
+                ServiceLocator.library.markChapterUnread(mangaKey, chapter.id)
+            } else {
+                ServiceLocator.library.markChapterRead(mangaKey, chapter.id)
+            }
+            onDismiss()
         }
     }
 }
@@ -1249,3 +1352,6 @@ private fun formatDate(timestamp: Long): String =
     DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()).format(Date(timestamp))
 
 private val ReadGreen = Color(0xFF16A34A)
+
+/** Single row height, used by every chapter state so the list keeps one rhythm. */
+private val ChapterRowHeight = 60.dp

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
+import com.mangaos.app.domain.model.ChapterOrder
 import com.mangaos.app.domain.model.ChapterSort
 import com.mangaos.app.domain.model.ExtensionFailure
 import com.mangaos.app.domain.model.Manga
@@ -100,18 +101,14 @@ class MangaDetailViewModel : ViewModel() {
         library.toggle(current.manga)
     }
 
+    /** One canonical order, shared with the reader so "next" here matches "next" there. */
     private fun sortChapters(chapters: List<Chapter>): List<Chapter> {
-        val comparator = compareBy<Chapter> { chapterNumberValue(it) }
-            .thenBy { it.publishedAt ?: 0L }
-            .thenBy { it.id }
+        val ascending = ChapterOrder.ascending(chapters)
         return when (sort) {
-            ChapterSort.NEWEST_FIRST -> chapters.sortedWith(comparator).reversed()
-            ChapterSort.OLDEST_FIRST -> chapters.sortedWith(comparator)
+            ChapterSort.NEWEST_FIRST -> ascending.asReversed()
+            ChapterSort.OLDEST_FIRST -> ascending
         }
     }
-
-    private fun chapterNumberValue(chapter: Chapter): Float =
-        chapter.number.toFloatOrNull() ?: -1f
 
     private fun Result<*>.failureOrDefault(): ExtensionFailure {
         val error = exceptionOrNull() ?: return ExtensionFailure.NETWORK

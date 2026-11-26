@@ -24,6 +24,7 @@ import com.mangaos.app.data.work.DownloadScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,7 +65,7 @@ class LocalDownloadRepository(
     override val downloads: StateFlow<List<Download>> = _downloads.asStateFlow()
 
     private val file = File(context.filesDir, QUEUE_RECORDS)
-    private val root = File(context.filesDir, DOWNLOAD_DIRECTORY)
+    private val root = StorageInspector.root(context)
     private val lock = Any()
     private val lastPersistedAt = mutableMapOf<String, Long>()
     private val lastNotifiedAt = mutableMapOf<String, Long>()
@@ -313,6 +314,45 @@ class LocalDownloadRepository(
 
     fun notificationFor(task: Download) = notifier.build(task)
 
+    /** Storage state for the UI: never inferred from a failure message. */
+    fun storageStatus(): StorageStatus = StorageInspector.check(context)
+
+    /**
+     * Maps a download failure to the message that matches the real cause, so a missing folder
+     * or a refused network request is never reported as a full disk.
+     */
+    private fun failureMessage(error: Throwable): String {
+        (error as? StorageException)?.failure?.let { failure ->
+            return context.getString(
+                when (failure) {
+                    StorageFailure.NO_SPACE -> com.mangaos.app.R.string.download_error_storage
+                    StorageFailure.UNAVAILABLE, StorageFailure.READ_ONLY,
+                    StorageFailure.CANNOT_CREATE ->
+                        com.mangaos.app.R.string.download_error_storage_access
+                    StorageFailure.CANNOT_WRITE -> com.mangaos.app.R.string.download_error_write
+                },
+            )
+        }
+        val message = error.message.orEmpty()
+        Regex("HTTP (\\d{3})").find(message)?.groupValues?.getOrNull(1)?.let { code ->
+            return context.getString(com.mangaos.app.R.string.download_error_http, code)
+        }
+        return when {
+            message.startsWith("Could not store page") || message.startsWith("Empty page") ->
+                context.getString(com.mangaos.app.R.string.download_error_write)
+            error is java.net.UnknownHostException ||
+                error is java.net.SocketTimeoutException ||
+                error is java.net.ConnectException ||
+                error is javax.net.ssl.SSLException ||
+                message.contains("timeout", ignoreCase = true) ||
+                message.contains("Unable to resolve host", ignoreCase = true) ->
+                context.getString(com.mangaos.app.R.string.download_error_network)
+            else -> message.ifBlank {
+                context.getString(com.mangaos.app.R.string.download_error_generic)
+            }
+        }
+    }
+
     fun pumpIfPending() {
         if (!hasPendingWork()) return
         scheduler.pump(unmeteredOnly = appSettings.wifiOnlyDownloads)
@@ -344,11 +384,12 @@ class LocalDownloadRepository(
                 persist(force = true)
                 throw cancelled
             } catch (error: Throwable) {
-                deleteChapterDirectory(task.manga.key, chapter.chapterId)
+                // Pages that were already written stay on disk, so a retry only re-fetches
+                // what is missing instead of starting the chapter over.
                 setChapter(taskId, chapter.chapterId) {
                     it.copy(
                         state = DownloadChapterState.FAILED,
-                        error = error.message ?: error.javaClass.simpleName,
+                        error = failureMessage(error),
                     )
                 }
                 persist(force = true)
@@ -367,14 +408,17 @@ class LocalDownloadRepository(
         if (pages.isEmpty()) {
             throw IOException(context.getString(com.mangaos.app.R.string.download_error_no_pages))
         }
-        if (root.usableSpace in 0L until MIN_FREE_SPACE) {
-            throw IOException(context.getString(com.mangaos.app.R.string.download_error_storage))
-        }
+        // Directory, permission and a real probe write first: a chapter never starts on a
+        // storage layer that cannot accept it, and "no space" is only reported by the volume
+        // that actually reported it. Free space is read from the nearest existing ancestor,
+        // because File.usableSpace is 0 for a directory that does not exist yet.
+        val storage = StorageInspector.check(context)
+        if (!storage.writable) throw StorageException(storage.failure ?: StorageFailure.UNAVAILABLE)
         val headers = mangaRepository.imageHeaders(manga.sourceId)
         val directory = chapterDir(manga.key, chapter.chapterId)
-        if (directory.exists()) directory.deleteRecursively()
-        if (!directory.mkdirs()) {
-            throw IOException(context.getString(com.mangaos.app.R.string.download_error_folder))
+        // Existing pages are kept: retrying a failed chapter continues where it stopped.
+        if (!directory.isDirectory && !directory.mkdirs() && !directory.isDirectory) {
+            throw StorageException(StorageFailure.CANNOT_CREATE)
         }
 
         setChapter(taskId, chapter.chapterId) { it.copy(pageCount = pages.size) }
@@ -386,7 +430,7 @@ class LocalDownloadRepository(
             currentCoroutineContext().ensureActive()
             val name = pageFileName(index, url)
             val target = File(directory, name)
-            val partial = File(directory, "$name.part")
+            val part = File(directory, "$name.part")
             val request = Request.Builder()
                 .url(url)
                 .apply {
@@ -395,13 +439,23 @@ class LocalDownloadRepository(
                     }
                 }
                 .build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw IOException("HTTP ${response.code} for page ${index + 1}")
+            if (target.isFile && target.length() > 0L) {
+                // A previous attempt already stored this page; never download it twice.
+                bytes += target.length()
+                names += name
+                setChapter(taskId, chapter.chapterId) {
+                    it.copy(
+                        pageCount = pages.size,
+                        downloadedPages = index + 1,
+                        bytes = bytes,
+                    )
                 }
-                val body = response.body ?: throw IOException("Empty page ${index + 1}")
-                partial.outputStream().use { output -> body.byteStream().copyTo(output) }
+                persist(force = false)
+                notifyThrottled(taskId)
+                return@forEachIndexed
             }
+            fetchPage(request, part, index)
+            val partial = part
             if (!partial.exists() || partial.length() <= 0L) {
                 partial.delete()
                 throw IOException("Empty page ${index + 1}")
@@ -468,6 +522,31 @@ class LocalDownloadRepository(
         }
         persist(force = true)
         findTask(taskId)?.let { notifier.notify(it, appSettings) }
+    }
+
+    /**
+     * One page request with bounded retries. A page that fails is retried here, so a single
+     * flaky response does not fail the whole chapter; pages that already succeeded are kept.
+     */
+    private suspend fun fetchPage(request: Request, partial: File, index: Int) {
+        var lastError: Throwable? = null
+        repeat(PAGE_ATTEMPTS) { attempt ->
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        throw IOException("HTTP ${response.code} for page ${index + 1}")
+                    }
+                    val body = response.body ?: throw IOException("Empty page ${index + 1}")
+                    partial.outputStream().use { output -> body.byteStream().copyTo(output) }
+                }
+                return
+            } catch (error: IOException) {
+                lastError = error
+                runCatching { partial.delete() }
+                if (attempt < PAGE_ATTEMPTS - 1) delay(PAGE_RETRY_DELAY_MS * (attempt + 1))
+            }
+        }
+        throw lastError ?: IOException("Empty page ${index + 1}")
     }
 
     private fun finalizeTask(taskId: String) {
@@ -696,11 +775,11 @@ class LocalDownloadRepository(
 
     private companion object {
         const val QUEUE_RECORDS = "download_queue.json"
-        const val DOWNLOAD_DIRECTORY = "downloads"
         const val PERSIST_KEY = "queue"
         const val PERSIST_INTERVAL_MS = 800L
         const val NOTIFICATION_INTERVAL_MS = 700L
-        const val MIN_FREE_SPACE = 24L * 1024L * 1024L
+        const val PAGE_ATTEMPTS = 3
+        const val PAGE_RETRY_DELAY_MS = 900L
         val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
         val ACTIVE_OR_DONE = setOf(
             DownloadChapterState.QUEUED,

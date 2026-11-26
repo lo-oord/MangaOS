@@ -455,6 +455,19 @@
     <string name="download_error_folder">تعذر إنشاء مجلد الفصل</string>
     <string name="download_error_verify">فشل التحقق من الصور التي تم تنزيلها</string>
     <string name="download_error_record">تعذر حفظ الفصل في التخزين المحلي</string>
+    <string name="download_error_storage_access">مجلد التنزيلات غير متاح. تحقق من أن التخزين موصول ثم أعد المحاولة.</string>
+    <string name="download_error_write">تعذرت كتابة الصور إلى مساحة التخزين</string>
+    <string name="download_error_network">انقطع الاتصال أثناء التنزيل. أعد المحاولة عند عودة الشبكة.</string>
+    <string name="download_error_http">رفض المصدر الطلب (%1$s)</string>
+    <string name="download_error_generic">فشل التنزيل</string>
+    <string name="download_storage_title">تخزين التنزيلات</string>
+    <string name="download_storage_location">المكان: %1$s</string>
+    <string name="download_storage_free">المتاح %1$s</string>
+    <string name="download_storage_check">فحص التخزين</string>
+    <string name="download_storage_ok">التخزين جاهز للتنزيل</string>
+    <string name="download_storage_problem">التخزين غير جاهز: %1$s</string>
+    <string name="notif_pages_progress">%1$d من %2$d صورة</string>
+    <string name="sources_section_updates">تحديثات المصادر</string>
 
     <!-- التخزين المحلي والقراءة دون إنترنت -->
     <string name="storage_summary">%1$d عملًا · %2$s</string>
@@ -477,6 +490,8 @@
     <string name="chapter_action_retry">إعادة محاولة التنزيل</string>
     <string name="chapter_action_open">فتح الفصل</string>
     <string name="chapter_action_delete_local">حذف التنزيل المحلي</string>
+    <string name="chapter_action_mark_read">تحديد كمقروء</string>
+    <string name="chapter_action_mark_unread">تحديد كغير مقروء</string>
     <string name="reader_image_failed">تعذّر تحميل الصورة</string>
     <string name="reader_direction">اتجاه القراءة</string>
     <string name="reader_direction_hint">يُطبَّق على أوضاع الصفحات الأفقية</string>
@@ -485,6 +500,9 @@
     <string name="detail_filter_unread">غير مقروء</string>
     <string name="detail_filter_downloaded">محمّل</string>
     <string name="action_mark_selected_read">تعليم كمقروء</string>
+    <string name="action_mark_selected_unread">تعليم كغير مقروء</string>
+    <string name="action_retry_selected">إعادة محاولة الفاشلة</string>
+    <string name="action_cancel_selected">إلغاء التنزيلات</string>
     <string name="action_clear_selection">إلغاء التحديد</string>
     <string name="detail_chapter_search">بحث في الفصول</string>
     <string name="detail_jump_resume">الانتقال إلى آخر قراءة</string>

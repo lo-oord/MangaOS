@@ -95,6 +95,9 @@ interface LibraryRepository {
     fun setProgress(mangaKey: String, progress: ReadingProgress)
     fun markChapterRead(mangaKey: String, chapterId: String)
 
+    /** Explicit user action from the chapter list; never called by the reader. */
+    fun markChapterUnread(mangaKey: String, chapterId: String)
+
     /** Fresh library snapshot for background work, independent of flow warm-up timing. */
     suspend fun worksSnapshot(): List<Manga>
 }

@@ -119,6 +119,17 @@ class DataStoreLibraryRepository(
         }
     }
 
+    override fun markChapterUnread(mangaKey: String, chapterId: String) {
+        scope.launch {
+            dataStore.edit { preferences ->
+                val read = decodeReadChapters(preferences[Keys.readChapters]).toMutableSet()
+                if (read.remove(readChapterKey(mangaKey, chapterId))) {
+                    preferences[Keys.readChapters] = encodeReadChapters(read)
+                }
+            }
+        }
+    }
+
     private fun encodeReadChapters(read: Set<String>): String = JSONArray(read.toList()).toString()
 
     private fun decodeReadChapters(raw: String?): Set<String> {

@@ -117,6 +117,9 @@ class ReaderViewModel : ViewModel() {
     private var sourceId: String = ""
     private var mangaId: String = ""
     private var currentChapterId: String = ""
+
+    /** Chapters whose last page was actually reached in this session. */
+    private val finishedChapterIds = mutableSetOf<String>()
     private var nextLoadJob: Job? = null
     private var previousLoadJob: Job? = null
     private var consecutiveTallImages = 0
@@ -206,6 +209,7 @@ class ReaderViewModel : ViewModel() {
         loadedChapterIds.clear()
         inFlightChapterIds.clear()
         chapterPageCounts.clear()
+        finishedChapterIds.clear()
         _error.value = null
         _nextChapterError.value = false
         _previousChapterError.value = false
@@ -472,8 +476,11 @@ class ReaderViewModel : ViewModel() {
         val page = pages.getOrNull(pageIndex) ?: return
         val chapterIndex = _chapters.value.indexOfFirst { it.id == page.chapterId }
         if (chapterIndex >= 0 && chapterIndex != _currentChapterIndex.value) {
-            // Reaching another chapter means the previous one was actually read.
-            _chapters.value.getOrNull(_currentChapterIndex.value)?.let { markRead(it) }
+            // Only a chapter the reader scrolled to its end counts as read. Opening a chapter
+            // and leaving it again must not silently change its reading state.
+            _chapters.value.getOrNull(_currentChapterIndex.value)
+                ?.takeIf { it.id in finishedChapterIds }
+                ?.let { markRead(it) }
             _currentChapterIndex.value = chapterIndex
             currentChapterId = page.chapterId
             _chapters.value.getOrNull(chapterIndex)?.let { recordProgress(it) }
@@ -486,6 +493,7 @@ class ReaderViewModel : ViewModel() {
             1f
         }
         if (count > 0 && page.indexInChapter >= count - 1 && chapterIndex >= 0) {
+            finishedChapterIds += page.chapterId
             _chapters.value.getOrNull(chapterIndex)?.let { markRead(it) }
         }
         currentChapterId = page.chapterId
@@ -529,7 +537,9 @@ class ReaderViewModel : ViewModel() {
         previousLoadJob?.cancel()
         viewModelScope.launch {
             val previous = _chapters.value.getOrNull(_currentChapterIndex.value)
-            if (previous != null && previous.id != chapter.id) markRead(previous)
+            if (previous != null && previous.id != chapter.id && previous.id in finishedChapterIds) {
+                markRead(previous)
+            }
             resetSequence()
             _currentChapterIndex.value = index
             currentChapterId = chapter.id

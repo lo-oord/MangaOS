@@ -481,6 +481,19 @@
     <string name="download_error_folder">Could not create the chapter folder</string>
     <string name="download_error_verify">The downloaded pages failed verification</string>
     <string name="download_error_record">Could not save the chapter in the local library</string>
+    <string name="download_error_storage_access">The download folder is not available. Check that the storage is mounted, then try again.</string>
+    <string name="download_error_write">Could not write the images to your storage</string>
+    <string name="download_error_network">The connection was lost while downloading. Try again when the network is back.</string>
+    <string name="download_error_http">The source refused the request (%1$s)</string>
+    <string name="download_error_generic">The download failed</string>
+    <string name="download_storage_title">Download storage</string>
+    <string name="download_storage_location">Location: %1$s</string>
+    <string name="download_storage_free">%1$s free</string>
+    <string name="download_storage_check">Check storage</string>
+    <string name="download_storage_ok">Storage is ready for downloads</string>
+    <string name="download_storage_problem">Storage is not ready: %1$s</string>
+    <string name="notif_pages_progress">%1$d / %2$d images</string>
+    <string name="sources_section_updates">Source updates</string>
 
     <!-- Local library and offline reading -->
     <string name="storage_summary">%1$d works · %2$s</string>
@@ -503,6 +516,8 @@
     <string name="chapter_action_retry">Retry download</string>
     <string name="chapter_action_open">Open chapter</string>
     <string name="chapter_action_delete_local">Delete local download</string>
+    <string name="chapter_action_mark_read">Mark as read</string>
+    <string name="chapter_action_mark_unread">Mark as unread</string>
     <string name="reader_image_failed">Image failed to load</string>
     <string name="reader_direction">Reading direction</string>
     <string name="reader_direction_hint">Applies to horizontal page modes</string>
@@ -511,6 +526,9 @@
     <string name="detail_filter_unread">Unread</string>
     <string name="detail_filter_downloaded">Downloaded</string>
     <string name="action_mark_selected_read">Mark read</string>
+    <string name="action_mark_selected_unread">Mark unread</string>
+    <string name="action_retry_selected">Retry failed</string>
+    <string name="action_cancel_selected">Cancel downloads</string>
     <string name="action_clear_selection">Clear</string>
     <string name="detail_chapter_search">Search chapters</string>
     <string name="detail_jump_resume">Jump to last read</string>

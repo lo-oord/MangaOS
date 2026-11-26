@@ -126,6 +126,20 @@ fun MangaCard(
             RatingBadge(manga.rating)
         }
 
+        // The two most relevant genres, on a fixed line so cards in a row keep one height.
+        Spacer(Modifier.height(2.dp))
+        Box(modifier = Modifier.height(16.dp)) {
+            if (manga.genres.isNotEmpty()) {
+                Text(
+                    text = manga.genres.take(2).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
         if (showUpdatedAt && manga.updatedAt != null) {
             Spacer(Modifier.height(Spacing.xxs))
             Text(

@@ -12,6 +12,7 @@ import com.mangaos.app.MainActivity
 import com.mangaos.app.R
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.domain.model.Download
+import com.mangaos.app.domain.model.DownloadChapterState
 import com.mangaos.app.domain.model.DownloadState
 import com.mangaos.app.domain.model.AppSettings
 import java.io.File
@@ -36,12 +37,14 @@ class DownloadNotifications(private val context: Context) {
 
     fun build(task: Download): Notification {
         val state = task.state
+        val text = contentText(task)
+        val cover = thumbnail(task)
         val builder = NotificationCompat.Builder(context, NotificationIntents.CHANNEL_DOWNLOADS)
             .setSmallIcon(R.mipmap.ic_stat_mangaos)
             .setColor(0xFF018AFE.toInt())
             .setContentTitle(task.mangaTitle)
-            .setContentText(contentText(task))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(contentText(task)))
+            .setContentText(text)
+            .setSubText(subText(task))
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setWhen(if (task.createdAt > 0L) task.createdAt else System.currentTimeMillis())
@@ -49,7 +52,19 @@ class DownloadNotifications(private val context: Context) {
             .setContentIntent(openTask(task))
             .setOngoing(state == DownloadState.DOWNLOADING || state == DownloadState.QUEUED)
 
-        thumbnail(task)?.let { builder.setLargeIcon(it) }
+        // The real cover of the work, taken from the app-private copy the manager cached, so
+        // the notification never waits on the network and never shows another work's cover.
+        if (cover != null) {
+            builder.setLargeIcon(cover)
+            builder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(cover)
+                    .setBigContentTitle(task.mangaTitle)
+                    .setSummaryText(text),
+            )
+        } else {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        }
 
         when (state) {
             DownloadState.QUEUED -> builder.setProgress(0, 0, true)
@@ -167,6 +182,28 @@ class DownloadNotifications(private val context: Context) {
         }
     }
 
+    /** Second line: the chapter, plus the real page counter while it is downloading. */
+    private fun subText(task: Download): String? {
+        if (task.totalChapters != 1) return null
+        val chapter = task.chapters.firstOrNull() ?: return null
+        val chapterLabel = context.appString(R.string.chapter_number, chapter.number)
+        val pages = if (
+            chapter.state == DownloadChapterState.DOWNLOADING && chapter.pageCount > 0
+        ) {
+            context.appString(
+                R.string.notif_pages_progress,
+                chapter.downloadedPages,
+                chapter.pageCount,
+            )
+        } else {
+            null
+        }
+        return listOfNotNull(chapterLabel, pages)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+            .takeIf { it.isNotBlank() }
+    }
+
     private fun stateLabel(state: DownloadState): Int = when (state) {
         DownloadState.QUEUED -> R.string.download_status_queued
         DownloadState.DOWNLOADING -> R.string.download_status_downloading
@@ -215,7 +252,7 @@ class DownloadNotifications(private val context: Context) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(path, bounds)
             var sample = 1
-            while (bounds.outWidth / sample > 256 || bounds.outHeight / sample > 256) {
+            while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) {
                 sample *= 2
             }
             val options = BitmapFactory.Options().apply { inSampleSize = sample }
