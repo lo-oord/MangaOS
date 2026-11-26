@@ -99,18 +99,26 @@ object MihonIndexParser {
                 EXTENSION_FIELD -> {
                     val container = reader.readLengthDelimited()
                     val before = found.size
-                    ProtoReader.walk(container) { entry ->
-                        if (entry.field == EXTENSION_ENTRY_FIELD) {
-                            parseExtension(entry.readLengthDelimited())
-                                ?.let { found[it.pkgName] = it }
-                            true
-                        } else {
-                            false
+                    // A legacy payload is a single extension message, whose field 1 is the
+                    // name string. That string is not a message, so nested parsing must not
+                    // abort the whole parse: failures fall through to the legacy reader.
+                    runCatching {
+                        ProtoReader.walk(container) { entry ->
+                            if (entry.field == EXTENSION_ENTRY_FIELD) {
+                                runCatching { parseExtension(entry.readLengthDelimited()) }
+                                    .getOrNull()
+                                    ?.let { found[it.pkgName] = it }
+                                true
+                            } else {
+                                false
+                            }
                         }
                     }
                     if (found.size == before) {
                         // Legacy layout: the 101 payload is a single extension message.
-                        parseExtension(container)?.let { found[it.pkgName] = it }
+                        runCatching { parseExtension(container) }
+                            .getOrNull()
+                            ?.let { found[it.pkgName] = it }
                     }
                     true
                 }
