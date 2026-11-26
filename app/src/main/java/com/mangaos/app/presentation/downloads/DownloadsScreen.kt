@@ -84,7 +84,7 @@ fun DownloadsScreen(
     Column(modifier = modifier.fillMaxSize()) {
         FilterRow(
             selected = viewModel.filter,
-            onSelect = viewModel::setFilter,
+            onSelect = viewModel::selectFilter,
         )
 
         val visible = viewModel.visible(downloads)

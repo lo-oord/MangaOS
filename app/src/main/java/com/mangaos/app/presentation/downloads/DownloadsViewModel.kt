@@ -25,7 +25,7 @@ class DownloadsViewModel : ViewModel() {
     var filter by mutableStateOf(DownloadFilter.ALL)
         private set
 
-    fun setFilter(value: DownloadFilter) {
+    fun selectFilter(value: DownloadFilter) {
         filter = value
     }
 
