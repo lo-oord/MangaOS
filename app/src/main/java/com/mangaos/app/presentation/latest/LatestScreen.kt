@@ -40,7 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,7 +88,7 @@ fun LatestScreen(
     val prefs by ServiceLocator.settings.appSettings.collectAsStateWithLifecycle(
         initialValue = AppSettings(),
     )
-    val view = LocalView.current
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(viewMode) {
         snapshotFlow {
@@ -186,39 +186,20 @@ fun LatestScreen(
             }
 
             if (sources.isNotEmpty()) {
-                AnimatedVisibility(
+                SourcePickerFab(
                     visible = fabVisible,
+                    source = selectedSource,
+                    iconUrl = selectedSource?.let { icons[it.pkgName] },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(Spacing.lg),
-                    enter = fadeIn() + slideInVertically { it / 2 },
-                    exit = fadeOut() + slideOutVertically { it / 2 },
-                ) {
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            if (prefs.hapticFeedback) {
-                                view.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
-                            showSourcePicker = true
-                        },
-                        modifier = Modifier.widthIn(max = 280.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ) {
-                        SourceBadge(
-                            source = selectedSource,
-                            iconUrl = selectedSource?.let { icons[it.pkgName] },
-                        )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(
-                            text = selectedSource?.name ?: stringResource(R.string.source_choose),
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 190.dp),
-                        )
-                    }
-                }
+                    onClick = {
+                        if (prefs.hapticFeedback) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                        showSourcePicker = true
+                    },
+                )
             }
         }
     }
@@ -238,6 +219,39 @@ fun LatestScreen(
             },
             onDismiss = { showSourcePicker = false },
         )
+    }
+}
+
+@Composable
+private fun SourcePickerFab(
+    visible: Boolean,
+    source: SourceInfo?,
+    iconUrl: String?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + slideInVertically { it / 2 },
+        exit = fadeOut() + slideOutVertically { it / 2 },
+    ) {
+        ExtendedFloatingActionButton(
+            onClick = onClick,
+            modifier = Modifier.widthIn(max = 280.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            SourceBadge(source = source, iconUrl = iconUrl)
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = source?.name ?: stringResource(R.string.source_choose),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 190.dp),
+            )
+        }
     }
 }
 
