@@ -617,7 +617,7 @@ private fun SourceBadge(source: SourceInfo?, iconUrl: String?) {
 private fun radialPositions(count: Int, center: Offset, density: androidx.compose.ui.unit.Density): List<Offset> {
     if (count <= 0) return emptyList()
     return with(density) {
-        fun ring(items: Int, radius: Float, startAngle: Double, offset: Int): List<Offset> =
+        fun ring(items: Int, radius: Float, startAngle: Double): List<Offset> =
             List(items) { index ->
                 val angle = startAngle + index * 2.0 * Math.PI / items.coerceAtLeast(1)
                 Offset(
@@ -626,13 +626,13 @@ private fun radialPositions(count: Int, center: Offset, density: androidx.compos
                 )
             }
         if (count <= 8) {
-            ring(count, 94.dp.toPx(), -Math.PI / 2.0, 0)
+            ring(count, 94.dp.toPx(), -Math.PI / 2.0)
         } else {
             // Two rings keep the icons apart when many sources are installed.
             val inner = (count + 1) / 2
             val outer = count - inner
-            ring(inner, 76.dp.toPx(), -Math.PI / 2.0, 0) +
-                ring(outer, 138.dp.toPx(), -Math.PI / 2.0 + Math.PI / outer.coerceAtLeast(1), inner)
+            ring(inner, 76.dp.toPx(), -Math.PI / 2.0) +
+                ring(outer, 138.dp.toPx(), -Math.PI / 2.0 + Math.PI / outer.coerceAtLeast(1))
         }
     }
 }

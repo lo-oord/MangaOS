@@ -493,6 +493,7 @@ private fun DetailContent(
                         chapter = chapter,
                         isRead = readChapterKey(manga.key, chapter.id) in readChapters,
                         downloadChapter = pair?.second,
+                        isLastRead = resumeChapter?.id == chapter.id,
                         selectionMode = selectionMode,
                         selected = chapter.id in selectedIds,
                         onClick = {
@@ -907,6 +908,7 @@ private fun SelectionActions(
 private fun ChapterRow(
     chapter: Chapter,
     isRead: Boolean,
+    isLastRead: Boolean,
     downloadChapter: DownloadChapter?,
     selectionMode: Boolean,
     selected: Boolean,
@@ -919,12 +921,16 @@ private fun ChapterRow(
     val downloadState = downloadChapter?.state
     val percent = (downloadChapter?.progress ?: 0f).times(100f).roundToInt()
     val downloading = downloadState == DownloadChapterState.DOWNLOADING
-    Surface(
-        color = if (selected && selectionMode) {
+    val rowColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected && selectionMode) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
         } else {
             Color.Transparent
         },
+        label = "chapterSelection",
+    )
+    Surface(
+        color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
@@ -974,6 +980,15 @@ private fun ChapterRow(
                         text = details.joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                if (isLastRead) {
+                    Spacer(Modifier.height(Spacing.xxs))
+                    Text(
+                        text = stringResource(R.string.detail_jump_resume),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                     )
                 }
