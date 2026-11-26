@@ -163,7 +163,13 @@
     <string name="cd_grid_view">Grid view</string>
     <string name="cd_list_view">List view</string>
     <string name="status_unknown">Unknown</string>
-    <string name="search_latest_placeholder">Search this source</string>
+    <string name="search_latest_placeholder">Search every source</string>
+    <string name="search_sources_failed">%1$d sources could not be searched</string>
+    <string name="feed_end">You reached the end</string>
+    <string name="source_radial_hint">Slide to a source</string>
+    <string name="detail_start_reading">Start reading</string>
+    <string name="detail_continue_reading">Continue reading</string>
+    <string name="detail_chapter_count">%1$d chapters</string>
     <string name="search_manga_placeholder">Search every source</string>
     <string name="search_library_placeholder">Search your library</string>
     <string name="search_sources_placeholder">Search sources</string>
@@ -260,6 +266,9 @@
     <string name="reader_chapter_error">Chapter pages could not be loaded</string>
     <string name="info_webview_required">Android System WebView is required to open this source. Install or enable it, then retry.</string>
     <string name="info_cloudflare_bypass_failure">The source could not get past Cloudflare protection. Try again later.</string>
+    <string name="settings_group_look">Look and reading</string>
+    <string name="settings_group_content">Content and storage</string>
+    <string name="settings_group_app">App and behavior</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_appearance_desc">Language, theme and dark mode</string>
     <string name="settings_section_reader">Reader</string>
@@ -321,6 +330,8 @@
     <string name="exit_confirm_title">Exit MangaOS?</string>
     <string name="exit_confirm_message">Your reading progress is saved.</string>
     <string name="action_exit">Exit</string>
+    <string name="reader_quick_title">Reader settings</string>
+    <string name="reader_quick_more">All reader settings</string>
     <string name="reader_group_mode">Reading mode</string>
     <string name="reader_group_display">Pages and fitting</string>
     <string name="reader_group_image">Image adjustments</string>

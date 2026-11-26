@@ -8,6 +8,7 @@ import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.ReadingProgress
 import com.mangaos.app.domain.repository.LibraryRepository
+import com.mangaos.app.domain.repository.readChapterKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,7 @@ class DataStoreLibraryRepository(
     private object Keys {
         val items = stringPreferencesKey("library_items")
         val progress = stringPreferencesKey("library_progress")
+        val readChapters = stringPreferencesKey("library_read_chapters")
     }
 
     override val works: StateFlow<List<Manga>> = dataStore.data
@@ -43,6 +45,10 @@ class DataStoreLibraryRepository(
     override val progress: StateFlow<Map<String, ReadingProgress>> = dataStore.data
         .map { decodeProgress(it[Keys.progress]) }
         .stateIn(scope, SharingStarted.Eagerly, emptyMap())
+
+    override val readChapters: StateFlow<Set<String>> = dataStore.data
+        .map { preferences -> decodeReadChapters(preferences[Keys.readChapters]) }
+        .stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     override fun toggle(manga: Manga) {
         scope.launch {
@@ -78,6 +84,10 @@ class DataStoreLibraryRepository(
                 val progress = decodeProgress(preferences[Keys.progress]).toMutableMap()
                 progress.remove(mangaId)
                 preferences[Keys.progress] = encodeProgress(progress)
+                val read = decodeReadChapters(preferences[Keys.readChapters])
+                    .filterNot { it.startsWith("$mangaId\u0001") }
+                    .toSet()
+                preferences[Keys.readChapters] = encodeReadChapters(read)
             }
         }
     }
@@ -92,6 +102,31 @@ class DataStoreLibraryRepository(
                 preferences[Keys.progress] = encodeProgress(map)
             }
         }
+    }
+
+    override fun markChapterRead(mangaKey: String, chapterId: String) {
+        scope.launch {
+            dataStore.edit { preferences ->
+                val read = decodeReadChapters(preferences[Keys.readChapters]).toMutableSet()
+                if (read.add(readChapterKey(mangaKey, chapterId))) {
+                    preferences[Keys.readChapters] = encodeReadChapters(read)
+                }
+            }
+        }
+    }
+
+    private fun encodeReadChapters(read: Set<String>): String = JSONArray(read.toList()).toString()
+
+    private fun decodeReadChapters(raw: String?): Set<String> {
+        if (raw.isNullOrBlank()) return emptySet()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildSet {
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }.getOrDefault(emptySet())
     }
 
     private fun encodeMangas(mangas: List<Manga>): String {
@@ -113,6 +148,7 @@ class DataStoreLibraryRepository(
                     manga.originalLanguage?.let { put("originalLanguage", it) }
                     manga.coverUrl?.let { put("coverUrl", it) }
                     manga.latestChapter?.let { put("latestChapter", it) }
+                    manga.latestChapterId?.let { put("latestChapterId", it) }
                     manga.updatedAt?.let { put("updatedAt", it) }
                     manga.url?.let { put("url", it) }
                     manga.sourceName?.let { put("sourceName", it) }
@@ -148,6 +184,7 @@ class DataStoreLibraryRepository(
                     originalLanguage = json.stringOrNull("originalLanguage"),
                     coverUrl = json.stringOrNull("coverUrl"),
                     latestChapter = json.stringOrNull("latestChapter"),
+                    latestChapterId = json.stringOrNull("latestChapterId"),
                     updatedAt = json.takeIf { it.has("updatedAt") }?.optLong("updatedAt"),
                     url = json.stringOrNull("url"),
                     sourceName = json.stringOrNull("sourceName"),

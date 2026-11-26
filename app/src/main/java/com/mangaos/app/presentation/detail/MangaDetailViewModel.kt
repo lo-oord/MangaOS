@@ -38,6 +38,7 @@ class MangaDetailViewModel : ViewModel() {
 
     val savedIds: StateFlow<Set<String>> = library.ids
     val progress: StateFlow<Map<String, ReadingProgress>> = library.progress
+    val readChapters: StateFlow<Set<String>> = library.readChapters
 
     var sort by mutableStateOf(ChapterSort.NEWEST_FIRST)
         private set
@@ -88,8 +89,8 @@ class MangaDetailViewModel : ViewModel() {
         if (sourceId.isNotEmpty()) load(sourceId, mangaId, force = true)
     }
 
-    fun changeSort(next: ChapterSort) {
-        sort = next
+    fun toggleSort() {
+        sort = if (sort == ChapterSort.NEWEST_FIRST) ChapterSort.OLDEST_FIRST else ChapterSort.NEWEST_FIRST
         val current = _state.value as? DetailUiState.Content ?: return
         _state.value = current.copy(chapters = sortChapters(current.chapters))
     }
@@ -99,25 +100,18 @@ class MangaDetailViewModel : ViewModel() {
         library.toggle(current.manga)
     }
 
-    fun markOpened(chapter: Chapter) {
-        val current = _state.value as? DetailUiState.Content ?: return
-        library.setProgress(
-            current.manga.key,
-            ReadingProgress(
-                chapterId = chapter.id,
-                chapterNumber = chapter.number,
-                updatedAt = System.currentTimeMillis(),
-            ),
-        )
-    }
-
-    private fun sortChapters(chapters: List<Chapter>): List<Chapter> = when (sort) {
-        ChapterSort.NEWEST_FIRST -> chapters.sortedByDescending { chapterNumberValue(it) }
-        ChapterSort.OLDEST_FIRST -> chapters.sortedBy { chapterNumberValue(it) }
+    private fun sortChapters(chapters: List<Chapter>): List<Chapter> {
+        val comparator = compareBy<Chapter> { chapterNumberValue(it) }
+            .thenBy { it.publishedAt ?: 0L }
+            .thenBy { it.id }
+        return when (sort) {
+            ChapterSort.NEWEST_FIRST -> chapters.sortedWith(comparator).reversed()
+            ChapterSort.OLDEST_FIRST -> chapters.sortedWith(comparator)
+        }
     }
 
     private fun chapterNumberValue(chapter: Chapter): Float =
-        chapter.number.toFloatOrNull() ?: 0f
+        chapter.number.toFloatOrNull() ?: -1f
 
     private fun Result<*>.failureOrDefault(): ExtensionFailure {
         val error = exceptionOrNull() ?: return ExtensionFailure.NETWORK

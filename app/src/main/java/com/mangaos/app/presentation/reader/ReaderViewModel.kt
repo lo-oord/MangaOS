@@ -8,8 +8,11 @@ import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
 import com.mangaos.app.domain.model.ReadingProgress
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +39,7 @@ sealed interface ImageState {
 class ReaderViewModel : ViewModel() {
 
     private val mangaRepo = ServiceLocator.manga
+    private val downloads = ServiceLocator.downloads
     private val library = ServiceLocator.library
     private val settingsRepo = ServiceLocator.settings
     private val readerSettingsRepo = ServiceLocator.readerSettings
@@ -76,6 +80,10 @@ class ReaderViewModel : ViewModel() {
     /** Page the reader should open after restoring a saved position. */
     private val _initialPage = MutableStateFlow(0)
     val initialPage: StateFlow<Int> = _initialPage.asStateFlow()
+
+    /** One-shot page index the screen must reveal after a chapter switch. */
+    private val _scrollRequests = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    val scrollRequests = _scrollRequests.asSharedFlow()
 
     /** Reading position inside the current chapter, 0f..1f. */
     private val _readingFraction = MutableStateFlow(0f)
@@ -131,7 +139,6 @@ class ReaderViewModel : ViewModel() {
                     _initialPage.value = settingsRepo
                         .readerPosition(positionKey(startChapter.id))
                         .first() ?: 0
-                    recordProgress(startChapter)
                     loadChapterPages(startChapter)
                     if (_pages.value.isEmpty() && _error.value == null) {
                         _error.value = "The source returned no pages for this chapter"
@@ -149,8 +156,14 @@ class ReaderViewModel : ViewModel() {
     private suspend fun loadChapterPages(chapter: Chapter): Boolean {
         if (chapter.id in loadedChapterIds) return true
         return try {
-            val urls = mangaRepo.pages(sourceId, mangaId, chapter.id)
-            val headers = mangaRepo.imageHeaders(sourceId)
+            // A completed download is authoritative and works without a network connection.
+            val localUrls = downloads.localPages("$sourceId/$mangaId", chapter.id)
+            val urls = if (localUrls.isNotEmpty()) {
+                localUrls
+            } else {
+                mangaRepo.pages(sourceId, mangaId, chapter.id)
+            }
+            val headers = if (localUrls.isNotEmpty()) emptyMap() else mangaRepo.imageHeaders(sourceId)
             if (urls.isEmpty()) {
                 if (chapter.id == currentChapterId) {
                     _error.value = "The source returned no pages for chapter ${chapter.number}"
@@ -174,6 +187,9 @@ class ReaderViewModel : ViewModel() {
                 _imageStates.value = states
                 true
             }
+        } catch (cancelled: CancellationException) {
+            loadedChapterIds.remove(chapter.id)
+            throw cancelled
         } catch (error: Exception) {
             loadedChapterIds.remove(chapter.id)
             false
@@ -309,6 +325,8 @@ class ReaderViewModel : ViewModel() {
         val page = pages.getOrNull(pageIndex) ?: return
         val chapterIndex = _chapters.value.indexOfFirst { it.id == page.chapterId }
         if (chapterIndex >= 0 && chapterIndex != _currentChapterIndex.value) {
+            // Reaching another chapter means the previous one was actually read.
+            _chapters.value.getOrNull(_currentChapterIndex.value)?.let { markRead(it) }
             _currentChapterIndex.value = chapterIndex
             currentChapterId = page.chapterId
             _chapters.value.getOrNull(chapterIndex)?.let { recordProgress(it) }
@@ -319,6 +337,9 @@ class ReaderViewModel : ViewModel() {
         } else {
             1f
         }
+        if (count > 0 && page.indexInChapter >= count - 1 && chapterIndex >= 0) {
+            _chapters.value.getOrNull(chapterIndex)?.let { markRead(it) }
+        }
         currentChapterId = page.chapterId
         viewModelScope.launch {
             settingsRepo.setReaderPosition(positionKey(page.chapterId), page.indexInChapter)
@@ -326,9 +347,11 @@ class ReaderViewModel : ViewModel() {
     }
 
     fun goToChapter(chapter: Chapter) {
-        val index = _chapters.value.indexOf(chapter)
-        if (index < 0) return
+        val index = _chapters.value.indexOfFirst { it.id == chapter.id }
+        if (index < 0 || chapter.id == currentChapterId || _isLoading.value) return
         viewModelScope.launch {
+            val previous = _chapters.value.getOrNull(_currentChapterIndex.value)
+            if (previous != null && previous.id != chapter.id) markRead(previous)
             currentChapterId = chapter.id
             _currentChapterIndex.value = index
             _pages.value = emptyList()
@@ -342,6 +365,8 @@ class ReaderViewModel : ViewModel() {
             _isLoading.value = true
             loadChapterPages(chapter)
             _isLoading.value = false
+            val target = pageIndexOfChapter(chapter.id).coerceAtLeast(0)
+            _scrollRequests.tryEmit(target)
             if (settings.value.continuousReading) prefetchNextChapters()
         }
     }
@@ -367,6 +392,11 @@ class ReaderViewModel : ViewModel() {
                 updatedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    private fun markRead(chapter: Chapter) {
+        val manga = _manga.value ?: return
+        library.markChapterRead(manga.key, chapter.id)
     }
 
     private fun positionKey(chapterId: String): String = "$sourceId/$mangaId/$chapterId"

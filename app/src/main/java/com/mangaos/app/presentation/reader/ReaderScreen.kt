@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -85,11 +87,12 @@ import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import okhttp3.Headers
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     sourceId: String,
@@ -125,6 +128,7 @@ fun ReaderScreen(
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
+    var showQuickSettings by remember { mutableStateOf(false) }
     var restored by remember(sourceId, mangaId, chapterId) { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -184,6 +188,14 @@ fun ReaderScreen(
                 initialPage
             }
             listState.scrollToItem(target.coerceIn(0, pages.lastIndex.coerceAtLeast(0)))
+            restored = true
+        }
+    }
+
+    LaunchedEffect(mode) {
+        viewModel.scrollRequests.collect { pageIndex ->
+            val itemIndex = if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
+            listState.scrollToItem(itemIndex.coerceAtLeast(0))
             restored = true
         }
     }
@@ -411,13 +423,6 @@ fun ReaderScreen(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = stringResource(R.string.reader_settings),
-                        tint = Color.White,
-                    )
-                }
             }
         }
 
@@ -445,31 +450,18 @@ fun ReaderScreen(
             } else {
                 0f
             }
-            val loaded = imageStates.count { it.value is ImageState.Success }
+            val pageInChapter = if (chapterStart >= 0 && chapterSize > 0) {
+                (visiblePage - chapterStart + 1).coerceIn(1, chapterSize)
+            } else {
+                0
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.62f))
-                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .padding(start = Spacing.xs, end = Spacing.xs, top = 2.dp, bottom = 2.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (settings.showProgressPercent) {
-                        Text(
-                            text = "${(readingFraction * 100).toInt()}%",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                    Text(
-                        text = "$loaded/${pages.size}",
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
                 Slider(
                     value = localProgress,
                     onValueChange = { value ->
@@ -477,6 +469,32 @@ fun ReaderScreen(
                             val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
                             val itemIndex = if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
                             scope.launch { listState.scrollToItem(itemIndex) }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(22.dp)
+                        .padding(horizontal = Spacing.sm),
+                    thumb = {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .background(Color.White, CircleShape),
+                        )
+                    },
+                    track = { state ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(Color.White.copy(alpha = 0.25f), CircleShape),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(state.value)
+                                    .height(2.dp)
+                                    .background(Color.White, CircleShape),
+                            )
                         }
                     },
                 )
@@ -487,46 +505,82 @@ fun ReaderScreen(
                 ) {
                     IconButton(
                         onClick = {
-                            val index = (currentChapterIndex - 1).coerceAtLeast(0)
-                            if (index != currentChapterIndex) {
-                                chapters.getOrNull(index)?.let { viewModel.goToChapter(it) }
+                            val previous = chapters.getOrNull(currentChapterIndex - 1)
+                                ?: return@IconButton
+                            val appendedIndex = viewModel.pageIndexOfChapter(previous.id)
+                            if (viewModel.settings.value.continuousReading && appendedIndex >= 0) {
+                                scope.launch {
+                                    listState.scrollToItem(
+                                        if (mode == ReaderMode.DOUBLE_PAGE) appendedIndex / 2 else appendedIndex,
+                                    )
+                                }
+                            } else {
+                                viewModel.goToChapter(previous)
                             }
                         },
                         enabled = currentChapterIndex > 0,
+                        modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.SkipPrevious,
                             contentDescription = stringResource(R.string.reader_previous_chapter),
                             tint = Color.White,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
-                    when {
-                        nextChapterLoading -> CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp,
-                        )
-                        nextChapterError -> TextButton(onClick = { viewModel.retryNextChapter() }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Replay,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(Spacing.xs))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = stringResource(R.string.reader_next_failed),
+                                text = currentChapter?.number?.let {
+                                    stringResource(R.string.chapter_number, it)
+                                }.orEmpty(),
                                 color = Color.White,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                            if (nextChapterLoading) {
+                                Spacer(Modifier.width(Spacing.xs))
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(12.dp),
+                                    color = Color.White,
+                                    strokeWidth = 1.5.dp,
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "$pageInChapter / $chapterSize",
+                                color = Color.White.copy(alpha = 0.68f),
                                 style = MaterialTheme.typography.labelSmall,
                             )
+                            if (settings.showProgressPercent) {
+                                Text(
+                                    text = " · ${(readingFraction * 100).toInt()}%",
+                                    color = Color.White.copy(alpha = 0.68f),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            if (nextChapterError) {
+                                TextButton(
+                                    onClick = { viewModel.retryNextChapter() },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
+                                    modifier = Modifier.height(22.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Replay,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Text(
+                                        text = stringResource(R.string.reader_next_failed),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
                         }
-                        else -> Text(
-                            text = currentChapter?.number?.let {
-                                stringResource(R.string.chapter_number, it)
-                            }.orEmpty(),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
                     }
                     IconButton(
                         onClick = {
@@ -544,11 +598,24 @@ fun ReaderScreen(
                             }
                         },
                         enabled = currentChapterIndex < chapters.lastIndex,
+                        modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.SkipNext,
                             contentDescription = stringResource(R.string.reader_next_chapter),
                             tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = { showQuickSettings = true },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.reader_settings),
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
@@ -581,10 +648,23 @@ fun ReaderScreen(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-            }
+                        }
         }
     }
+
+    if (showQuickSettings) {
+        ReaderQuickSettingsSheet(
+            settings = settings,
+            onUpdate = viewModel::updateSettings,
+            onDismiss = { showQuickSettings = false },
+            onOpenAdvanced = {
+                showQuickSettings = false
+                onOpenSettings()
+            },
+        )
+    }
 }
+
 
 @Composable
 private fun ReaderImage(
@@ -616,7 +696,13 @@ private fun ReaderImage(
     }
     val request = remember(page.url, attempt, headers) {
         ImageRequest.Builder(context)
-            .data(page.url)
+            .data(
+                if (page.url.startsWith("http://") || page.url.startsWith("https://") || page.url.startsWith("data:")) {
+                    page.url
+                } else {
+                    java.io.File(page.url)
+                },
+            )
             .headers(headers)
             .crossfade(true)
             .build()

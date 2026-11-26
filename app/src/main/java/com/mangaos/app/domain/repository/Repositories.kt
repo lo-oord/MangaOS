@@ -34,6 +34,9 @@ interface MangaRepository {
 
     suspend fun byId(sourceId: String, mangaId: String): Manga?
     suspend fun chapters(sourceId: String, mangaId: String): List<Chapter>
+
+    /** Newest chapter known by the source, used by the Latest feed badges. */
+    suspend fun latestChapter(sourceId: String, mangaId: String): Chapter?
     suspend fun pages(sourceId: String, mangaId: String, chapterId: String): List<String>
 
     /** Headers the source requires when fetching its images (Referer/User-Agent/cookies). */
@@ -81,17 +84,27 @@ interface LibraryRepository {
     val ids: StateFlow<Set<String>>
     val progress: StateFlow<Map<String, ReadingProgress>>
 
+    /** Keys of chapters the reader actually left; never set by opening details. */
+    val readChapters: StateFlow<Set<String>>
+
     fun toggle(manga: Manga)
     fun add(manga: Manga)
     fun remove(mangaId: String)
     fun isSaved(mangaKey: String): Boolean
     fun setProgress(mangaKey: String, progress: ReadingProgress)
+    fun markChapterRead(mangaKey: String, chapterId: String)
 }
+
+/** Stable key for the read-chapter set. */
+fun readChapterKey(mangaKey: String, chapterId: String): String = "$mangaKey\u0001$chapterId"
 
 interface DownloadRepository {
     val downloads: StateFlow<List<Download>>
 
-    fun enqueue(manga: Manga, chapterNumber: String)
+    fun enqueue(manga: Manga, chapter: Chapter)
+
+    /** Completed page files for offline reading, in page order. */
+    fun localPages(mangaKey: String, chapterId: String): List<String>
     fun pause(downloadId: String)
     fun resume(downloadId: String)
     fun retry(downloadId: String)

@@ -132,8 +132,10 @@ private fun DownloadRow(
                         append(formatPercent(download.progress))
                         append(" · ")
                         append(formatBytes(download.downloadedBytes))
-                        append(" / ")
-                        append(formatBytes(download.totalBytes))
+                        if (download.totalBytes > 0L) {
+                            append(" / ")
+                            append(formatBytes(download.totalBytes))
+                        }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

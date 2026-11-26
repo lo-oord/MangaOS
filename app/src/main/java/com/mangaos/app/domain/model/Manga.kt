@@ -19,6 +19,8 @@ data class Manga(
     val originalLanguage: String? = null,
     val coverUrl: String? = null,
     val latestChapter: String? = null,
+    /** Source-relative id of [latestChapter], when the feed could resolve it. */
+    val latestChapterId: String? = null,
     val updatedAt: Long? = null,
     val url: String? = null,
     val sourceName: String? = null,

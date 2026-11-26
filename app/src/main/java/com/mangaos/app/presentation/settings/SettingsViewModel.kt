@@ -2,6 +2,7 @@ package com.mangaos.app.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil.imageLoader
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.util.LocaleManager
 import com.mangaos.app.di.ServiceLocator
@@ -94,6 +95,8 @@ class SettingsViewModel : ViewModel() {
             _clearingCache.value = true
             val freed = withContext(Dispatchers.IO) {
                 val before = directorySize(context.cacheDir)
+                // Close and clear Coil's cache first, then remove the remaining cache files.
+                context.imageLoader.diskCache?.clear()
                 context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
                 before
             }

@@ -67,7 +67,7 @@ object ServiceLocator {
         manga = ExtensionMangaRepository(extensions, appContext)
         localStorage = InMemoryLocalStorageRepository()
         notifications = InMemoryNotificationRepository(appScope)
-        downloads = LocalDownloadRepository(appScope, localStorage, notifications, appContext, settings)
+        downloads = LocalDownloadRepository(appScope, manga, localStorage, notifications, appContext, settings)
 
         initialized = true
     }

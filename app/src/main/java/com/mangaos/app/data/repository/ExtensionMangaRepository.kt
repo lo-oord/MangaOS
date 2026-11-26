@@ -110,7 +110,23 @@ class ExtensionMangaRepository(
                 mangaId,
                 chapters.filter { it.memo.isNotEmpty() }.associate { it.url to it.memo },
             )
+            metadata.saveChapterMeta(source.id, mangaId, chapters)
             chapters.map { it.toDomain(mangaId) }
+        }
+
+    override suspend fun latestChapter(sourceId: String, mangaId: String): Chapter? =
+        call(sourceId) { source ->
+            val placeholder = SManga.create().apply { url = mangaId }
+            metadata.restore(source.id, mangaId, placeholder)
+            val update = source.getMangaUpdate(placeholder, emptyList(), false, true)
+            val chapter = update.chapters
+                .sortedWith(
+                    compareBy<SChapter> { if (it.chapter_number >= 0f) it.chapter_number else -1f }
+                        .thenBy { it.date_upload },
+                )
+                .lastOrNull() ?: return@call null
+            metadata.saveChapterMeta(source.id, mangaId, listOf(chapter))
+            chapter.toDomain(mangaId)
         }
 
     override suspend fun pages(sourceId: String, mangaId: String, chapterId: String): List<String> =
@@ -249,7 +265,8 @@ class ExtensionMangaRepository(
             id = url,
             mangaId = mangaId,
             number = resolvedNumber,
-            title = scanlator?.takeIf { it.isNotBlank() },
+            title = name.takeIf { it.isNotBlank() && it != resolvedNumber }
+                ?: scanlator?.takeIf { it.isNotBlank() },
             publishedAt = date_upload.takeIf { it > 0L },
         )
     }
@@ -269,6 +286,7 @@ class ExtensionMangaRepository(
         val trimmed = value.trim()
         return when {
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.startsWith("data:") || trimmed.startsWith("file:") -> trimmed
             trimmed.startsWith("//") -> "https:$trimmed"
             baseUrl.isBlank() -> trimmed
             trimmed.startsWith("/") -> baseUrl.trimEnd('/') + trimmed
