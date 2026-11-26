@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">MangaOS</string>
+
+    <string name="cd_logo">MangaOS のロゴ</string>
+    <string name="cd_menu">メニューを開く</string>
+    <string name="cd_notifications">通知</string>
+    <string name="cd_back">戻る</string>
+    <string name="cd_cover">%1$s の表紙</string>
+    <string name="cd_avatar">プロフィール画像</string>
+    <string name="cd_change_photo">プロフィール画像を変更</string>
+    <string name="cd_external_link">開く</string>
+
+    <string name="splash_welcome">MangaOS へようこそ</string>
+    <string name="splash_tagline">読む。楽しむ。続ける。</string>
+
+    <string name="auth_create_account">アカウントを作成</string>
+    <string name="auth_existing_user">アカウントをお持ちの方</string>
+    <string name="auth_guest">ゲストとして続ける</string>
+    <string name="signup_title">アカウントを作成</string>
+    <string name="signin_title">ログイン</string>
+    <string name="signup_with_google">Google で登録</string>
+    <string name="label_email">メールアドレス</string>
+    <string name="label_password">パスワード</string>
+    <string name="label_confirm_password">パスワード（確認）</string>
+    <string name="action_next">次へ</string>
+    <string name="google_unavailable">Google ログインは次の段階で提供されます。</string>
+    <string name="error_email_invalid">メールアドレスが正しくありません</string>
+    <string name="error_password_short">8 文字以上で入力してください</string>
+    <string name="error_password_mismatch">パスワードが一致しません</string>
+    <string name="error_required">この項目は必須です</string>
+    <string name="profile_title">アカウント情報</string>
+    <string name="label_display_name">表示名</string>
+    <string name="label_username">ユーザー名</string>
+    <string name="error_username_length">3〜20 文字で入力してください</string>
+    <string name="error_username_chars">半角英数字と _ のみ使用できます</string>
+    <string name="action_change_photo">画像を変更</string>
+    <string name="action_add_photo">画像を追加</string>
+    <string name="verify_title">メールアドレスの確認</string>
+    <string name="verify_code_label">確認コード</string>
+    <string name="verify_note">この段階では実際のコードは送信されません。</string>
+    <string name="action_edit_email">メールを編集</string>
+    <string name="error_code_incomplete">6 桁のコードを入力してください</string>
+    <string name="guest_display_name">ゲスト</string>
+    <string name="guest_username">guest</string>
+
+    <string name="nav_latest">最新</string>
+    <string name="nav_manga">マンガ</string>
+    <string name="nav_library">マイライブラリ</string>
+    <string name="nav_downloads">ダウンロード</string>
+    <string name="nav_storage">ローカル保存</string>
+    <string name="nav_settings">設定</string>
+    <string name="nav_about">このアプリについて</string>
+    <string name="notifications_title">通知</string>
+
+    <string name="status_ongoing">連載中</string>
+    <string name="status_completed">完結</string>
+    <string name="status_hiatus">休載中</string>
+    <string name="status_cancelled">打ち切り</string>
+    <string name="type_manga">マンガ</string>
+    <string name="type_manhwa">マンファ</string>
+    <string name="chapter_short">%1$s話</string>
+    <string name="chapter_number">第 %1$s 話</string>
+
+    <string name="time_just_now">たった今</string>
+    <string name="time_minutes_ago">%1$d 分前</string>
+    <string name="time_hour_ago">1 時間前</string>
+    <string name="time_hours_ago">%1$d 時間前</string>
+    <string name="time_yesterday">昨日</string>
+    <string name="time_days_ago">%1$d 日前</string>
+    <string name="time_weeks_ago">%1$d 週間前</string>
+    <string name="time_months_ago">%1$d か月前</string>
+
+    <string name="library_empty_title">ライブラリは空です</string>
+    <string name="library_empty_action">マンガを見る</string>
+    <string name="library_added">ライブラリに追加しました</string>
+    <string name="library_removed">ライブラリから削除しました</string>
+    <string name="action_add_to_library">ライブラリに追加</string>
+    <string name="action_remove_from_library">ライブラリから削除</string>
+
+    <string name="downloads_empty_title">ダウンロードはありません</string>
+    <string name="download_status_queued">待機中</string>
+    <string name="download_status_downloading">ダウンロード中</string>
+    <string name="download_status_paused">一時停止中</string>
+    <string name="download_status_failed">失敗</string>
+    <string name="download_status_completed">完了</string>
+    <string name="download_status_cancelling">キャンセル中</string>
+    <string name="download_status_cancelled">キャンセル済み</string>
+    <string name="action_pause">一時停止</string>
+    <string name="action_resume">再開</string>
+    <string name="action_retry">再試行</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_delete">削除</string>
+    <string name="action_select">選択</string>
+    <string name="action_done">完了</string>
+    <string name="selected_count">%1$d 件選択</string>
+
+    <string name="storage_empty_title">保存された項目はありません</string>
+    <string name="storage_chapter_count">%1$d 話</string>
+    <string name="delete_chapter_title">この話を削除しますか？</string>
+    <string name="delete_chapters_title">選択した話を削除しますか？</string>
+    <string name="delete_work_title">作品を削除しますか？</string>
+    <string name="delete_chapter_message">%1$s をローカル保存から削除します。</string>
+    <string name="delete_work_message">%1$s のすべての話をローカル保存から削除します。</string>
+    <string name="storage_deleted">削除しました</string>
+
+    <string name="notifications_empty_title">通知はありません</string>
+    <string name="action_mark_all_read">すべて既読にする</string>
+    <string name="action_delete_all">すべて削除</string>
+    <string name="delete_all_notifications_title">すべての通知を削除しますか？</string>
+    <string name="notif_completed_title">ダウンロード完了</string>
+    <string name="notif_completed_message">%1$s — %2$s 話をローカル保存に追加しました</string>
+    <string name="notif_failed_title">ダウンロード失敗</string>
+    <string name="notif_failed_message">%1$s — %2$s 話をダウンロードできませんでした</string>
+    <string name="notif_started_title">ダウンロード開始</string>
+    <string name="notif_started_message">%1$s — %2$s 話</string>
+    <string name="notif_system_title">MangaOS</string>
+    <string name="notif_system_message">これはサンプルの通知です。</string>
+
+    <string name="settings_appearance">テーマと表示</string>
+    <string name="settings_language">言語</string>
+    <string name="settings_theme">テーマ</string>
+    <string name="settings_dark_mode">ダークモード</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
+    <string name="language_japanese">日本語</string>
+    <string name="theme_default">デフォルト</string>
+    <string name="theme_miku">ミク</string>
+    <string name="theme_neon">ネオン</string>
+    <string name="theme_sky">スカイ</string>
+    <string name="settings_reader">リーダー</string>
+    <string name="settings_notifications">通知</string>
+    <string name="settings_reader_soon">リーダー設定</string>
+    <string name="settings_notifications_soon">通知設定</string>
+    <string name="badge_soon">近日</string>
+
+    <string name="about_privacy">プライバシーとセキュリティ</string>
+    <string name="about_terms">利用規約</string>
+    <string name="about_version">バージョン %1$s</string>
+    <string name="content_pending">コンテンツは後で追加されます。</string>
+
+    <string name="state_empty_title">コンテンツがありません</string>
+    <string name="state_offline">インターネット接続がありません</string>
+    <string name="state_error_title">読み込めませんでした</string>
+    <string name="state_error_retry">再試行</string>
+</resources>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">MangaOS</string>
+
+    <string name="cd_logo">شعار MangaOS</string>
+    <string name="cd_menu">فتح القائمة</string>
+    <string name="cd_notifications">الإشعارات</string>
+    <string name="cd_back">رجوع</string>
+    <string name="cd_cover">غلاف %1$s</string>
+    <string name="cd_avatar">صورة البروفايل</string>
+    <string name="cd_change_photo">تغيير صورة البروفايل</string>
+    <string name="cd_external_link">فتح</string>
+
+    <string name="splash_welcome">أهلاً بك في MangaOS</string>
+    <string name="splash_tagline">اقرأ. استمتع. تابع.</string>
+
+    <string name="auth_create_account">إنشاء حساب</string>
+    <string name="auth_existing_user">مستخدم سابق</string>
+    <string name="auth_guest">التسجيل كضيف</string>
+    <string name="signup_title">إنشاء حساب</string>
+    <string name="signin_title">تسجيل الدخول</string>
+    <string name="signup_with_google">التسجيل باستخدام Google</string>
+    <string name="label_email">البريد الإلكتروني</string>
+    <string name="label_password">كلمة المرور</string>
+    <string name="label_confirm_password">تأكيد كلمة المرور</string>
+    <string name="action_next">التالي</string>
+    <string name="google_unavailable">سيتوفر تسجيل Google في مرحلة قادمة.</string>
+    <string name="error_email_invalid">بريد إلكتروني غير صالح</string>
+    <string name="error_password_short">٨ أحرف على الأقل</string>
+    <string name="error_password_mismatch">كلمتا المرور غير متطابقتين</string>
+    <string name="error_required">هذا الحقل مطلوب</string>
+    <string name="profile_title">بيانات الحساب</string>
+    <string name="label_display_name">الاسم الظاهر</string>
+    <string name="label_username">اسم المستخدم</string>
+    <string name="error_username_length">من ٣ إلى ٢٠ حرفاً</string>
+    <string name="error_username_chars">أحرف إنجليزية وأرقام و _ فقط</string>
+    <string name="action_change_photo">تغيير الصورة</string>
+    <string name="action_add_photo">إضافة صورة</string>
+    <string name="verify_title">تأكيد البريد الإلكتروني</string>
+    <string name="verify_code_label">رمز التأكيد</string>
+    <string name="verify_note">لن يُرسل رمز فعلي في هذه المرحلة.</string>
+    <string name="action_edit_email">تعديل البريد</string>
+    <string name="error_code_incomplete">أدخل الرمز المكوّن من ٦ أرقام</string>
+    <string name="guest_display_name">ضيف</string>
+    <string name="guest_username">guest</string>
+
+    <string name="nav_latest">الأحدث</string>
+    <string name="nav_manga">المانجا</string>
+    <string name="nav_library">مكتبتي</string>
+    <string name="nav_downloads">التحميلات</string>
+    <string name="nav_storage">التخزين المحلي</string>
+    <string name="nav_settings">الإعدادات</string>
+    <string name="nav_about">حول</string>
+    <string name="notifications_title">الإشعارات</string>
+
+    <string name="status_ongoing">مستمر</string>
+    <string name="status_completed">مكتمل</string>
+    <string name="status_hiatus">متوقف</string>
+    <string name="status_cancelled">ملغي</string>
+    <string name="type_manga">مانجا</string>
+    <string name="type_manhwa">مانهوا</string>
+    <string name="chapter_short">ف %1$s</string>
+    <string name="chapter_number">الفصل %1$s</string>
+
+    <string name="time_just_now">قبل لحظات</string>
+    <string name="time_minutes_ago">قبل %1$d دقائق</string>
+    <string name="time_hour_ago">قبل ساعة</string>
+    <string name="time_hours_ago">قبل %1$d ساعات</string>
+    <string name="time_yesterday">أمس</string>
+    <string name="time_days_ago">منذ %1$d أيام</string>
+    <string name="time_weeks_ago">منذ %1$d أسابيع</string>
+    <string name="time_months_ago">منذ %1$d أشهر</string>
+
+    <string name="library_empty_title">مكتبتك فارغة</string>
+    <string name="library_empty_action">تصفح المانجا</string>
+    <string name="library_added">أُضيف إلى المكتبة</string>
+    <string name="library_removed">أُزيل من المكتبة</string>
+    <string name="action_add_to_library">إضافة إلى مكتبتي</string>
+    <string name="action_remove_from_library">إزالة من مكتبتي</string>
+
+    <string name="downloads_empty_title">لا توجد تنزيلات</string>
+    <string name="download_status_queued">في الانتظار</string>
+    <string name="download_status_downloading">جارٍ التنزيل</string>
+    <string name="download_status_paused">متوقف مؤقتاً</string>
+    <string name="download_status_failed">فشل التنزيل</string>
+    <string name="download_status_completed">اكتمل التنزيل</string>
+    <string name="download_status_cancelling">جارٍ الإلغاء</string>
+    <string name="download_status_cancelled">تم الإلغاء</string>
+    <string name="action_pause">إيقاف مؤقت</string>
+    <string name="action_resume">استئناف</string>
+    <string name="action_retry">إعادة المحاولة</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_delete">حذف</string>
+    <string name="action_select">تحديد</string>
+    <string name="action_done">تم</string>
+    <string name="selected_count">تم تحديد %1$d</string>
+
+    <string name="storage_empty_title">لا يوجد محتوى محفوظ</string>
+    <string name="storage_chapter_count">%1$d فصول</string>
+    <string name="delete_chapter_title">حذف الفصل؟</string>
+    <string name="delete_chapters_title">حذف الفصول المحددة؟</string>
+    <string name="delete_work_title">حذف العمل؟</string>
+    <string name="delete_chapter_message">سيُحذف «%1$s» من التخزين المحلي.</string>
+    <string name="delete_work_message">ستُحذف جميع فصول «%1$s» من التخزين المحلي.</string>
+    <string name="storage_deleted">تم الحذف</string>
+
+    <string name="notifications_empty_title">لا توجد إشعارات</string>
+    <string name="action_mark_all_read">تحديد الكل كمقروء</string>
+    <string name="action_delete_all">حذف الكل</string>
+    <string name="delete_all_notifications_title">حذف جميع الإشعارات؟</string>
+    <string name="notif_completed_title">اكتمل التنزيل</string>
+    <string name="notif_completed_message">%1$s — الفصل %2$s جاهز في التخزين المحلي</string>
+    <string name="notif_failed_title">فشل التنزيل</string>
+    <string name="notif_failed_message">تعذر تنزيل %1$s — الفصل %2$s</string>
+    <string name="notif_started_title">بدأ التنزيل</string>
+    <string name="notif_started_message">%1$s — الفصل %2$s</string>
+    <string name="notif_system_title">MangaOS</string>
+    <string name="notif_system_message">هذا إشعار تجريبي.</string>
+
+    <string name="settings_appearance">الثيم والظهور</string>
+    <string name="settings_language">اللغة</string>
+    <string name="settings_theme">الثيم</string>
+    <string name="settings_dark_mode">الوضع الداكن</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_english">English</string>
+    <string name="language_japanese">日本語</string>
+    <string name="theme_default">الافتراضي</string>
+    <string name="theme_miku">ميكو</string>
+    <string name="theme_neon">نيون</string>
+    <string name="theme_sky">Sky</string>
+    <string name="settings_reader">القارئ</string>
+    <string name="settings_notifications">الإشعارات</string>
+    <string name="settings_reader_soon">إعدادات القارئ</string>
+    <string name="settings_notifications_soon">إعدادات الإشعارات</string>
+    <string name="badge_soon">قريباً</string>
+
+    <string name="about_privacy">الخصوصية والأمان</string>
+    <string name="about_terms">الشروط والأحكام</string>
+    <string name="about_version">الإصدار %1$s</string>
+    <string name="content_pending">سيُضاف المحتوى لاحقاً.</string>
+
+    <string name="state_empty_title">لا يوجد محتوى</string>
+    <string name="state_offline">لا يوجد اتصال بالإنترنت</string>
+    <string name="state_error_title">تعذر تحميل المحتوى</string>
+    <string name="state_error_retry">إعادة المحاولة</string>
+</resources>

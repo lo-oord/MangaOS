@@ -1,0 +1,109 @@
+name: Android Release Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build & sign release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle (with dependency cache)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Run unit tests
+        run: ./gradlew testReleaseUnitTest --console=plain --stacktrace
+
+      - name: Require release signing secrets
+        run: |
+          missing=0
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret $name. Run tools/setup-signing.sh to create the keystore and upload the secrets."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Restore release keystore
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mangaos-release.jks"
+          {
+            echo "MANGAOS_KEYSTORE_PATH=$RUNNER_TEMP/mangaos-release.jks"
+            echo "MANGAOS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "MANGAOS_KEY_ALIAS=$KEY_ALIAS"
+            echo "MANGAOS_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Keystore restored ($(stat -c%s "$RUNNER_TEMP/mangaos-release.jks") bytes)."
+
+      - name: Build signed release APK and AAB
+        run: ./gradlew assembleRelease bundleRelease --console=plain --stacktrace
+
+      - name: Verify signatures
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          APK=app/build/outputs/apk/release/app-release.apk
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          test -f "$APK"
+          test -f "$AAB"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          jarsigner -verify "$AAB"
+
+      - name: Collect artifacts
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/app-release.apk "artifacts/MangaOS-${SHORT_SHA}-release.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "artifacts/MangaOS-${SHORT_SHA}-release.aab"
+          sha256sum artifacts/* | tee artifacts/checksums-sha256.txt
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaos-release-${{ github.sha }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove keystore and signing environment
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/mangaos-release.jks"
+          echo "Keystore removed from the runner."

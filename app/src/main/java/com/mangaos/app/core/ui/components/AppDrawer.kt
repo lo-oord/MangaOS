@@ -1,0 +1,170 @@
+package com.mangaos.app.core.ui.components
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.Dimens
+import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.domain.model.SessionType
+import com.mangaos.app.domain.model.UserProfile
+import com.mangaos.app.presentation.navigation.DrawerDestination
+
+@Composable
+fun AppDrawer(
+    profile: UserProfile?,
+    unreadNotifications: Int,
+    currentRoute: String?,
+    onNavigate: (DrawerDestination) -> Unit,
+    onNotificationsClick: () -> Unit,
+) {
+    ModalDrawerSheet(
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(vertical = Spacing.sm),
+        ) {
+            DrawerHeader(
+                profile = profile,
+                unreadNotifications = unreadNotifications,
+                onNotificationsClick = onNotificationsClick,
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
+            DrawerDestination.entries.forEach { destination ->
+                if (destination == DrawerDestination.SETTINGS) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.xs),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                }
+                DrawerItem(
+                    destination = destination,
+                    selected = currentRoute == destination.route,
+                    onClick = { onNavigate(destination) },
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun DrawerHeader(
+    profile: UserProfile?,
+    unreadNotifications: Int,
+    onNotificationsClick: () -> Unit,
+) {
+    val isGuest = profile?.sessionType == SessionType.GUEST
+    val displayName = when {
+        profile == null -> ""
+        isGuest -> stringResource(R.string.guest_display_name)
+        else -> profile.displayName
+    }
+    val username = profile?.username ?: stringResource(R.string.guest_username)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.md, bottom = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileAvatar(
+            name = displayName.ifBlank { username },
+            avatarUri = profile?.avatarUri,
+            size = Dimens.avatarMedium,
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "@$username",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        AppIconButton(
+            icon = Icons.Outlined.NotificationsNone,
+            contentDescription = stringResource(R.string.cd_notifications),
+            onClick = onNotificationsClick,
+            badgeCount = unreadNotifications,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DrawerItem(
+    destination: DrawerDestination,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    NavigationDrawerItem(
+        label = {
+            Text(
+                text = stringResource(destination.labelRes),
+                style = MaterialTheme.typography.titleSmall,
+            )
+        },
+        icon = {
+            Icon(
+                imageVector = destination.icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        },
+        selected = selected,
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+            selectedIconColor = MaterialTheme.colorScheme.primary,
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = 1.dp),
+    )
+}
