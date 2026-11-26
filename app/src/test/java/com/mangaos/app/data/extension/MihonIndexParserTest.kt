@@ -123,7 +123,7 @@ class MihonIndexParserTest {
     }
 
     @Test
-    fun `missing icon falls back to the repository icon path`() {
+    fun `missing icon stays empty instead of inventing a repository path`() {
         val apk = bytes(stringField(1, "https://example.test/app.apk"))
         val entry = bytes(
             stringField(1, "NoIcon"),
@@ -133,8 +133,8 @@ class MihonIndexParserTest {
 
         val result = MihonIndexParser.parse(repository(entry))
 
-        assertTrue(result.first().iconUrl!!.endsWith("/icon/eu.kanade.tachiyomi.extension.all.noicon.png"))
-        assertNull(result.first().apkUrl.takeIf { it.isBlank() })
+        assertNull(result.first().iconUrl)
+        assertEquals("https://example.test/app.apk", result.first().apkUrl)
     }
 
     private fun repository(vararg entries: ByteArray): ByteArray = bytes(
