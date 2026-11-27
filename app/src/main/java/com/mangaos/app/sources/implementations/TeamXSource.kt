@@ -95,15 +95,20 @@ class TeamXSource : MangaSource {
     override suspend fun details(mangaId: String): SourceManga? {
         val document = http.document(mangaUrl(mangaId))
         val title = document.firstText("div.author-info-title h1") ?: return null
-        val statusText = document.selectFirst(".full-list-info > small:first-child:contains(الحالة) + small")
-            ?.text()
-        val author = document.selectFirst(".full-list-info > small:first-child:contains(الرسام) + small")
-            ?.text()
-            ?.takeIf { it != "غير معروف" }
+        // The sidebar lists label/value pairs: "الحالة:", "متروك", "الرسام:", …
+        val info = document.select(".full-list-info > small").map { it.text().trim() }
+        fun valueAfter(label: String): String? {
+            val index = info.indexOfFirst { it.trimEnd(':', '：') == label }
+            return info.getOrNull(index + 1)?.trim()?.takeIf { it.isNotEmpty() && it != "غير معروف" }
+        }
+        val statusText = valueAfter("الحالة")
+        val author = valueAfter("الرسام")
         return SourceManga(
             id = mangaId.trim('/'),
             title = title,
-            coverUrl = document.selectFirst("div.text-right img")?.coverImage(),
+            coverUrl = document.selectFirst("div.text-right img")?.coverImage()
+                ?: document.selectFirst("div.thumb img, img[itemprop=image]")?.coverImage()
+                ?: document.coverImage(),
             url = mangaUrl(mangaId),
             description = document.select("div.review-content").text().trim().takeIf { it.isNotBlank() },
             genres = document.select("div.review-author-info a").map { it.text().trim() }

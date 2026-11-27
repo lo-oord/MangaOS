@@ -45,7 +45,7 @@ fun Element.coverImage(): String? = imageUrl(
 
 fun Document.coverImage(): String? =
     selectFirst("meta[property=og:image]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
-        ?: selectFirst("img").coverImage()
+        ?: selectFirst("img")?.coverImage()
 
 /** The `chapter` numbers a source uses, in its own spelling ("12.5", "12", "12.5.1"). */
 fun String.chapterNumberOrNull(): String? =
