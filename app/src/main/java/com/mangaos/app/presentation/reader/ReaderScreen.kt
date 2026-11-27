@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Refresh
@@ -733,6 +734,7 @@ private fun ReaderTopToolbar(
  * three navigation controls. Reading mode, direction and image options stay in the settings
  * sheet reachable from the top bar, so no control is duplicated between the two bars.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderBottomToolbar(
     pageInChapter: Int,
@@ -861,7 +863,7 @@ private fun ReaderBottomToolbar(
                     onClick = onPrevious,
                 )
                 ReaderToolButton(
-                    icon = Icons.Outlined.FormatListBulleted,
+                    icon = Icons.AutoMirrored.Filled.List,
                     description = stringResource(R.string.reader_chapters_title),
                     enabled = true,
                     onClick = onOpenChapters,
