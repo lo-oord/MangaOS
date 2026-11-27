@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -94,10 +96,14 @@ import com.mangaos.app.core.ui.components.CoverImage
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.MangaDetailSkeleton
 import com.mangaos.app.core.ui.components.PrimaryButton
+import com.mangaos.app.core.ui.components.RatingLabel
+import com.mangaos.app.core.ui.components.StatusBadge
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.ChapterOrder
+import com.mangaos.app.domain.model.ChapterReadingState
 import com.mangaos.app.domain.model.ChapterSort
+import com.mangaos.app.domain.model.chapterReadingState
 import com.mangaos.app.domain.model.Download
 import com.mangaos.app.domain.model.DownloadChapter
 import com.mangaos.app.domain.model.DownloadChapterState
@@ -250,75 +256,17 @@ private fun DetailContent(
                     .padding(horizontal = Spacing.screen),
             ) {
                 Spacer(Modifier.height(Spacing.md))
-                MangaFacts(
+                DetailMeta(
                     manga = manga,
                     chapterCount = state.chapters
                         .takeIf { !state.chaptersLoading && state.chaptersFailure == null && it.isNotEmpty() }
                         ?.size,
                 )
-                Spacer(Modifier.height(Spacing.md))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    OutlinedButton(
-                        onClick = { viewModel.toggleLibrary() },
-                        modifier = Modifier.height(48.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = Spacing.md,
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = if (isSaved) Icons.Outlined.BookmarkRemove
-                            else Icons.Outlined.BookmarkAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.xs))
-                        Text(
-                            text = stringResource(
-                                if (isSaved) R.string.action_remove_from_library
-                                else R.string.action_add_to_library,
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                    Button(
-                        onClick = { readingChapter?.let(onOpenChapter) },
-                        enabled = readingChapter != null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ReadGreen,
-                            contentColor = Color.White,
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.xs))
-                        Text(
-                            text = stringResource(
-                                if (resumeChapter != null) R.string.detail_continue_reading
-                                else R.string.detail_start_reading,
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                        )
-                    }
+                if (manga.genres.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.md))
+                    GenreChips(manga.genres)
                 }
-                if (progress != null) {
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        text = appString(R.string.detail_last_read, progress.chapterNumber),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                DetailFacts(manga)
             }
         }
 
@@ -368,9 +316,82 @@ private fun DetailContent(
                     }
                 }
 
-                if (manga.genres.isNotEmpty()) {
-                    Spacer(Modifier.height(Spacing.md))
-                    GenreChips(manga.genres)
+            }
+        }
+
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = Spacing.screen,
+                        end = Spacing.screen,
+                        bottom = Spacing.lg,
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Button(
+                        onClick = { readingChapter?.let(onOpenChapter) },
+                        enabled = readingChapter != null,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ReadGreen,
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text(
+                            text = stringResource(
+                                if (resumeChapter != null) R.string.detail_continue_reading
+                                else R.string.detail_start_reading,
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.toggleLibrary() },
+                        modifier = Modifier.height(52.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = Spacing.md,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Outlined.BookmarkRemove
+                            else Icons.Outlined.BookmarkAdd,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text(
+                            text = stringResource(
+                                if (isSaved) R.string.action_remove_from_library
+                                else R.string.action_add_to_library,
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (progress != null) {
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = appString(R.string.detail_last_read, progress.chapterNumber),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -525,9 +546,11 @@ private fun DetailContent(
                     val pair = downloads.findChapter(manga.key, chapter.id)
                     ChapterRow(
                         chapter = chapter,
-                        isRead = readChapterKey(manga.key, chapter.id) in readChapters,
+                        readingState = chapterReadingState(
+                            isRead = readChapterKey(manga.key, chapter.id) in readChapters,
+                            holdsReadingPosition = resumeChapter?.id == chapter.id,
+                        ),
                         downloadChapter = pair?.second,
-                        isLastRead = resumeChapter?.id == chapter.id,
                         selectionMode = selectionMode,
                         selected = chapter.id in selectedIds,
                         onClick = {
@@ -632,7 +655,7 @@ private fun DetailHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp),
+            .height(252.dp),
     ) {
         AsyncImage(
             model = manga.coverUrl,
@@ -702,7 +725,7 @@ private fun DetailHeader(
         ) {
             Box(
                 modifier = Modifier
-                    .width(96.dp)
+                    .width(104.dp)
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -738,46 +761,75 @@ private fun DetailHeader(
     }
 }
 
+/**
+ * The first information tier: real rating, real status and the real chapter count, in that
+ * order. Anything the source does not provide is simply absent from the row.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MangaFacts(manga: Manga, chapterCount: Int?) {
-    val authorLabel = stringResource(R.string.detail_author)
-    val artistLabel = stringResource(R.string.detail_artist)
-    val yearLabel = stringResource(R.string.detail_year)
-    val languageLabel = stringResource(R.string.detail_language)
-    val facts = buildList {
-        manga.author?.let { add(authorLabel to it) }
-        manga.artist?.takeIf { it != manga.author }?.let { add(artistLabel to it) }
-        manga.year?.let { add(yearLabel to it.toString()) }
-        manga.originalLanguage?.let { add(languageLabel to it) }
-    }
-
+private fun DetailMeta(manga: Manga, chapterCount: Int?) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        manga.rating?.let { FactChip(appString(R.string.detail_rating, it)) }
-        if (manga.status != MangaStatus.UNKNOWN) {
-            FactChip(stringResource(statusLabel(manga.status)))
+        if (manga.rating != null) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Box(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 4.dp)) {
+                    RatingLabel(manga.rating)
+                }
+            }
         }
-        chapterCount?.let { FactChip(appString(R.string.detail_chapter_count, it)) }
-        facts.forEach { (label, value) -> FactChip("$label: $value") }
+        StatusBadge(manga.status)
+        chapterCount?.let { count ->
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) {
+                Text(
+                    text = appString(R.string.detail_chapter_count, count),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 4.dp),
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 
+/** Labelled rows keep author, artist, year and language aligned and never repeat each other. */
 @Composable
-private fun FactChip(text: String) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 5.dp),
-            maxLines = 1,
-        )
+private fun DetailFacts(manga: Manga) {
+    val rows = buildList {
+        manga.author?.takeIf { it.isNotBlank() }?.let { add(R.string.detail_author to it.trim()) }
+        manga.artist?.takeIf { it.isNotBlank() && it != manga.author }
+            ?.let { add(R.string.detail_artist to it.trim()) }
+        manga.year?.let { add(R.string.detail_year to it.toString()) }
+        manga.originalLanguage?.takeIf { it.isNotBlank() }
+            ?.let { add(R.string.detail_language to it.trim()) }
+    }
+    if (rows.isEmpty()) return
+    Spacer(Modifier.height(Spacing.md))
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        rows.forEach { (label, value) ->
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = stringResource(label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(84.dp),
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }
 
@@ -985,8 +1037,7 @@ private fun SelectionAction(
 @Composable
 private fun ChapterRow(
     chapter: Chapter,
-    isRead: Boolean,
-    isLastRead: Boolean,
+    readingState: ChapterReadingState,
     downloadChapter: DownloadChapter?,
     selectionMode: Boolean,
     selected: Boolean,
@@ -1037,13 +1088,20 @@ private fun ChapterRow(
                         chapter.title?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isRead) FontWeight.Normal else FontWeight.Medium,
+                    fontWeight = if (readingState == ChapterReadingState.READ) {
+                        FontWeight.Normal
+                    } else {
+                        FontWeight.Medium
+                    },
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 val details = buildList {
                     chapter.publishedAt?.let { add(formatDate(it)) }
+                    if (readingState == ChapterReadingState.IN_PROGRESS) {
+                        add(stringResource(R.string.detail_in_progress))
+                    }
                     when (downloadChapter?.state) {
                         DownloadChapterState.DOWNLOADING ->
                             if (percent in 1..99) add("$percent%")
@@ -1064,15 +1122,6 @@ private fun ChapterRow(
                         maxLines = 1,
                     )
                 }
-                if (isLastRead) {
-                    Spacer(Modifier.height(Spacing.xxs))
-                    Text(
-                        text = stringResource(R.string.detail_last_read_marker),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                    )
-                }
                 if (downloading) {
                     Spacer(Modifier.height(Spacing.xxs))
                     LinearProgressIndicator(
@@ -1090,13 +1139,23 @@ private fun ChapterRow(
             // Read marker only, and only when the chapter is really read. The space is reserved
             // in both states so the title column keeps the same width.
             Box(modifier = Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                if (isRead) {
-                    Icon(
+                when (readingState) {
+                    ChapterReadingState.READ -> Icon(
                         imageVector = Icons.Outlined.CheckCircle,
                         contentDescription = stringResource(R.string.detail_read),
                         tint = ReadGreen,
                         modifier = Modifier.size(14.dp),
                     )
+                    // An open ring: the chapter is started but not finished. Shown together
+                    // with the "In progress" label, so the state never relies on colour alone.
+                    ChapterReadingState.IN_PROGRESS -> Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            .padding(3.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    )
+                    ChapterReadingState.UNREAD -> Unit
                 }
             }
             Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
@@ -1338,14 +1397,6 @@ private fun DetailFailure(
             }
         }
     }
-}
-
-private fun statusLabel(status: MangaStatus): Int = when (status) {
-    MangaStatus.ONGOING -> R.string.status_ongoing
-    MangaStatus.COMPLETED -> R.string.status_completed
-    MangaStatus.HIATUS -> R.string.status_hiatus
-    MangaStatus.CANCELLED -> R.string.status_cancelled
-    MangaStatus.UNKNOWN -> R.string.status_unknown
 }
 
 private fun formatDate(timestamp: Long): String =

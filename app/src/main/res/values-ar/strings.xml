@@ -68,6 +68,7 @@
     <string name="time_hours_ago">قبل %1$d ساعات</string>
     <string name="time_yesterday">أمس</string>
     <string name="time_days_ago">منذ %1$d أيام</string>
+    <string name="time_week_ago">منذ أسبوع</string>
     <string name="time_weeks_ago">منذ %1$d أسابيع</string>
     <string name="time_months_ago">منذ %1$d أشهر</string>
 
@@ -219,6 +220,9 @@
     <string name="action_continue">متابعة</string>
     <string name="action_sign_in">تسجيل الدخول</string>
     <string name="sources_section_sources">المصادر</string>
+    <string name="reader_chapters_title">الفصول</string>
+    <string name="reader_current_chapter">الفصل الحالي</string>
+    <string name="detail_in_progress">قيد القراءة</string>
     <string name="reader_chapter_error">تعذر تحميل صفحات الفصل</string>
     <string name="info_webview_required">يتطلب هذا المصدر Android System WebView. ثبّته أو فعّله ثم أعد المحاولة.</string>
     <string name="info_cloudflare_bypass_failure">تعذر على المصدر تجاوز حماية Cloudflare. حاول مرة أخرى لاحقًا.</string>

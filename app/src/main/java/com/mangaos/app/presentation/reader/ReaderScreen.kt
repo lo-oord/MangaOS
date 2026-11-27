@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +34,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,8 +48,10 @@ import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -77,6 +82,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -93,6 +99,7 @@ import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.ui.LocalReduceMotion
+import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
@@ -147,6 +154,7 @@ fun ReaderScreen(
 
     var controlsVisible by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }
+    var showChapterSheet by remember { mutableStateOf(false) }
     var restored by remember(sourceId, mangaId, chapterId) { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -273,22 +281,16 @@ fun ReaderScreen(
         }
     }
 
-    // Prefetch upcoming pages through the same loader (and headers) used for display.
+    // Warm only the pages just ahead of the reader, in reading order and through the exact same
+    // request (and cache keys) the visible pages use: a prefetched page becomes a cache hit
+    // instead of a second download, and the page on screen is never requested again here.
     LaunchedEffect(listState.firstVisibleItemIndex, pages.size, settings.preloadImages) {
         if (pages.isEmpty() || settings.preloadImages <= 0) return@LaunchedEffect
         val loader = context.imageLoader
         val start = listState.firstVisibleItemIndex + 1
-        pages.drop(start).take(settings.preloadImages).forEach { page ->
-            val headers = Headers.Builder().apply {
-                page.headers.forEach { (name, value) -> add(name, value) }
-            }.build()
-            loader.enqueue(
-                ImageRequest.Builder(context)
-                    .data(page.data(context))
-                    .headers(headers)
-                    .build(),
-            )
-        }
+        pages.drop(start)
+            .take(settings.preloadImages)
+            .forEach { page -> loader.enqueue(readerImageRequest(context, page)) }
     }
 
     val enterSpec = tween<Float>(if (reduceMotion) 0 else 170)
@@ -439,7 +441,7 @@ fun ReaderScreen(
                 slideOutVertically(tween(if (reduceMotion) 0 else 130)) { -it / 3 },
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            ReaderTopBar(
+            ReaderTopToolbar(
                 title = manga?.title.orEmpty(),
                 chapterLabel = chapters.getOrNull(currentChapterIndex)?.let { chapter ->
                     buildString {
@@ -448,6 +450,7 @@ fun ReaderScreen(
                     }
                 }.orEmpty(),
                 onBack = onBack,
+                onOpenSettings = { showQuickSettings = true },
             )
         }
 
@@ -517,166 +520,63 @@ fun ReaderScreen(
                 0
             }
 
-            Surface(
-                color = Color.Black.copy(alpha = 0.82f),
-                contentColor = Color.White,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        CompositionLocalProvider(
-                            LocalLayoutDirection provides LayoutDirection.Ltr,
+            ReaderBottomToolbar(
+                pageInChapter = pageInChapter,
+                chapterSize = chapterSize,
+                percentLabel = if (settings.showProgressPercent) {
+                    "${(readingFraction * 100).toInt()}%"
+                } else {
+                    null
+                },
+                progress = progress,
+                onSeek = { value ->
+                    dragging = true
+                    if (chapterSize > 1) {
+                        val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
+                        val itemIndex = if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
+                        scope.launch { listState.scrollToItem(itemIndex) }
+                    }
+                },
+                onSeekFinished = { dragging = false },
+                canPrevious = currentChapterIndex > 0,
+                canNext = currentChapterIndex < chapters.lastIndex,
+                onPrevious = {
+                    val previous = chapters.getOrNull(currentChapterIndex - 1)
+                    if (previous != null) {
+                        val appendedIndex = viewModel.pageIndexOfChapter(previous.id)
+                        if (settings.continuousReading &&
+                            appendedIndex >= 0 &&
+                            mode != ReaderMode.DOUBLE_PAGE
                         ) {
-                            Text(
-                                text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.78f),
-                            )
-                        }
-                        if (settings.showProgressPercent) {
-                            Text(
-                                text = "${(readingFraction * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.6f),
-                            )
+                            scope.launch { listState.scrollToItem(appendedIndex) }
+                        } else {
+                            viewModel.goToChapter(previous)
                         }
                     }
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                        Slider(
-                            value = progress,
-                            onValueChange = { value ->
-                                dragging = true
-                                if (chapterSize > 1) {
-                                    val pageIndex = chapterStart + (value * (chapterSize - 1)).toInt()
-                                    val itemIndex =
-                                        if (mode == ReaderMode.DOUBLE_PAGE) pageIndex / 2 else pageIndex
-                                    scope.launch { listState.scrollToItem(itemIndex) }
-                                }
-                            },
-                            onValueChangeFinished = { dragging = false },
-                            enabled = chapterSize > 1,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(20.dp),
-                            thumb = {
-                                Box(
-                                    Modifier
-                                        .size(10.dp)
-                                        .background(Color.White, CircleShape),
-                                )
-                            },
-                            track = { state ->
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(3.dp)
-                                        .background(Color.White.copy(alpha = 0.22f), CircleShape),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(state.value)
-                                            .height(3.dp)
-                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ReaderControl(
-                            icon = Icons.Outlined.SkipPrevious,
-                            description = stringResource(R.string.reader_previous_chapter),
-                            enabled = currentChapterIndex > 0,
-                            onClick = {
-                                val previous = chapters.getOrNull(currentChapterIndex - 1)
-                                    ?: return@ReaderControl
-                                val appendedIndex = viewModel.pageIndexOfChapter(previous.id)
-                                if (settings.continuousReading && appendedIndex >= 0 && mode != ReaderMode.DOUBLE_PAGE) {
-                                    scope.launch { listState.scrollToItem(appendedIndex) }
-                                } else {
-                                    viewModel.goToChapter(previous)
-                                }
-                            },
-                        )
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
+                },
+                onNext = {
+                    val next = chapters.getOrNull(currentChapterIndex + 1)
+                    if (next != null) {
+                        val appendedIndex = viewModel.pageIndexOfChapter(next.id)
+                        if (settings.continuousReading &&
+                            appendedIndex >= 0 &&
+                            mode != ReaderMode.DOUBLE_PAGE
                         ) {
-                            Text(
-                                text = currentChapter?.number?.let {
-                                    appString(R.string.chapter_number, it)
-                                }.orEmpty(),
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (nextChapterLoading || previousChapterLoading) {
-                                Spacer(Modifier.width(Spacing.xs))
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(12.dp),
-                                    color = Color.White,
-                                    strokeWidth = 1.5.dp,
-                                )
-                            }
-                            if (nextChapterError || previousChapterError) {
-                                Spacer(Modifier.width(Spacing.xxs))
-                                IconButton(
-                                    onClick = {
-                                        if (previousChapterError) {
-                                            viewModel.retryPreviousChapter()
-                                        } else {
-                                            viewModel.retryNextChapter()
-                                        }
-                                    },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = stringResource(
-                                            if (previousChapterError) R.string.reader_previous_failed
-                                            else R.string.reader_next_failed,
-                                        ),
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                            }
+                            scope.launch { listState.scrollToItem(appendedIndex) }
+                        } else {
+                            viewModel.goToChapter(next)
                         }
-                        ReaderControl(
-                            icon = Icons.Outlined.Settings,
-                            description = stringResource(R.string.reader_settings),
-                            enabled = true,
-                            onClick = { showQuickSettings = true },
-                        )
-                        ReaderControl(
-                            icon = Icons.Outlined.SkipNext,
-                            description = stringResource(R.string.reader_next_chapter),
-                            enabled = currentChapterIndex < chapters.lastIndex,
-                            onClick = {
-                                val next = chapters.getOrNull(currentChapterIndex + 1)
-                                    ?: return@ReaderControl
-                                val appendedIndex = viewModel.pageIndexOfChapter(next.id)
-                                if (settings.continuousReading && appendedIndex >= 0 && mode != ReaderMode.DOUBLE_PAGE) {
-                                    scope.launch { listState.scrollToItem(appendedIndex) }
-                                } else {
-                                    viewModel.goToChapter(next)
-                                }
-                            },
-                        )
                     }
-                }
-            }
+                },
+                onOpenChapters = { showChapterSheet = true },
+                neighbourLoading = nextChapterLoading || previousChapterLoading,
+                neighbourError = nextChapterError || previousChapterError,
+                onRetryNeighbour = {
+                    if (previousChapterError) viewModel.retryPreviousChapter()
+                    else viewModel.retryNextChapter()
+                },
+            )
+
         }
 
         if (isLoading && pages.isEmpty()) {
@@ -737,13 +637,34 @@ fun ReaderScreen(
             },
         )
     }
+
+    if (showChapterSheet) {
+        ReaderChapterSheet(
+            chapters = chapters,
+            currentChapterId = chapters.getOrNull(currentChapterIndex)?.id,
+            onSelect = { chapter ->
+                showChapterSheet = false
+                val appendedIndex = viewModel.pageIndexOfChapter(chapter.id)
+                if (settings.continuousReading &&
+                    appendedIndex >= 0 &&
+                    mode != ReaderMode.DOUBLE_PAGE
+                ) {
+                    scope.launch { listState.scrollToItem(appendedIndex) }
+                } else {
+                    viewModel.goToChapter(chapter)
+                }
+            },
+            onDismiss = { showChapterSheet = false },
+        )
+    }
 }
 
 @Composable
-private fun ReaderTopBar(
+private fun ReaderTopToolbar(
     title: String,
     chapterLabel: String,
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -751,39 +672,43 @@ private fun ReaderTopBar(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color.Black.copy(alpha = 0.78f),
-                        Color.Black.copy(alpha = 0.38f),
+                        Color.Black.copy(alpha = 0.84f),
+                        Color.Black.copy(alpha = 0.46f),
                         Color.Transparent,
                     ),
                 ),
             )
             .statusBarsPadding()
-            .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+            // Taps on the bar itself are not "tap to hide": only the reading area toggles.
+            .pointerInput(Unit) { detectTapGestures { } },
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
+                .height(56.dp)
+                .padding(horizontal = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_back),
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+            ReaderToolButton(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                description = stringResource(R.string.cd_back),
+                enabled = true,
+                onClick = onBack,
+            )
             Spacer(Modifier.width(Spacing.xxs))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                if (title.isNotBlank()) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
                 if (chapterLabel.isNotBlank()) {
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = chapterLabel,
                         color = Color.White.copy(alpha = 0.72f),
@@ -793,13 +718,167 @@ private fun ReaderTopBar(
                     )
                 }
             }
-            Spacer(Modifier.width(Spacing.sm))
+            ReaderToolButton(
+                icon = Icons.Outlined.Settings,
+                description = stringResource(R.string.reader_settings),
+                enabled = true,
+                onClick = onOpenSettings,
+            )
+        }
+    }
+}
+
+/**
+ * One compact bottom bar: a precise chapter progress line, the page counter, and only the
+ * three navigation controls. Reading mode, direction and image options stay in the settings
+ * sheet reachable from the top bar, so no control is duplicated between the two bars.
+ */
+@Composable
+private fun ReaderBottomToolbar(
+    pageInChapter: Int,
+    chapterSize: Int,
+    percentLabel: String?,
+    progress: Float,
+    onSeek: (Float) -> Unit,
+    onSeekFinished: () -> Unit,
+    canPrevious: Boolean,
+    canNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onOpenChapters: () -> Unit,
+    neighbourLoading: Boolean,
+    neighbourError: Boolean,
+    onRetryNeighbour: () -> Unit,
+) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.86f),
+        contentColor = Color.White,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) { detectTapGestures { } },
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(start = Spacing.md, end = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Text(
+                        text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.78f),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (neighbourLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(11.dp),
+                            color = Color.White.copy(alpha = 0.8f),
+                            strokeWidth = 1.5.dp,
+                        )
+                        Spacer(Modifier.width(Spacing.xs))
+                    }
+                    if (neighbourError) {
+                        TextButton(
+                            onClick = onRetryNeighbour,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = Spacing.xs,
+                                vertical = 0.dp,
+                            ),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(Spacing.xxs))
+                            Text(
+                                text = stringResource(R.string.state_error_retry),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        Spacer(Modifier.width(Spacing.xs))
+                    }
+                    if (percentLabel != null) {
+                        Text(
+                            text = percentLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+            }
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Slider(
+                    value = progress,
+                    onValueChange = onSeek,
+                    onValueChangeFinished = onSeekFinished,
+                    enabled = chapterSize > 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp),
+                    thumb = {
+                        Box(
+                            Modifier
+                                .size(9.dp)
+                                .background(Color.White, CircleShape),
+                        )
+                    },
+                    track = { state ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(Color.White.copy(alpha = 0.22f), CircleShape),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(state.value)
+                                    .height(3.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            )
+                        }
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                ReaderToolButton(
+                    icon = Icons.Outlined.SkipPrevious,
+                    description = stringResource(R.string.reader_previous_chapter),
+                    enabled = canPrevious,
+                    onClick = onPrevious,
+                )
+                ReaderToolButton(
+                    icon = Icons.Outlined.FormatListBulleted,
+                    description = stringResource(R.string.reader_chapters_title),
+                    enabled = true,
+                    onClick = onOpenChapters,
+                )
+                ReaderToolButton(
+                    icon = Icons.Outlined.SkipNext,
+                    description = stringResource(R.string.reader_next_chapter),
+                    enabled = canNext,
+                    onClick = onNext,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ReaderControl(
+private fun ReaderToolButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     enabled: Boolean,
@@ -814,8 +893,89 @@ private fun ReaderControl(
             imageVector = icon,
             contentDescription = description,
             tint = if (enabled) Color.White else Color.White.copy(alpha = 0.32f),
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(21.dp),
         )
+    }
+}
+
+/** Chapter picker for the reader; the current chapter is highlighted, nothing else changes. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderChapterSheet(
+    chapters: List<Chapter>,
+    currentChapterId: String?,
+    onSelect: (Chapter) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Text(
+            text = stringResource(R.string.reader_chapters_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.xl),
+        ) {
+            items(chapters, key = { it.id }) { chapter ->
+                val current = chapter.id == currentChapterId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(chapter) }
+                        .background(
+                            if (current) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                            } else {
+                                Color.Transparent
+                            },
+                        )
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = appString(R.string.chapter_number, chapter.number),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (current) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        chapter.title?.takeIf { it.isNotBlank() }?.let { title ->
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (current) {
+                        Text(
+                            text = stringResource(R.string.reader_current_chapter),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                )
+            }
+        }
     }
 }
 
@@ -845,15 +1005,10 @@ private fun ReaderImage(
     }.let { fit ->
         if (!vertical && fit == ContentScale.FillWidth) ContentScale.Fit else fit
     }
-    val headers = remember(page.headers) {
-        Headers.Builder().apply { page.headers.forEach { (name, value) -> add(name, value) } }.build()
-    }
-    val request = remember(page.url, attempt, headers) {
-        ImageRequest.Builder(context)
-            .data(page.data(context))
-            .headers(headers)
-            .crossfade(false)
-            .build()
+    // The request carries the page's own identity, so a recycled slot or a late response can
+    // never place one chapter's image where another page belongs.
+    val request = remember(page.key, attempt) {
+        readerImageRequest(context, page)
     }
 
     BoxWithConstraints(
@@ -879,12 +1034,18 @@ private fun ReaderImage(
             contentAlignment = Alignment.Center,
         ) {
             if (state is ImageState.Loading) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        color = Color.White.copy(alpha = 0.85f),
-                        strokeWidth = 2.dp,
-                    )
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.42f),
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = Color.White.copy(alpha = 0.9f),
+                            strokeWidth = 1.5.dp,
+                        )
+                    }
                 }
             }
             if (state is ImageState.Error) {
@@ -972,6 +1133,24 @@ private fun ReaderImage(
             )
         }
     }
+}
+
+/**
+ * One request definition shared by display and prefetch. The memory key carries the chapter id,
+ * the page index and the URL, so two chapters that reuse the same URL or a recycled list slot
+ * can never show each other's image.
+ */
+private fun readerImageRequest(context: android.content.Context, page: ReaderPage): ImageRequest {
+    val headers = Headers.Builder().apply {
+        page.headers.forEach { (name, value) -> add(name, value) }
+    }.build()
+    return ImageRequest.Builder(context)
+        .data(page.data(context))
+        .headers(headers)
+        .memoryCacheKey("reader:${page.key}")
+        .diskCacheKey(page.url)
+        .crossfade(false)
+        .build()
 }
 
 /** Coil needs a File for downloaded pages and the URL string for remote pages. */

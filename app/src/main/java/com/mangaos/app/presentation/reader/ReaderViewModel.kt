@@ -181,6 +181,9 @@ class ReaderViewModel : ViewModel() {
                     _initialPage.value = settingsRepo
                         .readerPosition(positionKey(startChapter.id))
                         .first() ?: 0
+                    // Opening a chapter makes it the work's reading position, which is what the
+                    // details screen shows as "in progress". It stays unread until its end.
+                    recordProgress(startChapter)
                     loadChapterPages(startChapter)
                     if (_pages.value.isEmpty() && _error.value == null) {
                         _error.value = if (offlineOnly) {
@@ -315,6 +318,9 @@ class ReaderViewModel : ViewModel() {
     }
 
     fun onImageSuccess(pageKey: String, width: Int, height: Int) {
+        // A response that arrives after the page left the sequence (chapter switch, jump,
+        // trimming) must not resurrect a state entry or change the current layout.
+        if (!isCurrentPage(pageKey)) return
         _imageStates.value = _imageStates.value.toMutableMap().apply {
             this[pageKey] = ImageState.Success
         }
@@ -329,6 +335,7 @@ class ReaderViewModel : ViewModel() {
     }
 
     fun onImageError(pageKey: String) {
+        if (!isCurrentPage(pageKey)) return
         _imageStates.value = _imageStates.value.toMutableMap().apply {
             this[pageKey] = ImageState.Error
         }
@@ -336,6 +343,7 @@ class ReaderViewModel : ViewModel() {
     }
 
     fun retryImage(pageKey: String) {
+        if (!isCurrentPage(pageKey)) return
         _imageStates.value = _imageStates.value.toMutableMap().apply {
             this[pageKey] = ImageState.Loading
         }
@@ -358,6 +366,9 @@ class ReaderViewModel : ViewModel() {
             consecutiveTallImages = 0
         }
     }
+
+    private fun isCurrentPage(pageKey: String): Boolean =
+        _pages.value.any { it.key == pageKey }
 
     private fun recalculateLoading() {
         val states = _imageStates.value.values

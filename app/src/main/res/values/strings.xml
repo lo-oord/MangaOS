@@ -74,6 +74,7 @@
     <string name="time_hours_ago">%1$d hours ago</string>
     <string name="time_yesterday">yesterday</string>
     <string name="time_days_ago">%1$d days ago</string>
+    <string name="time_week_ago">a week ago</string>
     <string name="time_weeks_ago">%1$d weeks ago</string>
     <string name="time_months_ago">%1$d months ago</string>
 
@@ -233,6 +234,9 @@
     <string name="action_sign_in">Sign in</string>
     <string name="sources_section_sources">Sources</string>
     <string name="reader_chapter_error">Chapter pages could not be loaded</string>
+    <string name="reader_chapters_title">Chapters</string>
+    <string name="reader_current_chapter">Current chapter</string>
+    <string name="detail_in_progress">In progress</string>
     <string name="info_webview_required">Android System WebView is required to open this source. Install or enable it, then retry.</string>
     <string name="info_cloudflare_bypass_failure">The source could not get past Cloudflare protection. Try again later.</string>
     <string name="settings_group_look">Look and reading</string>

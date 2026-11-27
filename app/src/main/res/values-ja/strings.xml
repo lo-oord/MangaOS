@@ -68,6 +68,7 @@
     <string name="time_hours_ago">%1$d 時間前</string>
     <string name="time_yesterday">昨日</string>
     <string name="time_days_ago">%1$d 日前</string>
+    <string name="time_week_ago">1 週間前</string>
     <string name="time_weeks_ago">%1$d 週間前</string>
     <string name="time_months_ago">%1$d か月前</string>
 
@@ -219,6 +220,9 @@
     <string name="action_continue">続ける</string>
     <string name="action_sign_in">ログイン</string>
     <string name="sources_section_sources">ソース</string>
+    <string name="reader_chapters_title">章一覧</string>
+    <string name="reader_current_chapter">現在の章</string>
+    <string name="detail_in_progress">読書中</string>
     <string name="reader_chapter_error">チャプターのページを読み込めませんでした</string>
     <string name="info_webview_required">このソースを開くには Android System WebView が必要です。インストールまたは有効化してから再試行してください。</string>
     <string name="info_cloudflare_bypass_failure">ソースが Cloudflare の保護を通過できませんでした。しばらくしてから再試行してください。</string>

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -27,11 +26,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,24 +34,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mangaos.app.R
-import com.mangaos.app.core.designsystem.BrandColors
+import com.mangaos.app.core.designsystem.Dimens
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.relativeTime
 import com.mangaos.app.domain.model.Manga
-import com.mangaos.app.domain.model.MangaStatus
-import java.util.Locale
 
-/** The single grid card used by every catalogue screen. */
+/**
+ * The one grid card used by every catalogue screen.
+ *
+ * Information order is fixed and identical on every surface: cover, title, rating + status,
+ * genres, and — only when a screen asks for it — the newest chapter with its real publication
+ * date. Rows keep a fixed height so a card without a rating or a genre never shifts its
+ * neighbours, and every optional element simply disappears when the source has no value.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MangaCard(
@@ -90,69 +90,49 @@ fun MangaCard(
             }
         }
 
-        Spacer(Modifier.height(Spacing.sm))
+        Spacer(Modifier.height(6.dp))
 
-        Text(
-            text = manga.title,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.height(34.dp),
-        )
-
-        Spacer(Modifier.height(Spacing.xxs))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (manga.status != MangaStatus.UNKNOWN) {
-                Box(
-                    modifier = Modifier
-                        .size(5.dp)
-                        .clip(CircleShape)
-                        .background(statusColor(manga.status)),
-                )
-                Spacer(Modifier.width(Spacing.xs))
-                Text(
-                    text = stringResource(statusLabel(manga.status)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(Spacing.xs))
-            }
-            RatingBadge(manga.rating)
-        }
-
-        // The two most relevant genres, on a fixed line so cards in a row keep one height.
-        Spacer(Modifier.height(2.dp))
-        Box(modifier = Modifier.height(16.dp)) {
-            if (manga.genres.isNotEmpty()) {
-                Text(
-                    text = manga.genres.take(2).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        if (showUpdatedAt && manga.updatedAt != null) {
-            Spacer(Modifier.height(Spacing.xxs))
+        Box(modifier = Modifier.height(Dimens.cardTitleHeight)) {
             Text(
-                text = relativeTime(LocalContext.current, manga.updatedAt),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                maxLines = 1,
+                text = manga.title,
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 18.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        // Rating and status share one line; either one alone re-flows without leaving a hole.
+        Box(modifier = Modifier.height(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                RatingLabel(manga.rating)
+                StatusBadge(manga.status)
+            }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        Box(modifier = Modifier.height(18.dp)) {
+            GenreTags(genres = manga.genres, modifier = Modifier.fillMaxWidth(), limit = 2)
+        }
+
+        if (showLatestChapter && manga.latestChapter != null) {
+            Spacer(Modifier.height(3.dp))
+            LatestChapterLine(
+                chapter = manga.latestChapter,
+                timestamp = manga.updatedAt.takeIf { showUpdatedAt },
             )
         }
     }
 }
 
-/** Horizontal list row: same information as the card, laid out for scanning. */
+/** Horizontal list row: same information, same order, laid out for scanning. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MangaListRow(
@@ -195,76 +175,66 @@ fun MangaListRow(
 
             Spacer(Modifier.height(Spacing.xs))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (manga.status != MangaStatus.UNKNOWN) {
-                    Text(
-                        text = stringResource(statusLabel(manga.status)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor(manga.status),
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                }
-                RatingBadge(manga.rating)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                RatingLabel(manga.rating)
+                StatusBadge(manga.status)
             }
 
-            if (manga.genres.isNotEmpty()) {
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = manga.genres.take(3).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            GenreTags(
+                genres = manga.genres,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs),
+                limit = 2,
+            )
 
             if (showLatestChapter && manga.latestChapter != null) {
                 Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = appString(R.string.chapter_number, manga.latestChapter),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
-            }
-
-            val meta = buildList {
-                manga.sourceName?.takeIf { it.isNotBlank() }?.let(::add)
-                if (showUpdatedAt && manga.updatedAt != null) {
-                    add(relativeTime(LocalContext.current, manga.updatedAt))
-                }
-            }
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = meta.joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                LatestChapterLine(
+                    chapter = manga.latestChapter,
+                    timestamp = manga.updatedAt.takeIf { showUpdatedAt },
                 )
             }
         }
     }
 }
 
+/**
+ * "Ch. 42 · 3 days ago" — only for the Latest feed, and only for a real chapter. The age is the
+ * chapter's own publication date; when the source does not provide one the row simply shows the
+ * chapter number instead of a fabricated time.
+ */
 @Composable
-private fun RatingBadge(rating: Double?) {
-    if (rating == null) return
-    Icon(
-        imageVector = Icons.Filled.Star,
-        contentDescription = null,
-        tint = BrandColors.Rating,
-        modifier = Modifier.size(12.dp),
-    )
-    Spacer(Modifier.width(2.dp))
-    Text(
-        text = String.format(Locale.US, "%.1f", rating),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-    )
+private fun LatestChapterLine(chapter: String, timestamp: Long?) {
+    val context = LocalContext.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = appString(R.string.chapter_short, chapter),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (timestamp != null) {
+            Text(
+                text = " · ",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = relativeTime(context, timestamp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -391,22 +361,6 @@ fun MangaList(
             item { footer() }
         }
     }
-}
-
-private fun statusLabel(status: MangaStatus): Int = when (status) {
-    MangaStatus.ONGOING -> R.string.status_ongoing
-    MangaStatus.COMPLETED -> R.string.status_completed
-    MangaStatus.HIATUS -> R.string.status_hiatus
-    MangaStatus.CANCELLED -> R.string.status_cancelled
-    MangaStatus.UNKNOWN -> R.string.status_unknown
-}
-
-private fun statusColor(status: MangaStatus): Color = when (status) {
-    MangaStatus.ONGOING -> BrandColors.Ongoing
-    MangaStatus.COMPLETED -> BrandColors.Completed
-    MangaStatus.HIATUS -> BrandColors.Hiatus
-    MangaStatus.CANCELLED -> BrandColors.Cancelled
-    MangaStatus.UNKNOWN -> BrandColors.Hiatus
 }
 
 private const val COVER_ASPECT = 2f / 3f
