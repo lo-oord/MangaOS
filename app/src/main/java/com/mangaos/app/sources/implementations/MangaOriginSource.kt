@@ -53,14 +53,14 @@ class MangaOriginSource : MangaSource {
             append("\"$SERIES_SENTENCE\"")
             if (query.isNotBlank()) append(" ").append(query)
         }
-        val url = feed(baseUrl, "summary").newBuilder()
+        val url = feed(baseUrl, "summary")
             .addQueryParameter("q", search)
             .addQueryParameter("start-index", ((page - 1) * PAGE_SIZE + 1).toString())
             .addQueryParameter("max-results", (PAGE_SIZE + 1).toString())
             .build()
         val entries = entries(http.json(url.toString()))
         return entries.take(PAGE_SIZE)
-            .filter { it.isSeries }
+            .filter { it.isSeries() }
             .mapNotNull { it.toManga() }
     }
 
@@ -77,7 +77,7 @@ class MangaOriginSource : MangaSource {
         val found = ArrayList<SourceChapter>()
         var start = 1
         repeat(MAX_CHAPTER_PAGES) {
-            val url = feed(READER, "summary").newBuilder()
+            val url = feed(READER, "summary")
                 .addPathSegment("-")
                 .addPathSegment(label)
                 .addQueryParameter("start-index", start.toString())
@@ -125,7 +125,7 @@ class MangaOriginSource : MangaSource {
         labelCache[seriesPath]?.let { return it }
         val entry = entry(baseUrl, seriesPath, "default") ?: return null
         for (label in entry.labels) {
-            val url = feed(READER, "summary").newBuilder()
+            val url = feed(READER, "summary")
                 .addPathSegment("-")
                 .addPathSegment(label)
                 .addQueryParameter("max-results", "1")
@@ -140,7 +140,7 @@ class MangaOriginSource : MangaSource {
     }
 
     private suspend fun entry(blog: String, path: String, projection: String): BloggerEntry? {
-        val url = feed(blog, projection).newBuilder()
+        val url = feed(blog, projection)
             .addEncodedQueryParameter("path", path)
             .build()
         val payload = runCatching { http.json(url.toString()) }.getOrNull() ?: return null
@@ -211,7 +211,7 @@ class MangaOriginSource : MangaSource {
             ?: Regex("""\d+(?:\.\d+)*""").find(title)?.value
             ?: title
 
-    private fun BloggerEntry.isSeries: Boolean = (content ?: summary).orEmpty().contains(SERIES_SENTENCE)
+    private fun BloggerEntry.isSeries(): Boolean = (content ?: summary).orEmpty().contains(SERIES_SENTENCE)
 
     private data class BloggerEntry(
         val title: String,

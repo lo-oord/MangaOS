@@ -20,6 +20,7 @@ import kotlinx.serialization.json.longOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -60,6 +61,9 @@ class SourceHttp(
             throw SourceException(SourceFailure.PARSING, "Invalid HTML from $url", error)
         }
     }
+
+    suspend fun json(url: HttpUrl, headers: Map<String, String> = emptyMap()): JsonElement =
+        json(url.toString(), headers)
 
     suspend fun json(url: String, headers: Map<String, String> = emptyMap()): JsonElement {
         val payload = text(url, headers)
