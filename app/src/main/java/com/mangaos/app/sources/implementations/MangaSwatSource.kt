@@ -27,7 +27,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 class MangaSwatSource : MangaSource {
 
     override val id: String = "mangaswat"
-    override val name: String = "MangaSwat"
+    override val name: String = "Manga Swat"
     override val lang: String = "ar"
     override val baseUrl: String = "https://meshmanga.com"
     override val capabilities: Set<SourceCapability> = setOf(
