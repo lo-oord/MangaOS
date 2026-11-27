@@ -4,6 +4,7 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.sources.images.OverlayImageInterceptor
 import okhttp3.OkHttpClient
@@ -27,6 +28,13 @@ class MangaOSApplication : Application(), ImageLoaderFactory {
                 .addInterceptor(OverlayImageInterceptor)
                 .build(),
         )
+        // The in-memory cache is bounded hard: the reader only keeps a small window of pages
+        // alive, so decoded bitmaps must not pile up for chapters that are already left.
+        .memoryCache {
+            MemoryCache.Builder(this@MangaOSApplication)
+                .maxSizePercent(0.18)
+                .build()
+        }
         .diskCache {
             DiskCache.Builder()
                 .directory(cacheDir.resolve("image_cache"))

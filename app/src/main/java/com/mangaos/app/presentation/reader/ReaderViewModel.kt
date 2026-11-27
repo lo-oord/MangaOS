@@ -272,6 +272,8 @@ class ReaderViewModel : ViewModel() {
             insertPagesInOrder(newPages)
             loadedChapterIds += chapter.id
             chapterPageCounts[chapter.id] = newPages.size
+            // Appending a neighbour must never grow the window without bound.
+            trimDistantChapters(_currentChapterIndex.value, 0)
             val states = _imageStates.value.toMutableMap()
             newPages.forEach { page -> states.putIfAbsent(page.key, ImageState.Loading) }
             _imageStates.value = states
@@ -298,7 +300,7 @@ class ReaderViewModel : ViewModel() {
     private fun prefetchNextChapters() {
         nextLoadJob?.cancel()
         nextLoadJob = viewModelScope.launch {
-            val toPreload = settings.value.preloadChapters.coerceIn(0, 3)
+            val toPreload = settings.value.preloadChapters.coerceIn(0, 1)
             if (toPreload == 0) return@launch
             var index = _currentChapterIndex.value + 1
             repeat(toPreload) {
@@ -563,8 +565,12 @@ class ReaderViewModel : ViewModel() {
             _isLoading.value = true
             loadChapterPages(chapter)
             _isLoading.value = false
-            val target = pageIndexOfChapter(chapter.id).coerceAtLeast(0)
-            _scrollRequests.tryEmit(target)
+            // The chapter opens where the reader last was inside it, not at its first page:
+            // "previous" and "next" continue from the position the reader chose.
+            val start = pageIndexOfChapter(chapter.id).coerceAtLeast(0)
+            val count = chapterPageCounts[chapter.id] ?: _pages.value.count { it.chapterId == chapter.id }
+            val offset = if (count > 0) _initialPage.value.coerceIn(0, count - 1) else 0
+            _scrollRequests.tryEmit(start + offset)
             if (settings.value.continuousReading) prefetchNextChapters()
         }
     }
@@ -618,9 +624,13 @@ class ReaderViewModel : ViewModel() {
         /** Start fetching the previous chapter while still on one of its first pages. */
         const val PREVIOUS_TRIGGER_PAGES = 1
 
-        /** Loaded chapters kept on each side of the reading position before trimming. */
-        const val KEEP_CHAPTERS_BEHIND = 3
-        const val KEEP_CHAPTERS_AHEAD = 3
-        const val MAX_LOADED_CHAPTERS = 8
+        /**
+         * Only one chapter on each side of the reading position is held in memory. The window
+         * is deliberately small: turning a chapter keeps working, while decoded pages and
+         * their entries are released as the reader moves on instead of accumulating.
+         */
+        const val KEEP_CHAPTERS_BEHIND = 1
+        const val KEEP_CHAPTERS_AHEAD = 1
+        const val MAX_LOADED_CHAPTERS = 3
     }
 }

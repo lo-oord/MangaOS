@@ -51,19 +51,30 @@ class AzoraSource : MangaSource {
     override suspend fun search(query: String, page: Int): List<SourceManga> =
         query(page, orderBy = "totalViews", search = query.trim())
 
+    /**
+     * A page can be emptied by the novel filter. The next pages are read in that case (at most
+     * a few), so an adult-heavy stretch never looks like the end of the catalogue.
+     */
     private suspend fun query(page: Int, orderBy: String, search: String = ""): List<SourceManga> {
-        val url = "$API/api/query".toHttpUrl().newBuilder()
-            .addQueryParameter("perPage", PER_PAGE.toString())
-            .addQueryParameter("searchTerm", search)
-            .addQueryParameter("orderBy", orderBy)
-            .addQueryParameter("orderDirection", "desc")
-            .addQueryParameter("page", page.toString())
-            .build()
-        val payload = http.json(url.toString()).obj()
-            ?: throw SourceException(SourceFailure.PARSING, "Azora list payload is not an object")
-        return payload.array("posts").orEmpty().mapNotNull { element ->
-            element.obj()?.takeUnless { it.isNovel() }?.toManga()
+        var current = page
+        repeat(PAGES_PER_CALL) {
+            val url = "$API/api/query".toHttpUrl().newBuilder()
+                .addQueryParameter("perPage", PER_PAGE.toString())
+                .addQueryParameter("searchTerm", search)
+                .addQueryParameter("orderBy", orderBy)
+                .addQueryParameter("orderDirection", "desc")
+                .addQueryParameter("page", current.toString())
+                .build()
+            val payload = http.json(url.toString()).obj()
+                ?: throw SourceException(SourceFailure.PARSING, "Azora list payload is not an object")
+            val posts = payload.array("posts").orEmpty()
+            val mangas = posts.mapNotNull { element ->
+                element.obj()?.takeUnless { it.isNovel() }?.toManga()
+            }
+            if (mangas.isNotEmpty() || posts.isEmpty()) return mangas
+            current++
         }
+        return emptyList()
     }
 
     override suspend fun details(mangaId: String): SourceManga? {
@@ -196,5 +207,8 @@ class AzoraSource : MangaSource {
     private companion object {
         const val API = "https://api.azorafly.com"
         const val PER_PAGE = 24
+
+        /** Pages read in one call while the novel filter keeps emptying them. */
+        const val PAGES_PER_CALL = 4
     }
 }

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.repository.SourceUnavailableException
@@ -249,9 +250,13 @@ class LatestViewModel : ViewModel() {
                     val listed = merged.values.toList()
                     val ready = withTimeoutOrNull(RESOLVE_TOTAL_MS) { resolveCards(listed) }
                         ?: listed
+                    // The end of a feed is never inferred from a page's size: a source may
+                    // return fewer cards than a page hint (novels filtered out, a smaller page
+                    // size), which used to stop the feed after the first page. Paging ends only
+                    // when a page actually brings nothing new.
                     publish(LinkedHashMap<String, Manga>().apply {
                         ready.forEach { put(it.key, it) }
-                    }, failures, endReached = ready.size < PAGE_HINT)
+                    }, failures)
                     enrichNewest(ready)
                 }
                 failures.size == scope.size -> _state.value = LatestUiState.Error(
@@ -293,27 +298,59 @@ class LatestViewModel : ViewModel() {
         val semaphore = Semaphore(RESOLVE_CONCURRENCY)
         mangas.map { manga ->
             async(Dispatchers.IO) {
-                if (manga.latestChapter != null && manga.updatedAt != null) {
+                if (manga.latestChapter != null && manga.updatedAt != null &&
+                    !manga.needsMetadata()
+                ) {
                     manga
                 } else {
                     semaphore.withPermit {
-                        runCatching {
-                            withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
-                                repository.latestChapter(manga.sourceId, manga.id)
+                        var resolved = manga
+                        if (resolved.latestChapter == null || resolved.updatedAt == null) {
+                            runCatching {
+                                withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
+                                    repository.latestChapter(resolved.sourceId, resolved.id)
+                                }
+                            }.getOrNull()?.let { chapter ->
+                                resolved = resolved.copy(
+                                    latestChapter = chapter.number.takeIf { it.isNotBlank() }
+                                        ?: resolved.latestChapter,
+                                    latestChapterId = chapter.id,
+                                    updatedAt = chapter.publishedAt ?: resolved.updatedAt,
+                                )
                             }
-                        }.getOrNull()?.let { chapter ->
-                            manga.copy(
-                                latestChapter = chapter.number.takeIf { it.isNotBlank() }
-                                    ?: manga.latestChapter,
-                                latestChapterId = chapter.id,
-                                updatedAt = chapter.publishedAt ?: manga.updatedAt,
-                            )
-                        } ?: manga
+                        }
+                        // Some sources list a work with neither its state nor a genre (their
+                        // card markup carries neither). The detail page does, so it is read
+                        // for those cards only, and the card is never shown half empty.
+                        if (resolved.needsMetadata()) {
+                            runCatching {
+                                withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
+                                    repository.byId(resolved.sourceId, resolved.id)
+                                }
+                            }.getOrNull()?.let { details ->
+                                resolved = resolved.copy(
+                                    status = if (details.status != MangaStatus.UNKNOWN) {
+                                        details.status
+                                    } else {
+                                        resolved.status
+                                    },
+                                    genres = details.genres.takeIf { it.isNotEmpty() }
+                                        ?: resolved.genres,
+                                    author = resolved.author ?: details.author,
+                                    coverUrl = resolved.coverUrl ?: details.coverUrl,
+                                )
+                            }
+                        }
+                        resolved
                     }
                 }
             }
         }.awaitAll()
     }
+
+    /** A card with no state and no genre still needs its metadata resolved. */
+    private fun Manga.needsMetadata(): Boolean =
+        status == MangaStatus.UNKNOWN && genres.isEmpty()
 
     private fun enrichNewest(mangas: List<Manga>) {
         enrichJob?.cancel()
@@ -430,9 +467,6 @@ class LatestViewModel : ViewModel() {
 
         /** How many undated works one refresh may resolve, to stay light on the sources. */
         const val MAX_ENRICH = 60
-
-        /** A page smaller than this hints that the source has nothing left to page through. */
-        const val PAGE_HINT = 24
 
         /** Cards resolved side by side; enough to be quick without hammering one source. */
         const val RESOLVE_CONCURRENCY = 6

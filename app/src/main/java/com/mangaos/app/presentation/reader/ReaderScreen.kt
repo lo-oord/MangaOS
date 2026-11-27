@@ -291,14 +291,29 @@ fun ReaderScreen(
         if (pages.isEmpty() || settings.preloadImages <= 0) return@LaunchedEffect
         val loader = context.imageLoader
         val start = listState.firstVisibleItemIndex + 1
+        // A bounded window: only the pages just ahead are warmed, so browsing a long chapter
+        // never queues every page or fills the cache behind the reader's back.
         pages.drop(start)
-            .take(settings.preloadImages)
+            .take(settings.preloadImages.coerceAtMost(PRELOAD_AHEAD))
             .forEach { page -> loader.enqueue(readerImageRequest(context, page)) }
         // A few pages behind are warmed too, so turning back never stutters.
         val behind = (listState.firstVisibleItemIndex - PRELOAD_BEHIND).coerceAtLeast(0)
         val upTo = listState.firstVisibleItemIndex.coerceIn(behind, pages.size)
         pages.subList(behind, upTo).forEach { page -> loader.enqueue(readerImageRequest(context, page)) }
     }
+
+    // The chapter's own images are what the loading badge reports, so the percentage is always
+    // "how much of this chapter is on screen", never a count of neighbouring chapters.
+    val chapterPages = remember(pages, currentChapterIndex, chapters) {
+        val chapterId = chapters.getOrNull(currentChapterIndex)?.id
+        if (chapterId == null) emptyList() else pages.filter { it.chapterId == chapterId }
+    }
+    val chapterDone = chapterPages.count { page ->
+        val state = imageStates[page.key]
+        state is ImageState.Success || state is ImageState.Error
+    }
+    val chapterTotal = chapterPages.size
+    val loadFraction = if (chapterTotal == 0) 0f else chapterDone.toFloat() / chapterTotal
 
     val enterSpec = tween<Float>(if (reduceMotion) 0 else 170)
     val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(if (reduceMotion) 0 else 170)
@@ -573,6 +588,7 @@ fun ReaderScreen(
                 onOpenSettings = { showQuickSettings = true },
                 settings = settings,
                 onUpdateSettings = viewModel::updateSettings,
+                settingsActive = showQuickSettings,
                 neighbourLoading = nextChapterLoading || previousChapterLoading,
                 neighbourError = nextChapterError || previousChapterError,
                 onRetryNeighbour = {
@@ -581,6 +597,24 @@ fun ReaderScreen(
                 },
             )
 
+        }
+
+        // A quiet, precise loading badge: the share of this chapter's images already drawn.
+        // It sits under the top bar instead of covering the artwork, and it leaves on its own.
+        AnimatedVisibility(
+            visible = chapterTotal > 0 && chapterDone < chapterTotal,
+            enter = fadeIn(enterSpec),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 200)),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = if (controlsVisible && settings.showTopBar) 92.dp else 14.dp),
+        ) {
+            ReaderLoadingBadge(
+                fraction = loadFraction,
+                done = chapterDone,
+                total = chapterTotal,
+            )
         }
 
         if (isLoading && pages.isEmpty()) {
@@ -672,6 +706,86 @@ fun ReaderScreen(
  * three navigation controls. Reading mode, direction and image options stay in the settings
  * sheet reachable from the top bar, so no control is duplicated between the two bars.
  */
+/**
+ * The reader's loading badge: a thin ring filled to the share of the chapter already drawn,
+ * with that percentage inside it and the page count beside it. It reports real progress (an
+ * image counts once its bitmap is decoded or has failed), and it never dims the page.
+ */
+@Composable
+private fun ReaderLoadingBadge(fraction: Float, done: Int, total: Int) {
+    val scheme = MaterialTheme.colorScheme
+    val animated by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = fraction.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 260),
+        label = "readerLoadFraction",
+    )
+    val percent = (fraction.coerceIn(0f, 1f) * 100f).toInt().coerceIn(0, 100)
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = scheme.surface.copy(alpha = 0.88f),
+        contentColor = scheme.onSurface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            scheme.primary.copy(alpha = 0.22f),
+        ),
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    val stroke = 3.dp.toPx()
+                    val inset = stroke / 2f
+                    val arcSize = androidx.compose.ui.geometry.Size(
+                        size.width - stroke,
+                        size.height - stroke,
+                    )
+                    drawArc(
+                        color = scheme.onSurface.copy(alpha = 0.16f),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                        size = arcSize,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = stroke,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        ),
+                    )
+                    drawArc(
+                        color = scheme.primary,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animated,
+                        useCenter = false,
+                        topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                        size = arcSize,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = stroke,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        ),
+                    )
+                }
+                Text(
+                    text = "$percent%",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.primary,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "$done / $total",
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 /** Chapter picker for the reader; the current chapter is highlighted, nothing else changes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -987,7 +1101,11 @@ private fun readerColorFilter(settings: ReaderSettings): ColorFilter? {
     return ColorFilter.colorMatrix(ColorMatrix(matrix))
 }
 
-private const val PRELOAD_BEHIND = 3
+/** Pages warmed behind the reading position; enough for a turn back, never a whole chapter. */
+private const val PRELOAD_BEHIND = 1
+
+/** Pages warmed ahead at most, whatever the reader's preload setting asks for. */
+private const val PRELOAD_AHEAD = 6
 
 /** Tallest bitmap a vertical page may decode to, relative to its width. */
 private const val MAX_TALL_DECODE = 5

@@ -45,6 +45,9 @@ class ProcomicSource : MangaSource {
         defaultHeaders = mapOf("Accept" to "application/json"),
     )
 
+    /** Content type of each series, learnt from the first answer that worked. */
+    private val typeCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     override suspend fun popular(page: Int): List<SourceManga> = listing(page, "popular")
 
     override suspend fun latest(page: Int): List<SourceManga> = listing(page, "latest_chapter")
@@ -73,9 +76,37 @@ class ProcomicSource : MangaSource {
         return payload.takeIf { it.isReadable() }?.toManga(details = true)
     }
 
+    /**
+     * The chapter list lives under the series' own content type (`manhua`, `manhwa`, `manga`).
+     * The type is taken from the series when that answer is available, and every type is tried
+     * in turn otherwise, so a series whose detail payload is withheld is never left without its
+     * chapters (the API answers 404 for the wrong type).
+     */
     override suspend fun chapters(mangaId: String): List<SourceChapter> {
         val id = mangaId.trim('/')
-        val type = details(id)?.let { readType(it) } ?: "manga"
+        val preferred = typeCache[id]
+            ?: runCatching { details(id)?.let { readType(it) } }.getOrNull()
+        val candidates = buildList {
+            preferred?.let(::add)
+            add("manhua")
+            add("manhwa")
+            add("manga")
+        }.distinct()
+        var lastFailure: SourceException? = null
+        for (type in candidates) {
+            val chapters = runCatching { chaptersOfType(id, type) }.getOrElse { error ->
+                lastFailure = error as? SourceException
+                null
+            }
+            if (!chapters.isNullOrEmpty()) {
+                typeCache[id] = type
+                return chapters
+            }
+        }
+        throw lastFailure ?: SourceException(SourceFailure.EMPTY, "This series has no chapters")
+    }
+
+    private suspend fun chaptersOfType(id: String, type: String): List<SourceChapter> {
         val url = "$baseUrl/api/public/$type/$id/chapters".toHttpUrl().newBuilder()
             .addQueryParameter("limit", "100")
             .addQueryParameter("order", "desc")
@@ -83,18 +114,27 @@ class ProcomicSource : MangaSource {
             .build()
         val first = http.json(url.toString()).obj()
             ?: throw SourceException(SourceFailure.PARSING, "ProComic chapter payload is missing")
-        val total = first.int("total") ?: 0
+        val total = first.int("total") ?: first.obj("meta")?.int("total") ?: 0
         val pages = if (total > 100) (total + 99) / 100 else 1
-        val chapters = ArrayList<SourceChapter>()
+        val all = ArrayList<SourceChapter>()
+        val arabic = ArrayList<SourceChapter>()
         (1..pages.coerceAtMost(MAX_CHAPTER_PAGES)).forEach { page ->
             val pageUrl = url.newBuilder().setQueryParameter("page", page.toString()).build()
-            val payload = if (page == 1) first else http.json(pageUrl.toString()).obj()
+            val payload = if (page == 1) {
+                first
+            } else {
+                runCatching { http.json(pageUrl.toString()).obj() }.getOrNull()
+            }
             payload?.array("data").orEmpty().forEach { element ->
-                element.obj()?.toChapter()?.let(chapters::add)
+                val chapter = element.obj() ?: return@forEach
+                val mapped = chapter.toChapter() ?: return@forEach
+                all += mapped
+                if (chapter.isArabicChapter()) arabic += mapped
             }
         }
-        if (chapters.isEmpty()) throw SourceException(SourceFailure.EMPTY, "This series has no chapters")
-        return chapters
+        // The Arabic release is preferred; a series that only ships another language keeps its
+        // chapters instead of appearing empty.
+        return arabic.ifEmpty { all }
     }
 
     override suspend fun pages(mangaId: String, chapterId: String): List<SourcePage> {
@@ -119,15 +159,23 @@ class ProcomicSource : MangaSource {
     /** Exposed for unit tests: one recorded API object, no network. */
     internal fun mapManga(json: JsonObject): SourceManga? = json.toManga(details = true)
 
-    private fun JsonObject.isReadable(): Boolean =
-        string("type") != "novel" && bool("isBlockedSeries") != true
+    /**
+     * Only novels are dropped: the app cannot read them. A series flagged as region-blocked or
+     * protected is still listed, with its cover, its details and its chapters — hiding it here
+     * left the source almost empty and made its works unreachable.
+     */
+    private fun JsonObject.isReadable(): Boolean = string("type") != "novel"
 
     private fun JsonObject.toManga(details: Boolean = false): SourceManga? {
         val id = int("id") ?: return null
         val title = string("title") ?: return null
         val meta = obj("metadata")
         val type = string("type")
-        val cover = string("coverImage") ?: meta?.string("coverImage") ?: string("thumbnail")
+        val cover = string("coverImage")
+            ?: obj("coverImageApp")?.string("mobile")
+            ?: obj("coverImageApp")?.string("desktop")
+            ?: meta?.string("coverImage")
+            ?: string("thumbnail")
         val genres = buildList {
             type?.replaceFirstChar { it.titlecase() }?.let(::add)
             meta?.string("origin")?.replaceFirstChar { it.titlecase() }?.let(::add)
@@ -138,7 +186,7 @@ class ProcomicSource : MangaSource {
         return SourceManga(
             id = id.toString(),
             title = title,
-            coverUrl = cover?.let { resolveCover(it) },
+            coverUrl = cover?.let { resolveCover(it, string("cdn_path")) },
             url = "$baseUrl/ar/series/${string("slug") ?: id}-$id",
             description = buildString {
                 string("description")?.trim()?.takeIf { it.isNotBlank() }?.let(::append)
@@ -170,9 +218,8 @@ class ProcomicSource : MangaSource {
     private fun JsonObject.toChapter(): SourceChapter? {
         val id = int("id") ?: return null
         val number = raw("chapter_number") ?: return null
-        val language = string("language")
-        // The site publishes several languages per series; only the Arabic release is listed.
-        if (language != null && !language.equals("AR", ignoreCase = true)) return null
+        // The site publishes several languages per series; the Arabic release is preferred by
+        // [chaptersOfType], and the others are kept when a series has no Arabic release at all.
         val locked = bool("lockedForever") == true ||
             bool("lockedByCoins") == true ||
             bool("lockedByShortlink") == true ||
@@ -189,13 +236,20 @@ class ProcomicSource : MangaSource {
         )
     }
 
-    private fun resolveCover(cover: String): String = when {
-        cover.startsWith("http") -> cover
-        else -> try {
-            baseUrl.toHttpUrl().resolve(cover)?.toString() ?: cover
-        } catch (_: Exception) {
-            cover
-        }
+    private fun JsonObject.isArabicChapter(): Boolean {
+        val language = string("language") ?: return true
+        return language.equals("AR", ignoreCase = true)
+    }
+
+    /**
+     * Covers are served from a per-series CDN host (`cdn2.procomic.pro`), and some payloads only
+     * carry the relative path, so it is resolved against that host instead of the site root.
+     */
+    private fun resolveCover(cover: String, cdnPath: String?): String {
+        if (cover.startsWith("http")) return cover
+        val host = cdnPath?.takeIf { it.isNotBlank() } ?: "cdn2"
+        val path = if (cover.startsWith("/")) cover else "/$cover"
+        return "https://$host.procomic.pro$path"
     }
 
     private companion object {

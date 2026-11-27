@@ -80,8 +80,34 @@ class MangaTekSource : MangaSource {
                 title = title,
                 coverUrl = element.selectFirst("img")?.coverImage(),
                 url = "$baseUrl/manga/$slug",
+                genres = cardGenres(element),
+                status = cardStatus(element),
             )
         }.distinctBy { it.id }
+    }
+
+    /** Card chips, when the listing prints them: genre links and the state badge. */
+    private fun cardGenres(element: org.jsoup.nodes.Element): List<String> =
+        element.select("a[href*=genre], a[href*=tag], .genre, .badge")
+            .map { it.text().trim() }
+            .filter { it.isNotEmpty() && it.length <= 24 && statusOf(it) == MangaStatus.UNKNOWN }
+            .distinct()
+
+    private fun cardStatus(element: org.jsoup.nodes.Element): MangaStatus {
+        val badge = statusOf(element.select(".badge, .status").text().trim())
+        if (badge != MangaStatus.UNKNOWN) return badge
+        val text = element.text()
+        val label = listOf("مستمر", "مكتمل", "متوقف", "ملغي").firstOrNull { text.contains(it) }
+        return statusOf(label.orEmpty())
+    }
+
+    private fun statusOf(value: String): MangaStatus = when (value.trim().lowercase()) {
+        "مستمر", "ongoing" -> MangaStatus.ONGOING
+        "مكتمل", "completed" -> MangaStatus.COMPLETED
+        "متوقف", "hiatus" -> MangaStatus.HIATUS
+        "ملغي", "cancelled", "dropped" -> MangaStatus.CANCELLED
+        else -> MangaStatus.UNKNOWN
+    }
     }
 
     override suspend fun details(mangaId: String): SourceManga? {
@@ -101,8 +127,13 @@ class MangaTekSource : MangaSource {
             val number = chapter.raw("chapter_number") ?: return@mapNotNull null
             val title = chapter.string("title")
             val isMachineTranslated = chapter.int("isAI") == 1
+            val createdAt = (chapter.string("created_at") ?: chapter.string("createdAt")).orEmpty()
+            // The same chapter number can appear more than once (the original and the machine
+            // translated release). A number alone is therefore not an identity: the creation
+            // time keeps every release distinct, so page counts, progress and the reader's
+            // chapter index never point at another release with the same number.
             SourceChapter(
-                id = number,
+                id = if (createdAt.isBlank()) number else "$number@$createdAt",
                 number = number,
                 title = buildString {
                     append(title?.takeIf { it.isNotBlank() && it != "Chapter $number" } ?: "Chapter $number")
@@ -117,13 +148,13 @@ class MangaTekSource : MangaSource {
 
     override suspend fun pages(mangaId: String, chapterId: String): List<SourcePage> {
         val slug = mangaId.trim('/').substringAfterLast("/")
-        val document = http.document("$baseUrl/reader/$slug/$chapterId")
-        val props = astroProp(document, "imageUrls") ?: throw SourceException(
-            SourceFailure.PARSING,
-            "The reader data is missing for chapter $chapterId",
-        )
+        // The id carries the release's creation time (see [chapters]); the reader URL only
+        // needs the chapter number.
+        val number = chapterId.substringBefore("@")
+        val document = http.document("$baseUrl/reader/$slug/$number")
+        val props = astroProp(document, "imageUrls")
 
-        val embedded = props.array("imageUrls").orEmpty().map { element ->
+        val embedded = props?.array("imageUrls").orEmpty().map { element ->
             when (element) {
                 is JsonPrimitive -> ReaderImage(element.content, pending = false, trap = false)
                 is JsonObject -> ReaderImage(
@@ -134,16 +165,26 @@ class MangaTekSource : MangaSource {
                 else -> ReaderImage("", pending = false, trap = false)
             }
         }
-        // Pages the site mints in its own reader are not listed here; the pages that *are*
-        // embedded are still the real chapter and are shown, instead of refusing the chapter.
-        val imageUrls = embedded
-            .filterNot { it.trap || it.pending }
+        // A decoy page (the site's trap) is dropped. A page the site marks as pending still
+        // carries a usable URL, and dropping it used to shorten a chapter to nothing; it is
+        // kept so the whole chapter is readable.
+        var imageUrls = embedded
+            .filterNot { it.trap }
             .map { resolveUrl(it.url) }
             .filter { it.isNotBlank() }
+            .distinct()
+        // Some chapters publish no props at all and render their pages straight into the
+        // reader markup. Those images are the chapter too, so they are read instead of failing.
+        if (imageUrls.isEmpty()) imageUrls = domPages(document)
         if (imageUrls.isEmpty()) throw SourceException(SourceFailure.EMPTY, "This chapter has no pages")
 
-        val overlays = runCatching { overlaysFor(document, props) }.getOrDefault(emptyList())
-        val offset = props.int("overlayPageOffset") ?: 0
+        // A chapter whose translated text lives in a separate layer that only the site's own
+        // reader can unlock is shown with its original image, never refused: the artwork is
+        // the chapter, and a missing text layer must not hide it.
+        val overlays = if (props == null) emptyList() else {
+            runCatching { overlaysFor(document, props) }.getOrDefault(emptyList())
+        }
+        val offset = props?.int("overlayPageOffset") ?: 0
         val byPage = overlays.associate { (offset + it.pageNumber - 1) to it.bubbles }
 
         return imageUrls.mapIndexed { index, imageUrl ->
@@ -165,15 +206,23 @@ class MangaTekSource : MangaSource {
             val pages = runCatching { MangaTekOverlay.decryptEmbedded(blob) }.getOrNull()
             if (!pages.isNullOrEmpty()) return pages
         }
-        if (props.string("textMode") == "overlay") {
-            // The site answers this chapter's translation only to a signed reader request.
-            throw SourceException(
-                SourceFailure.EMPTY,
-                "MangaTek serves this chapter's translated text to its own reader only",
-            )
-        }
+        // `textMode == "overlay"` means the translation is answered only to the site's signed
+        // reader. The page images are still the real chapter, so no overlay is painted and the
+        // page is shown as published.
         return emptyList()
     }
+
+    /** Pages rendered into the reader markup, used when the props carry no page list. */
+    private fun domPages(document: Document): List<String> =
+        document.select("main img, [data-reader] img, .reader img, img[src]")
+            .mapNotNull { image ->
+                val url = image.absUrl("src").ifBlank { image.attr("src") }
+                val resolved = resolveUrl(url)
+                resolved.takeIf {
+                    it.startsWith("http") && !DOM_LOGO.containsMatchIn(it)
+                }
+            }
+            .distinct()
 
     override fun imageHeaders(): Map<String, String> = mapOf(
         "Referer" to "$baseUrl/",
@@ -247,4 +296,8 @@ class MangaTekSource : MangaSource {
     private fun JsonObject.firstTextOrNull(key: String): Long? = string(key).toInstantMillis()
 
     private data class ReaderImage(val url: String, val pending: Boolean, val trap: Boolean)
+
+    private companion object {
+        val DOM_LOGO = Regex("""(logo|favicon|avatar|icon|banner|sponsor)""", RegexOption.IGNORE_CASE)
+    }
 }

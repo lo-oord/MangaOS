@@ -1,7 +1,11 @@
 package com.mangaos.app.presentation.reader
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -167,6 +172,8 @@ fun ReaderBottomBar(
     onOpenSettings: () -> Unit,
     settings: ReaderSettings,
     onUpdateSettings: ((ReaderSettings) -> ReaderSettings) -> Unit,
+    /** True while the quick settings sheet is open, so its button can answer visually. */
+    settingsActive: Boolean,
     neighbourLoading: Boolean,
     neighbourError: Boolean,
     onRetryNeighbour: () -> Unit,
@@ -195,22 +202,7 @@ fun ReaderBottomBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(50)),
-                    shape = RoundedCornerShape(50),
-                    color = scheme.surfaceContainerHigh,
-                    contentColor = scheme.primary,
-                ) {
-                    IconButton(onClick = onOpenSettings, modifier = Modifier.size(44.dp)) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = stringResource(R.string.reader_settings),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
+                ReaderQuickSettingsButton(active = settingsActive, onClick = onOpenSettings)
 
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                     Surface(
@@ -375,6 +367,58 @@ fun ReaderBottomBar(
                     onClick = { onUpdateSettings { it.copy(zoomEnabled = !it.zoomEnabled) } },
                 )
             }
+        }
+    }
+}
+
+/**
+ * The reader's quick settings button: a small, quiet square that answers the touch with a
+ * spring and turns while its sheet is open. It is deliberately the smallest control in the bar —
+ * the page keeps the room.
+ */
+@Composable
+private fun ReaderQuickSettingsButton(active: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = when {
+            pressed -> 0.9f
+            active -> 1.05f
+            else -> 1f
+        },
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 900f),
+        label = "quickSettingsScale",
+    )
+    val rotation by animateFloatAsState(
+        targetValue = if (active) 180f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 260),
+        label = "quickSettingsRotation",
+    )
+    Surface(
+        modifier = Modifier
+            .size(34.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+            }
+            .clip(RoundedCornerShape(11.dp)),
+        shape = RoundedCornerShape(11.dp),
+        color = if (active) scheme.primaryContainer else scheme.surfaceContainerHigh,
+        contentColor = scheme.primary,
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.18f)),
+    ) {
+        IconButton(
+            onClick = onClick,
+            interactionSource = interaction,
+            modifier = Modifier.size(34.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.reader_settings),
+                modifier = Modifier.size(17.dp),
+            )
         }
     }
 }

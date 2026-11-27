@@ -148,43 +148,76 @@ class MangaDarSource : MangaSource {
         throw SourceException(SourceFailure.EMPTY, "This series has no chapters")
     }
 
+    /**
+     * The Alpine payload has carried the list under `rows` and under `chapters` over time, and
+     * it holds either compact `[id, number, path, seconds]` tuples or objects. Everything is
+     * read, on every element carrying `x-data`, so a rename on the site cannot empty a series.
+     */
     private fun embeddedRows(document: Document): List<SourceChapter>? {
-        for (container in document.select("div[x-data], [data-rows], [x-data]")) {
-            val data = container.attr("x-data").ifBlank { container.attr("data-rows") }
+        val blobs = document.select("[x-data]").map { it.attr("x-data") } +
+            document.select("[data-rows]").map { it.attr("data-rows") }
+        for (data in blobs) {
             if (data.isBlank()) continue
-            val rowsStart = data.indexOf("rows")
-            if (rowsStart < 0) continue
-            val bracketStart = data.indexOf("[", rowsStart)
+            val key = CHAPTER_KEYS.firstOrNull { data.contains(it) } ?: continue
+            val keyStart = data.indexOf(key)
+            val bracketStart = data.indexOf("[", keyStart)
             val bracketEnd = matchingBracket(data, bracketStart)
             if (bracketStart < 0 || bracketEnd < 0) continue
             val rows = runCatching {
                 SourceHttp.JSON.parseToJsonElement(data.substring(bracketStart, bracketEnd + 1)) as JsonArray
             }.getOrNull() ?: continue
-            val chapters = rows.mapNotNull { element ->
-                val row = element as? JsonArray ?: return@mapNotNull null
-                if (row.size < 3) return@mapNotNull null
-                val number = (row[1] as? JsonPrimitive)?.content ?: return@mapNotNull null
-                val path = (row[2] as? JsonPrimitive)?.content ?: return@mapNotNull null
-                val seconds = (row.getOrNull(3) as? JsonPrimitive)?.content?.toLongOrNull()
-                if (path.isBlank()) return@mapNotNull null
-                SourceChapter(
-                    id = path.removePrefix(baseUrl).trim('/'),
-                    number = number,
-                    title = "الفصل $number",
-                    publishedAt = seconds?.takeIf { it > 0L }?.times(1000L),
-                )
-            }
+            val chapters = rows.mapNotNull { element -> rowToChapter(element) }
+                .distinctBy { it.id }
             if (chapters.isNotEmpty()) return chapters
         }
         return null
     }
 
+    private fun rowToChapter(element: kotlinx.serialization.json.JsonElement): SourceChapter? =
+        when (element) {
+            is JsonArray -> {
+                if (element.size < 3) return null
+                val number = (element[1] as? JsonPrimitive)?.content ?: return null
+                val path = (element[2] as? JsonPrimitive)?.content ?: return null
+                val seconds = (element.getOrNull(3) as? JsonPrimitive)?.content?.toLongOrNull()
+                chapterOf(number, path, seconds?.takeIf { it > 0L }?.times(1000L))
+            }
+            is kotlinx.serialization.json.JsonObject -> {
+                val number = (element["number"] as? JsonPrimitive)?.content
+                    ?: (element["chapter_number"] as? JsonPrimitive)?.content
+                    ?: (element["name"] as? JsonPrimitive)?.content
+                    ?: return null
+                val path = (element["url"] as? JsonPrimitive)?.content
+                    ?: (element["link"] as? JsonPrimitive)?.content
+                    ?: (element["slug"] as? JsonPrimitive)?.content
+                    ?: (element["path"] as? JsonPrimitive)?.content
+                    ?: return null
+                val date = (element["created_at"] as? JsonPrimitive)?.content
+                    ?: (element["createdAt"] as? JsonPrimitive)?.content
+                    ?: (element["date"] as? JsonPrimitive)?.content
+                    ?: (element["time"] as? JsonPrimitive)?.content
+                chapterOf(number, path, date?.toInstantOrNull())
+            }
+            else -> null
+        }
+
+    private fun chapterOf(number: String, path: String, publishedAt: Long?): SourceChapter? {
+        val clean = path.removePrefix(baseUrl).trim('/')
+        if (clean.isBlank()) return null
+        val label = number.removeSuffix(".0").ifBlank { number }
+        return SourceChapter(
+            id = clean,
+            number = label,
+            title = "الفصل $label",
+            publishedAt = publishedAt,
+        )
+    }
+
     /** Any embedded JSON that carries an array of chapter objects (`number` + a link/id). */
     private fun jsonChapters(document: Document, mangaId: String): List<SourceChapter>? {
-        val blobs = document.select("script[type=application/json], script#__NEXT_DATA__, script#__NUXT_DATA__")
-            .map { it.data() }
+        val blobs = document.select("script").map { it.data() }
             .filter { it.contains("chapter", ignoreCase = true) } +
-            document.select("div[x-data], [x-data]").map { it.attr("x-data") }
+            document.select("[x-data]").map { it.attr("x-data") }
                 .filter { it.contains("chapter", ignoreCase = true) }
         for (blob in blobs) {
             val root = runCatching { SourceHttp.JSON.parseToJsonElement(blob) }.getOrNull() ?: continue
@@ -238,8 +271,9 @@ class MangaDarSource : MangaSource {
             .mapNotNull { anchor ->
                 val href = anchor.absUrl("href").ifBlank { anchor.attr("href") }
                 val looksLikeChapter = href.contains("/chapter", ignoreCase = true) ||
+                    href.contains("الفصل") ||
                     (slug.isNotBlank() && href.contains(slug) &&
-                        Regex("""\d""").containsMatchIn(href.substringAfter(slug)))
+                        CHAPTER_NUMBER.containsMatchIn(href.substringAfter(slug)))
                 if (!looksLikeChapter) return@mapNotNull null
                 val text = anchor.text().trim()
                 val number = CHAPTER_NUMBER.find(text)?.value
@@ -256,7 +290,10 @@ class MangaDarSource : MangaSource {
         val url = if (chapterId.startsWith("http")) chapterId else "$baseUrl/${chapterId.trim('/')}/"
         val document = http.document(url)
         val images = document
-            .select(".reader-page img, .reading-content img, article img, main img, img[data-src], img[src]")
+            .select(
+                ".reader-page img, .reading-content img, .wp-manga-chapter-img, " +
+                    ".chapter-images img, #images img, article img, main img, img[data-src], img[src]",
+            )
             .mapNotNull { image ->
                 val value = listOf("data-src", "data-lazy-src", "src")
                     .map { attribute -> image.absUrl(attribute) }
@@ -297,6 +334,7 @@ class MangaDarSource : MangaSource {
 
     private companion object {
         val CHAPTER_NUMBER = Regex("""(\d+(?:\.\d+)?)""")
+        val CHAPTER_KEYS = listOf("chapters", "chapterList", "rows")
         val CHAPTER_LABEL = Regex("""(?:الفصل|chapter)\s*#?(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
         val LOGO_PATTERN = Regex("""(logo|favicon|avatar|banner|icon)""", RegexOption.IGNORE_CASE)
     }
