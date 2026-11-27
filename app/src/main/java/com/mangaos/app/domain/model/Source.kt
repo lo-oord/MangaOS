@@ -39,12 +39,12 @@ enum class LanguageFilter(val code: String) {
 
     /**
      * "All" lists every source. A concrete filter accepts sources in that language, including
-     * regional tags such as `pt-BR`.
+     * regional tags such as `pt-BR`, and multi-language sources tagged `all`.
      */
     fun matches(languages: List<String>): Boolean {
         if (this == ALL) return true
         val normalized = languages.map { it.lowercase() }.filter { it.isNotBlank() }
-        if (normalized.isEmpty()) return true
+        if (normalized.isEmpty() || "all" in normalized) return true
         return normalized.any { it == code || it.startsWith("$code-") }
     }
 }

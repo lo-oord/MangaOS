@@ -15,6 +15,7 @@ mihonApi = "1.1.0"
 okhttp = "5.5.1"
 okio = "3.18.2"
 jsoup = "1.23.2"
+jspecify = "1.0.0"
 injekt = "1.16.1"
 rxjava = "1.3.8"
 serialization = "1.12.0"
@@ -62,6 +63,7 @@ okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverht
 okhttp-zstd = { group = "com.squareup.okhttp3", name = "okhttp-zstd", version.ref = "okhttp" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+jspecify = { group = "org.jspecify", name = "jspecify", version.ref = "jspecify" }
 injekt = { group = "uy.kohesive.injekt", name = "injekt-core", version.ref = "injekt" }
 rxjava = { group = "io.reactivex", name = "rxjava", version.ref = "rxjava" }
 quickjs-android = { group = "com.github.zhanghai.quickjs-java", name = "quickjs-android", version.ref = "quickjs" }

@@ -1,6 +1,7 @@
 package com.mangaos.app.sources.core
 
 import com.mangaos.app.domain.model.MangaStatus
+import com.mangaos.app.domain.model.SourceFailure
 
 /**
  * One work as returned by a native source. [id] is the source's own stable identifier: a
@@ -75,12 +76,3 @@ class SourceException(
     message: String? = null,
     cause: Throwable? = null,
 ) : Exception(message ?: failure.name, cause)
-
-enum class SourceFailure {
-    OFFLINE,
-    NETWORK,
-    PARSING,
-    UNSUPPORTED,
-    EMPTY,
-    NO_SOURCES,
-}

@@ -1,7 +1,7 @@
 package com.mangaos.app.sources.network
 
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.sources.core.SourceException
-import com.mangaos.app.sources.core.SourceFailure
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -14,6 +14,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient

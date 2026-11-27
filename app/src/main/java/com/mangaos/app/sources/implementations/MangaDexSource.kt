@@ -5,7 +5,7 @@ import com.mangaos.app.sources.core.MangaSource
 import com.mangaos.app.sources.core.SourceCapability
 import com.mangaos.app.sources.core.SourceChapter
 import com.mangaos.app.sources.core.SourceException
-import com.mangaos.app.sources.core.SourceFailure
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.sources.core.SourceManga
 import com.mangaos.app.sources.core.SourcePage
 import com.mangaos.app.sources.network.SourceHttp

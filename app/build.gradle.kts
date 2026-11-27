@@ -34,7 +34,11 @@ val hasReleaseSigning = releaseStoreFile != null &&
 android {
     namespace = "com.mangaos.app"
 
-    compileSdk = 35
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "com.mangaos.app"
@@ -136,6 +140,9 @@ dependencies {
     // Native sources: plain HTTP + HTML/JSON parsing. No extension APK is loaded at runtime.
     implementation(libs.okhttp)
     implementation(libs.jsoup)
+    // jsoup 1.21+ annotates its Java API with jspecify; Kotlin needs the annotation class on
+    // the compile classpath to read the nullability annotations.
+    compileOnly(libs.jspecify)
     implementation(libs.kotlinx.serialization.json)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
