@@ -2,6 +2,7 @@ package com.mangaos.app.presentation.downloads
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,27 +90,17 @@ fun DownloadsScreen(
     var pendingRemoveRecord by remember { mutableStateOf<Download?>(null) }
     var pendingDeleteChapter by remember { mutableStateOf<Pair<Download, DownloadChapter>?>(null) }
     Column(modifier = modifier.fillMaxSize()) {
-        FilterRow(
-            selected = viewModel.filter,
-            onSelect = viewModel::selectFilter,
-        )
-
-        val visible = viewModel.visible(downloads)
         when {
             downloads.isEmpty() -> EmptyState(
                 icon = Icons.Outlined.Download,
                 title = stringResource(R.string.downloads_empty_title),
-            )
-            visible.isEmpty() -> EmptyState(
-                icon = Icons.Outlined.Download,
-                title = stringResource(R.string.downloads_no_matching),
             )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = Spacing.screen, vertical = Spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                items(items = visible, key = { it.id }) { task ->
+                items(items = downloads, key = { it.id }) { task ->
                     DownloadCard(
                         task = task,
                         onPause = { viewModel.pause(task.id) },
@@ -174,39 +165,6 @@ fun DownloadsScreen(
 }
 
 @Composable
-private fun FilterRow(
-    selected: DownloadFilter,
-    onSelect: (DownloadFilter) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.screen, vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        DownloadFilter.entries.forEach { filter ->
-            FilterChip(
-                selected = filter == selected,
-                onClick = { onSelect(filter) },
-                label = { Text(stringResource(filter.label())) },
-                leadingIcon = if (filter == selected) {
-                    {
-                        Icon(
-                            imageVector = Icons.Outlined.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                } else {
-                    null
-                },
-            )
-        }
-    }
-}
-
-@Composable
 private fun DownloadCard(
     task: Download,
     onPause: () -> Unit,
@@ -230,6 +188,10 @@ private fun DownloadCard(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
+            // A finished download opens its local copy; nothing else on the card navigates.
+            .then(
+                if (hasLocalFiles) Modifier.clickable(onClick = onOpenWork) else Modifier,
+            )
             .animateContentSize(),
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
@@ -316,7 +278,28 @@ private fun DownloadCard(
                 }
             }
 
-            if (task.hasPendingChapters || hasLocalFiles) {
+            if (task.state == DownloadState.COMPLETED) {
+                // The bar is gone once the download finished; only the result stays.
+                Spacer(Modifier.height(Spacing.sm))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Done,
+                        contentDescription = null,
+                        tint = OfflineGreen,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        text = stringResource(R.string.downloads_completed_tap),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = OfflineGreen,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (task.state != DownloadState.COMPLETED && task.hasPendingChapters) {
                 Spacer(Modifier.height(Spacing.sm))
                 LinearProgressIndicator(
                     progress = { task.progress.coerceIn(0f, 1f) },
@@ -564,14 +547,6 @@ private fun stateLabel(state: DownloadState): Int = when (state) {
     DownloadState.COMPLETED -> R.string.download_status_completed
     DownloadState.FAILED -> R.string.download_status_failed
     DownloadState.CANCELLED -> R.string.download_status_cancelled
-}
-
-private fun DownloadFilter.label(): Int = when (this) {
-    DownloadFilter.ALL -> R.string.downloads_filter_all
-    DownloadFilter.ACTIVE -> R.string.downloads_filter_active
-    DownloadFilter.QUEUED -> R.string.downloads_filter_queued
-    DownloadFilter.COMPLETED -> R.string.downloads_filter_completed
-    DownloadFilter.FAILED -> R.string.downloads_filter_failed
 }
 
 private val OfflineGreen = Color(0xFF16A34A)

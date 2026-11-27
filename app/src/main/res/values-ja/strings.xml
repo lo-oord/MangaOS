@@ -394,4 +394,8 @@
     <string name="detail_story_chapters">チャプター</string>
     <string name="sources_all_label">すべてのソース</string>
     <string name="search_latest_in">%1$s 内を検索</string>
+    <string name="downloads_completed_tap">保存済み · タップで開く</string>
+    <string name="detail_continue_from">第%1$s話から続ける</string>
+    <string name="detail_chapter_word">話</string>
+    <string name="detail_chapter_new">新着</string>
 </resources>

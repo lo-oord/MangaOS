@@ -293,6 +293,10 @@ fun ReaderScreen(
         pages.drop(start)
             .take(settings.preloadImages)
             .forEach { page -> loader.enqueue(readerImageRequest(context, page)) }
+        // A few pages behind are warmed too, so turning back never stutters.
+        val behind = (listState.firstVisibleItemIndex - PRELOAD_BEHIND).coerceAtLeast(0)
+        val upTo = listState.firstVisibleItemIndex.coerceIn(behind, pages.size)
+        pages.subList(behind, upTo).forEach { page -> loader.enqueue(readerImageRequest(context, page)) }
     }
 
     val enterSpec = tween<Float>(if (reduceMotion) 0 else 170)
@@ -770,7 +774,11 @@ private fun ReaderImage(
         ImageFit.FIT_SCREEN -> ContentScale.Fit
         ImageFit.ORIGINAL -> ContentScale.None
     }.let { fit ->
-        if (!vertical && fit == ContentScale.FillWidth) ContentScale.Fit else fit
+        // In the vertical feed the slot height is derived from the image's own ratio, so
+        // filling the width is what makes the drawn image match the reserved box exactly.
+        if (vertical) ContentScale.FillWidth
+        else if (fit == ContentScale.FillWidth) ContentScale.Fit
+        else fit
     }
     // The request carries the page's own identity, so a recycled slot or a late response can
     // never place one chapter's image where another page belongs.
@@ -865,7 +873,6 @@ private fun ReaderImage(
                 colorFilter = readerColorFilter(settings),
                 modifier = Modifier
                     .fillMaxSize()
-                    .clipToBounds()
                     .graphicsLayer {
                         scaleX = if (zoomed) 2f else 1f
                         scaleY = if (zoomed) 2f else 1f
@@ -956,6 +963,8 @@ private fun readerColorFilter(settings: ReaderSettings): ColorFilter? {
     )
     return ColorFilter.colorMatrix(ColorMatrix(matrix))
 }
+
+private const val PRELOAD_BEHIND = 3
 
 private fun bgColor(settings: ReaderSettings): Color = when (settings.backgroundColor) {
     com.mangaos.app.domain.model.ReaderBackground.BLACK -> Color.Black

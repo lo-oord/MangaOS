@@ -1,10 +1,19 @@
 package com.mangaos.app.presentation.detail
 
 import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -92,6 +101,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -197,7 +208,6 @@ private fun DetailContent(
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var actionChapter by remember { mutableStateOf<Chapter?>(null) }
-    var chapterFilter by remember { mutableStateOf(ChapterFilter.ALL) }
     val resumeChapter = progress?.let { saved ->
         state.chapters.firstOrNull { it.id == saved.chapterId }
             ?: state.chapters.firstOrNull { it.number == saved.chapterNumber }
@@ -213,15 +223,7 @@ private fun DetailContent(
                 .map { it.chapterId }
         }
     }
-    val visibleChapters = remember(state.chapters, chapterFilter, readChapters, downloadedChapterIds) {
-        when (chapterFilter) {
-            ChapterFilter.ALL -> state.chapters
-            ChapterFilter.UNREAD -> state.chapters.filter {
-                readChapterKey(manga.key, it.id) !in readChapters
-            }
-            ChapterFilter.DOWNLOADED -> state.chapters.filter { it.id in downloadedChapterIds }
-        }
-    }
+    val visibleChapters = state.chapters
     val readCount = remember(state.chapters, readChapters, manga.key) {
         state.chapters.count { readChapterKey(manga.key, it.id) in readChapters }
     }
@@ -313,93 +315,6 @@ private fun DetailContent(
                     )
                 }
                 else -> {
-                    item {
-                        if (selectionMode) {
-                            val chosen = state.chapters.filter { it.id in selectedIds }
-                            val chosenStates = chosen.mapNotNull { chapter ->
-                                downloads.findChapter(manga.key, chapter.id)?.second?.state
-                            }
-                            SelectionActions(
-                                selectedCount = selectedIds.size,
-                                allSelected = visibleChapters.isNotEmpty() &&
-                                    visibleChapters.all { it.id in selectedIds },
-                                canDownload = chosen.any { chapter ->
-                                    downloads.findChapter(manga.key, chapter.id) == null
-                                },
-                                canRetry = chosenStates.any {
-                                    it == DownloadChapterState.FAILED ||
-                                        it == DownloadChapterState.CANCELLED
-                                },
-                                canCancel = chosenStates.any {
-                                    it == DownloadChapterState.QUEUED ||
-                                        it == DownloadChapterState.DOWNLOADING ||
-                                        it == DownloadChapterState.PAUSED
-                                },
-                                canDelete = chosen.any { it.id in downloadedChapterIds },
-                                onRetry = {
-                                    chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
-                                        .distinctBy { it.id }
-                                        .forEach { ServiceLocator.downloads.retry(it.id) }
-                                },
-                                onCancel = {
-                                    chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
-                                        .distinctBy { it.id }
-                                        .forEach { ServiceLocator.downloads.cancel(it.id) }
-                                },
-                                onMarkUnread = {
-                                    chosen.forEach { chapter ->
-                                        ServiceLocator.library.markChapterUnread(manga.key, chapter.id)
-                                    }
-                                    selectionMode = false
-                                    selectedIds = emptySet()
-                                },
-                                onSelectAll = {
-                                    val allChosen = visibleChapters.isNotEmpty() &&
-                                        visibleChapters.all { it.id in selectedIds }
-                                    selectedIds = if (allChosen) {
-                                        emptySet()
-                                    } else {
-                                        selectedIds + visibleChapters.map { it.id }
-                                    }
-                                },
-                                onDownload = {
-                                    ServiceLocator.downloads.enqueue(manga, chosen)
-                                    selectionMode = false
-                                    selectedIds = emptySet()
-                                    scope.launch {
-                                        snackbar.showSnackbar(context.getString(R.string.detail_download_queued))
-                                    }
-                                },
-                                onDelete = {
-                                    chosen.forEach { chapter ->
-                                        ServiceLocator.downloads.deleteLocalChapter(manga.key, chapter.id)
-                                    }
-                                    selectionMode = false
-                                    selectedIds = emptySet()
-                                    scope.launch {
-                                        snackbar.showSnackbar(context.getString(R.string.storage_deleted))
-                                    }
-                                },
-                                onMarkRead = {
-                                    chosen.forEach { chapter ->
-                                        ServiceLocator.library.markChapterRead(manga.key, chapter.id)
-                                    }
-                                    selectionMode = false
-                                    selectedIds = emptySet()
-                                },
-                                onClear = {
-                                    selectedIds = emptySet()
-                                    selectionMode = false
-                                },
-                            )
-                        } else {
-                            ChapterFilters(
-                                selected = chapterFilter,
-                                onSelect = { chapterFilter = it },
-                            )
-                        }
-                    }
-
                     if (visibleChapters.isEmpty()) {
                         item {
                             Text(
@@ -442,6 +357,13 @@ private fun DetailContent(
                                 }
                             },
                             onMoreClick = { actionChapter = chapter },
+                            onReadToggleClick = {
+                                if (readChapterKey(manga.key, chapter.id) in readChapters) {
+                                    ServiceLocator.library.markChapterUnread(manga.key, chapter.id)
+                                } else {
+                                    ServiceLocator.library.markChapterRead(manga.key, chapter.id)
+                                }
+                            },
                             onDownloadClick = {
                                 val task = pair?.first
                                 val downloadState = pair?.second?.state
@@ -478,6 +400,94 @@ private fun DetailContent(
             onLibrary = { viewModel.toggleLibrary() },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        AnimatedVisibility(
+            visible = selectionMode,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp, start = Spacing.md, end = Spacing.md),
+        ) {
+            val chosen = state.chapters.filter { it.id in selectedIds }
+            val chosenStates = chosen.mapNotNull { chapter ->
+                downloads.findChapter(manga.key, chapter.id)?.second?.state
+            }
+            SelectionActions(
+                selectedCount = selectedIds.size,
+                allSelected = visibleChapters.isNotEmpty() &&
+                    visibleChapters.all { it.id in selectedIds },
+                canDownload = chosen.any { chapter ->
+                    downloads.findChapter(manga.key, chapter.id) == null
+                },
+                canRetry = chosenStates.any {
+                    it == DownloadChapterState.FAILED ||
+                        it == DownloadChapterState.CANCELLED
+                },
+                canCancel = chosenStates.any {
+                    it == DownloadChapterState.QUEUED ||
+                        it == DownloadChapterState.DOWNLOADING ||
+                        it == DownloadChapterState.PAUSED
+                },
+                canDelete = chosen.any { it.id in downloadedChapterIds },
+                onRetry = {
+                    chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
+                        .distinctBy { it.id }
+                        .forEach { ServiceLocator.downloads.retry(it.id) }
+                },
+                onCancel = {
+                    chosen.mapNotNull { downloads.findChapter(manga.key, it.id)?.first }
+                        .distinctBy { it.id }
+                        .forEach { ServiceLocator.downloads.cancel(it.id) }
+                },
+                onMarkUnread = {
+                    chosen.forEach { chapter ->
+                        ServiceLocator.library.markChapterUnread(manga.key, chapter.id)
+                    }
+                    selectionMode = false
+                    selectedIds = emptySet()
+                },
+                onSelectAll = {
+                    val allChosen = visibleChapters.isNotEmpty() &&
+                        visibleChapters.all { it.id in selectedIds }
+                    selectedIds = if (allChosen) {
+                        emptySet()
+                    } else {
+                        selectedIds + visibleChapters.map { it.id }
+                    }
+                },
+                onDownload = {
+                    ServiceLocator.downloads.enqueue(manga, chosen)
+                    selectionMode = false
+                    selectedIds = emptySet()
+                    scope.launch {
+                        snackbar.showSnackbar(context.getString(R.string.detail_download_queued))
+                    }
+                },
+                onDelete = {
+                    chosen.forEach { chapter ->
+                        ServiceLocator.downloads.deleteLocalChapter(manga.key, chapter.id)
+                    }
+                    selectionMode = false
+                    selectedIds = emptySet()
+                    scope.launch {
+                        snackbar.showSnackbar(context.getString(R.string.storage_deleted))
+                    }
+                },
+                onMarkRead = {
+                    chosen.forEach { chapter ->
+                        ServiceLocator.library.markChapterRead(manga.key, chapter.id)
+                    }
+                    selectionMode = false
+                    selectedIds = emptySet()
+                },
+                onClear = {
+                    selectedIds = emptySet()
+                    selectionMode = false
+                },
+            )
+        }
+
     }
 
     actionChapter?.let { chapter ->
@@ -554,7 +564,7 @@ private fun DetailHero(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
+                    .padding(start = Spacing.xs, end = Spacing.xs, top = 0.dp, bottom = 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppIconButton(
@@ -681,12 +691,6 @@ private fun DetailHero(
                             value = it.toString(),
                         ),
                     )
-                }
-                manga.author?.takeIf { it.isNotBlank() }?.let {
-                    add(DetailTileData(Icons.Outlined.Person, R.string.detail_author, it.trim()))
-                }
-                manga.artist?.takeIf { it.isNotBlank() && it != manga.author }?.let {
-                    add(DetailTileData(Icons.Outlined.Brush, R.string.detail_artist, it.trim()))
                 }
             }
             if (tiles.isNotEmpty()) {
@@ -934,10 +938,11 @@ private fun DetailActionBar(
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
-                        text = stringResource(
-                            if (resuming) R.string.detail_continue_reading
-                            else R.string.detail_start_reading,
-                        ),
+                        text = if (resuming && readingChapter != null) {
+                            appString(R.string.detail_continue_from, readingChapter.number)
+                        } else {
+                            stringResource(R.string.detail_start_reading)
+                        },
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                     )
@@ -970,7 +975,6 @@ private fun DetailActionBar(
  * order. Anything the source does not provide is simply absent from the row.
  */
 /** Labelled rows keep author, artist, year and language aligned and never repeat each other. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChapterSectionHeader(
     count: Int,
@@ -982,96 +986,69 @@ private fun ChapterSectionHeader(
     onToggleSelection: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.md),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.FormatListBulleted,
-                contentDescription = null,
-                tint = scheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(Spacing.xs))
-            Text(
-                text = stringResource(R.string.detail_story_chapters),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = scheme.onSurface,
-            )
-            Text(
-                text = " · $count",
-                style = MaterialTheme.typography.labelMedium,
-                color = scheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.weight(1f))
-            if (selectionMode) {
-                Text(
-                    text = appString(R.string.selected_count, selectedCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = scheme.primary,
-                )
-                TextButton(onClick = onToggleSelection) {
-                    Text(
-                        text = stringResource(R.string.action_cancel),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-            } else {
-                TextButton(
-                    onClick = onToggleSort,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = Spacing.xs,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.SwapVert,
-                        contentDescription = stringResource(R.string.detail_sort),
-                        tint = scheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(Spacing.xxs))
-                    Text(
-                        text = stringResource(R.string.detail_sort_by),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.primary,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-        Text(
-            text = appString(R.string.detail_chapters_stats, readCount, downloadedCount),
-            style = MaterialTheme.typography.labelSmall,
-            color = scheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = Spacing.xs),
-        )
-    }
-}
-
-private enum class ChapterFilter { ALL, UNREAD, DOWNLOADED }
-
-@Composable
-private fun ChapterFilters(selected: ChapterFilter, onSelect: (ChapterFilter) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.screen, vertical = Spacing.xxs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.md, bottom = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        listOf(
-            ChapterFilter.ALL to R.string.detail_filter_all,
-            ChapterFilter.UNREAD to R.string.detail_filter_unread,
-            ChapterFilter.DOWNLOADED to R.string.detail_filter_downloaded,
-        ).forEach { (filter, label) ->
-            FilterChip(
-                selected = selected == filter,
-                onClick = { onSelect(filter) },
-                label = { Text(stringResource(label)) },
-                shape = RoundedCornerShape(10.dp),
+        Icon(
+            imageVector = Icons.Outlined.FormatListBulleted,
+            contentDescription = null,
+            tint = scheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(
+            text = stringResource(R.string.detail_story_chapters),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = scheme.onSurface,
+        )
+        Spacer(Modifier.width(6.dp))
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = scheme.primary.copy(alpha = 0.12f),
+            contentColor = scheme.primary,
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
             )
+        }
+        Spacer(Modifier.weight(1f))
+        if (selectionMode) {
+            Text(
+                text = appString(R.string.selected_count, selectedCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.primary,
+            )
+            TextButton(onClick = onToggleSelection) {
+                Text(
+                    text = stringResource(R.string.action_cancel),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onToggleSort),
+                shape = CircleShape,
+                color = scheme.surfaceContainerHigh,
+                contentColor = scheme.primary,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.SwapVert,
+                        contentDescription = stringResource(R.string.detail_sort),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -1115,9 +1092,9 @@ private fun SelectionActions(
             }
             Row(
                 modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(bottom = Spacing.xxs),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SelectionAction(
@@ -1161,6 +1138,7 @@ private fun SelectionActions(
     }
 }
 
+/** One action in the selection bar, as a round bubble with its icon only. */
 @Composable
 private fun SelectionAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1168,10 +1146,23 @@ private fun SelectionAction(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(Spacing.xxs))
-        Text(stringResource(labelRes), maxLines = 1)
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = CircleShape,
+        color = if (enabled) scheme.surfaceContainerHighest else scheme.surfaceContainerLow,
+        contentColor = if (enabled) scheme.onSurface else scheme.onSurface.copy(alpha = 0.35f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = stringResource(labelRes),
+                modifier = Modifier.size(19.dp),
+            )
+        }
     }
 }
 
@@ -1187,23 +1178,34 @@ private fun ChapterRow(
     onLongClick: () -> Unit,
     onMoreClick: () -> Unit,
     onDownloadClick: () -> Unit,
+    onReadToggleClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val downloadedLabel = stringResource(R.string.detail_downloaded)
     val downloadState = downloadChapter?.state
-    val percent = (downloadChapter?.progress ?: 0f).times(100f).roundToInt()
-    val downloading = downloadState == DownloadChapterState.DOWNLOADING
+    val percent = ((downloadChapter?.progress ?: 0f) * 100f).roundToInt()
     val read = readingState == ChapterReadingState.READ
     val inProgress = readingState == ChapterReadingState.IN_PROGRESS
-    val accent = if (read) scheme.onSurfaceVariant else scheme.primary
+    val isNew = chapter.publishedAt?.let { published ->
+        !read && System.currentTimeMillis() - published in 0..NEW_CHAPTER_WINDOW_MS
+    } == true
+    val transition = rememberInfiniteTransition(label = "chapterNew")
+    val badgeAlpha by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "chapterNewAlpha",
+    )
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.screen, vertical = 3.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = Spacing.screen, vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = if (selected && selectionMode) {
             scheme.primaryContainer.copy(alpha = 0.42f)
         } else {
@@ -1212,171 +1214,195 @@ private fun ChapterRow(
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             if (selected && selectionMode) scheme.primary.copy(alpha = 0.5f)
-            else scheme.outlineVariant.copy(alpha = 0.55f),
+            else scheme.outlineVariant.copy(alpha = 0.45f),
         ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 62.dp)
-                .padding(start = Spacing.sm, end = Spacing.xs, top = 6.dp, bottom = 6.dp),
+                .heightIn(min = 54.dp)
+                .padding(start = Spacing.sm, end = 6.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionMode) {
-                Checkbox(checked = selected, onCheckedChange = null, modifier = Modifier.size(30.dp))
+                Checkbox(checked = selected, onCheckedChange = null, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(Spacing.xxs))
             }
 
-            // The chapter number keeps its own quiet chip, so a long list can be scanned by number.
+            // The number appears exactly once: in its own round chip.
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (read) scheme.surfaceContainerHigh else accent.copy(alpha = 0.14f),
-                contentColor = accent,
-                modifier = Modifier.widthIn(min = 46.dp),
+                shape = CircleShape,
+                color = if (read) scheme.surfaceContainerHigh else scheme.primary.copy(alpha = 0.14f),
+                contentColor = if (read) scheme.onSurfaceVariant else scheme.primary,
+                modifier = Modifier.size(36.dp),
             ) {
-                Text(
-                    text = chapter.number,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = chapter.number,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
             }
 
             Spacer(Modifier.width(Spacing.sm))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = appString(R.string.chapter_number, chapter.number),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
-                    color = scheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                chapter.title?.takeIf { it.isNotBlank() }?.let { title ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scheme.onSurfaceVariant,
+                        text = chapter.title?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.detail_chapter_word),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
+                        color = scheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                }
-                val details = buildList {
-                    chapter.publishedAt?.let { add(formatDate(it)) }
-                    if (inProgress) add(stringResource(R.string.detail_in_progress))
-                    when (downloadState) {
-                        DownloadChapterState.DOWNLOADING -> if (percent in 1..99) add("$percent%")
-                        DownloadChapterState.COMPLETED -> add(downloadedLabel)
-                        DownloadChapterState.FAILED -> add(stringResource(R.string.state_error_retry))
-                        DownloadChapterState.PAUSED -> add(stringResource(R.string.download_status_paused))
-                        DownloadChapterState.QUEUED -> add(stringResource(R.string.download_status_queued))
-                        DownloadChapterState.CANCELLED -> add(stringResource(R.string.download_status_cancelled))
-                        null -> chapter.sizeBytes?.let { add(com.mangaos.app.core.util.formatBytes(it)) }
-                    }
-                }
-                if (details.isNotEmpty()) {
-                    Text(
-                        text = details.joinToString(" · "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (downloading) {
-                    Spacer(Modifier.height(Spacing.xxs))
-                    LinearProgressIndicator(
-                        progress = { downloadChapter?.progress ?: 0f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .clip(RoundedCornerShape(1.dp)),
-                        color = scheme.primary,
-                        trackColor = scheme.outlineVariant.copy(alpha = 0.3f),
-                    )
-                }
-            }
-
-            if (read) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = stringResource(R.string.detail_read),
-                    tint = scheme.primary,
-                    modifier = Modifier.size(15.dp),
-                )
-                Spacer(Modifier.width(Spacing.xxs))
-            }
-
-            Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                when (downloadState) {
-                    DownloadChapterState.QUEUED, DownloadChapterState.PAUSED -> IconButton(
-                        onClick = onDownloadClick,
-                        modifier = Modifier.size(34.dp),
-                    ) {
-                        Icon(
-                            if (downloadState == DownloadChapterState.PAUSED) {
-                                Icons.Outlined.PlayArrow
-                            } else {
-                                Icons.Outlined.Pause
-                            },
-                            contentDescription = stringResource(
-                                if (downloadState == DownloadChapterState.PAUSED) {
-                                    R.string.action_resume
-                                } else {
-                                    R.string.action_pause
-                                },
-                            ),
-                            modifier = Modifier.size(18.dp),
-                            tint = scheme.onSurfaceVariant,
-                        )
-                    }
-                    DownloadChapterState.DOWNLOADING -> IconButton(
-                        onClick = onDownloadClick,
-                        modifier = Modifier.size(34.dp),
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { downloadChapter?.progress ?: 0f },
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    }
-                    DownloadChapterState.COMPLETED -> Icon(
-                        Icons.Outlined.Done,
-                        contentDescription = downloadedLabel,
-                        tint = scheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    DownloadChapterState.FAILED, DownloadChapterState.CANCELLED ->
-                        IconButton(onClick = onDownloadClick, modifier = Modifier.size(34.dp)) {
-                            Icon(
-                                Icons.Outlined.Refresh,
-                                contentDescription = stringResource(R.string.state_error_retry),
-                                tint = scheme.error,
-                                modifier = Modifier.size(18.dp),
+                    if (isNew) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = scheme.primary.copy(alpha = 0.16f * badgeAlpha + 0.06f),
+                            contentColor = scheme.primary,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.detail_chapter_new),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                             )
                         }
-                    null -> IconButton(onClick = onDownloadClick, modifier = Modifier.size(34.dp)) {
-                        Icon(
-                            Icons.Outlined.Download,
-                            contentDescription = stringResource(R.string.action_download_selected),
-                            tint = scheme.onSurface,
-                            modifier = Modifier.size(18.dp),
-                        )
                     }
                 }
+                val status = when (downloadState) {
+                    DownloadChapterState.DOWNLOADING -> "${percent}%"
+                    DownloadChapterState.COMPLETED -> stringResource(R.string.detail_downloaded)
+                    DownloadChapterState.FAILED -> stringResource(R.string.state_error_retry)
+                    DownloadChapterState.PAUSED -> stringResource(R.string.download_status_paused)
+                    DownloadChapterState.QUEUED -> stringResource(R.string.download_status_queued)
+                    DownloadChapterState.CANCELLED -> stringResource(R.string.download_status_cancelled)
+                    null -> if (inProgress) stringResource(R.string.detail_in_progress) else null
+                }
+                if (status != null) {
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
-            IconButton(onClick = onMoreClick, modifier = Modifier.size(30.dp)) {
+
+            Spacer(Modifier.width(Spacing.xxs))
+
+            // Reading state lives on its own eye bubble, right next to the download one.
+            ChapterBubble(
+                onClick = onReadToggleClick,
+                contentDescription = stringResource(
+                    if (read) R.string.chapter_action_mark_unread
+                    else R.string.chapter_action_mark_read,
+                ),
+                container = if (read) ReadGreen.copy(alpha = 0.16f) else scheme.surfaceContainerHigh,
+                content = if (read) ReadGreen else scheme.onSurfaceVariant,
+            ) {
+                Icon(
+                    imageVector = if (read) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+
+            Spacer(Modifier.width(Spacing.xxs))
+
+            ChapterBubble(
+                onClick = onDownloadClick,
+                contentDescription = stringResource(R.string.action_download_selected),
+                container = when (downloadState) {
+                    DownloadChapterState.COMPLETED -> ReadGreen.copy(alpha = 0.16f)
+                    DownloadChapterState.FAILED, DownloadChapterState.CANCELLED ->
+                        scheme.error.copy(alpha = 0.14f)
+                    DownloadChapterState.DOWNLOADING, DownloadChapterState.QUEUED ->
+                        scheme.primary.copy(alpha = 0.16f)
+                    else -> scheme.surfaceContainerHigh
+                },
+                content = when (downloadState) {
+                    DownloadChapterState.COMPLETED -> ReadGreen
+                    DownloadChapterState.FAILED, DownloadChapterState.CANCELLED -> scheme.error
+                    DownloadChapterState.DOWNLOADING, DownloadChapterState.QUEUED -> scheme.primary
+                    else -> scheme.onSurface
+                },
+            ) {
+                when (downloadState) {
+                    DownloadChapterState.DOWNLOADING -> Text(
+                        text = "$percent",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    DownloadChapterState.QUEUED -> Icon(
+                        Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    DownloadChapterState.PAUSED -> Icon(
+                        Icons.Outlined.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                    )
+                    DownloadChapterState.COMPLETED -> Icon(
+                        Icons.Outlined.Done,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                    )
+                    DownloadChapterState.FAILED, DownloadChapterState.CANCELLED -> Icon(
+                        Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    null -> Icon(
+                        Icons.Outlined.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+            }
+
+            IconButton(onClick = onMoreClick, modifier = Modifier.size(26.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.MoreVert,
                     contentDescription = stringResource(R.string.action_more),
                     tint = scheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
+    }
+}
+
+/** One round action: the same bubble shape for download, reading state and sort. */
+@Composable
+private fun ChapterBubble(
+    onClick: () -> Unit,
+    contentDescription: String,
+    container: Color,
+    content: Color,
+    body: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        shape = CircleShape,
+        color = container,
+        contentColor = content,
+    ) {
+        Box(
+            modifier = Modifier.semantics { this.contentDescription = contentDescription },
+            contentAlignment = Alignment.Center,
+        ) { body() }
     }
 }
 
@@ -1560,3 +1586,6 @@ private val ReadGreen = Color(0xFF16A34A)
 
 /** Single row height, used by every chapter state so the list keeps one rhythm. */
 private val ChapterRowHeight = 60.dp
+
+/** A chapter counts as new for three hours after it was published. */
+private const val NEW_CHAPTER_WINDOW_MS = 3L * 60L * 60L * 1000L

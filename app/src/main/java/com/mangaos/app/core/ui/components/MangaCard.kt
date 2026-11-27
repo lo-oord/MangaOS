@@ -122,31 +122,32 @@ fun MangaCard(
             }
 
             Column(
-                modifier = Modifier.padding(
-                    start = Spacing.sm,
-                    end = Spacing.sm,
-                    top = Spacing.sm,
-                    bottom = Spacing.sm,
-                ),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
+                // Exactly two lines are always reserved, so every card in a row ends at the same
+                // height whether its title is one word or ten.
                 Text(
                     text = manga.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = scheme.onSurface,
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                // Latest only: the real publication time of the newest chapter, on its own
-                // line so a long title is never crushed against it.
+                // Latest only: the real publication time of the newest chapter. The slot keeps a
+                // fixed height even when the source sent no date, so the row never staggers.
                 if (context == MangaCardContext.LATEST) {
-                    manga.updatedAt?.let { timestamp ->
-                        Spacer(Modifier.height(3.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(12.dp),
+                    ) {
+                        val timestamp = manga.updatedAt
+                        if (timestamp != null) {
                             Icon(
                                 imageVector = Icons.Outlined.Schedule,
                                 contentDescription = null,
@@ -165,16 +166,29 @@ fun MangaCard(
                     }
                 }
 
-                Spacer(Modifier.height(Spacing.xs))
+                Spacer(Modifier.height(5.dp))
 
-                FlowRow(
+                // A single, non-wrapping pill row: two facts at most, chosen deterministically.
+                Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RatingPill(manga.rating)
-                    StatusPill(manga.status)
-                    GenrePill(manga.genres)
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (ratingLabel(manga.rating) != null) {
+                            RatingPill(manga.rating)
+                        } else if (manga.status != MangaStatus.UNKNOWN) {
+                            StatusPill(manga.status)
+                        }
+                    }
+                    if (ratingLabel(manga.rating) != null && manga.status != MangaStatus.UNKNOWN) {
+                        StatusPill(manga.status)
+                    } else {
+                        GenrePill(manga.genres)
+                    }
                 }
             }
         }
@@ -230,6 +244,7 @@ fun MangaListRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = scheme.onSurface,
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -246,11 +261,11 @@ fun MangaListRow(
                     }
                 }
 
-                Spacer(Modifier.height(Spacing.sm))
+                Spacer(Modifier.height(Spacing.xs))
 
-                FlowRow(
+                Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RatingPill(manga.rating)
                     StatusPill(manga.status)
@@ -426,17 +441,20 @@ fun CoverImage(
  */
 @Composable
 fun ChapterBadge(text: String, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    // The badge borrows the active theme's surface and accent, so its text colour follows the
+    // interface (and therefore the language's typography) instead of a fixed white.
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.34f),
-        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.14f)),
+        color = scheme.surface.copy(alpha = 0.78f),
+        contentColor = scheme.primary,
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.22f)),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
@@ -460,11 +478,11 @@ fun MangaGrid(
         contentPadding = PaddingValues(
             start = Spacing.screen,
             end = Spacing.screen,
-            top = Spacing.sm,
+            top = Spacing.xs,
             bottom = Spacing.xl,
         ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.gridGap),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         items(items = mangas, key = { it.key }) { manga ->
             MangaCard(
@@ -515,6 +533,7 @@ fun MangaList(
     }
 }
 
-private const val CoverAspect = 3f / 4f
-private val CardCorner = 18.dp
-private val ListCoverWidth = 74.dp
+// Slightly wider than 3:4, so the grid cards are shorter and read as one uniform block.
+private const val CoverAspect = 0.78f
+private val CardCorner = 16.dp
+private val ListCoverWidth = 72.dp

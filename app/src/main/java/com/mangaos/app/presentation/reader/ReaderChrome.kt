@@ -101,7 +101,7 @@ fun ReaderTopBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                    .padding(horizontal = Spacing.sm, vertical = 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
@@ -195,13 +195,21 @@ fun ReaderBottomBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onOpenSettings, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = stringResource(R.string.reader_settings),
-                        tint = scheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
+                Surface(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50)),
+                    shape = RoundedCornerShape(50),
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.primary,
+                ) {
+                    IconButton(onClick = onOpenSettings, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.reader_settings),
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
                 }
 
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -249,12 +257,12 @@ fun ReaderBottomBar(
                         enabled = chapterSize > 1,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = Spacing.xs)
-                            .height(24.dp),
+                            .padding(horizontal = Spacing.sm)
+                            .height(34.dp),
                         thumb = {
                             Box(
                                 Modifier
-                                    .size(11.dp)
+                                    .size(15.dp)
                                     .background(scheme.primary, RoundedCornerShape(50)),
                             )
                         },
@@ -262,13 +270,13 @@ fun ReaderBottomBar(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(4.dp)
-                                    .background(scheme.onSurface.copy(alpha = 0.14f), RoundedCornerShape(50)),
+                                    .height(7.dp)
+                                    .background(scheme.onSurface.copy(alpha = 0.16f), RoundedCornerShape(50)),
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth(state.value)
-                                        .height(4.dp)
+                                        .height(7.dp)
                                         .background(scheme.primary, RoundedCornerShape(50)),
                                 )
                             }
@@ -333,8 +341,8 @@ fun ReaderBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = Spacing.xxs),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .padding(top = Spacing.xs, bottom = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ReaderTool(
@@ -386,27 +394,22 @@ private fun ReaderTool(
         active -> scheme.primary
         else -> MangaTheme.tokens.textSecondary
     }
-    Column(
+    // One round, generous bubble per tool: bigger targets, no labels crowding the bar.
+    Surface(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .padding(horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .size(48.dp)
+            .clip(RoundedCornerShape(50)),
+        shape = RoundedCornerShape(50),
+        color = if (active) scheme.primaryContainer else scheme.surfaceContainerHigh,
+        contentColor = tint,
     ) {
-        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(38.dp)) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = tint,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(23.dp),
             )
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp),
-        )
     }
 }

@@ -1,6 +1,11 @@
 package com.mangaos.app.presentation.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,46 +17,100 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Animation
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.SettingsBrightness
+import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.ThemeMode
+import com.mangaos.app.core.designsystem.ThemeReveal
+import com.mangaos.app.core.designsystem.themeSwatches
+import com.mangaos.app.core.ui.LocalSnackbarHostState
+import com.mangaos.app.core.ui.components.AppBottomSheet
+import com.mangaos.app.core.ui.components.AppDialog
+import com.mangaos.app.core.ui.components.LanguageTransition
+import com.mangaos.app.core.ui.components.SettingsOptionRow
+import com.mangaos.app.core.ui.components.SettingsRow
+import com.mangaos.app.core.ui.components.SettingsSection as SettingsGroup
+import com.mangaos.app.core.ui.components.SettingsSwitchRow
+import com.mangaos.app.core.util.appString
+import com.mangaos.app.core.util.formatBytes
+import com.mangaos.app.domain.model.LibraryFilter
+import com.mangaos.app.domain.model.LibrarySort
+import com.mangaos.app.domain.model.MangaViewMode
+import kotlinx.coroutines.launch
 
+/**
+ * Settings are one page: each heading stands above its own rows, so language, theme and dark
+ * mode sit together, and the library's view, sort and filter are not scattered over separate
+ * screens. Only the reader's long preferences list keeps its own focused screen.
+ */
 @Composable
 fun SettingsScreen(
     onOpenSection: (SettingsSection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val groups = listOf(
-        SettingsGroup(
-            titleRes = R.string.settings_group_look,
-            sections = listOf(SettingsSection.APPEARANCE, SettingsSection.READER),
-        ),
-        SettingsGroup(
-            titleRes = R.string.settings_group_content,
-            sections = listOf(SettingsSection.LIBRARY, SettingsSection.DOWNLOADS),
-        ),
-        SettingsGroup(
-            titleRes = R.string.settings_group_app,
-            sections = listOf(
-                SettingsSection.NOTIFICATIONS,
-                SettingsSection.PERFORMANCE,
-                SettingsSection.INTERACTION,
-                SettingsSection.BEHAVIOR,
-            ),
-        ),
-    )
+    val viewModel: SettingsViewModel = viewModel()
+    val app by viewModel.appSettings.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
+    val cacheBytes by viewModel.cacheBytes.collectAsStateWithLifecycle()
+    val clearingCache by viewModel.clearingCache.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val snackbar = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
+    val darkTheme = themeMode.resolveDark(isSystemInDarkTheme())
+
+    var showLanguageSheet by remember { mutableStateOf(false) }
+    var showThemeSheet by remember { mutableStateOf(false) }
+    var showClearCacheDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -61,66 +120,424 @@ fun SettingsScreen(
             top = Spacing.xs,
             bottom = Spacing.xl,
         ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        groups.forEach { group ->
-            item(key = "header-${group.titleRes}") {
-                Text(
-                    text = stringResource(group.titleRes),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xxs),
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_appearance)) {
+                SettingsRow(
+                    icon = Icons.Outlined.Language,
+                    title = stringResource(R.string.settings_language),
+                    value = languageLabel(language),
+                    showDivider = true,
+                    onClick = { showLanguageSheet = true },
                 )
-            }
-            items(group.sections, key = { it.name }) { section ->
-                SettingsSectionRow(section = section, onClick = { onOpenSection(section) })
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                SettingsRow(
+                    icon = Icons.Outlined.Palette,
+                    title = stringResource(R.string.settings_theme),
+                    value = themeLabel(theme),
+                    showDivider = true,
+                    onClick = { showThemeSheet = true },
+                )
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_dark_mode_system),
+                    selected = themeMode == ThemeMode.SYSTEM,
+                    onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) },
+                    leading = { Icon(Icons.Outlined.SettingsBrightness, contentDescription = null) },
+                )
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_dark_mode_light),
+                    selected = themeMode == ThemeMode.LIGHT,
+                    onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) },
+                    leading = { Icon(Icons.Outlined.LightMode, contentDescription = null) },
+                )
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_dark_mode_dark),
+                    selected = themeMode == ThemeMode.DARK,
+                    onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
+                    leading = { Icon(Icons.Outlined.DarkMode, contentDescription = null) },
+                )
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_mode_amoled),
+                    subtitle = stringResource(R.string.settings_mode_amoled_desc),
+                    selected = themeMode == ThemeMode.AMOLED,
+                    onClick = { viewModel.setThemeMode(ThemeMode.AMOLED) },
+                    leading = { Icon(Icons.Outlined.Contrast, contentDescription = null) },
                 )
             }
         }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_reader)) {
+                SettingsRow(
+                    icon = Icons.Outlined.AutoStories,
+                    title = stringResource(R.string.settings_section_reader),
+                    value = stringResource(R.string.settings_section_reader_desc),
+                    onClick = { onOpenSection(SettingsSection.READER) },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_notifications)) {
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.NotificationsActive,
+                    title = stringResource(R.string.settings_notifications_enabled),
+                    checked = app.notificationsEnabled,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(notificationsEnabled = value) }
+                    },
+                    showDivider = true,
+                )
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.Download,
+                    title = stringResource(R.string.settings_notifications_downloads),
+                    checked = app.downloadNotifications,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(downloadNotifications = value) }
+                    },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_downloads)) {
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.Wifi,
+                    title = stringResource(R.string.settings_downloads_wifi_only),
+                    checked = app.wifiOnlyDownloads,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(wifiOnlyDownloads = value) }
+                    },
+                    showDivider = true,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Folder,
+                    title = stringResource(R.string.settings_downloads_location),
+                    value = context.filesDir.absolutePath.substringAfterLast('/'),
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_library_view)) {
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_library_grid),
+                    selected = viewMode == MangaViewMode.GRID,
+                    onClick = { viewModel.setViewMode(MangaViewMode.GRID) },
+                    leading = { Icon(Icons.Outlined.GridView, contentDescription = null) },
+                )
+                SettingsOptionRow(
+                    label = stringResource(R.string.settings_library_list),
+                    selected = viewMode == MangaViewMode.LIST,
+                    onClick = { viewModel.setViewMode(MangaViewMode.LIST) },
+                    leading = { Icon(Icons.Outlined.ViewAgenda, contentDescription = null) },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_library_sort)) {
+                LibrarySort.entries.forEach { sort ->
+                    SettingsOptionRow(
+                        label = librarySortLabel(sort),
+                        selected = app.librarySort == sort,
+                        onClick = { viewModel.update { it.copy(librarySort = sort) } },
+                        leading = { Icon(Icons.Outlined.Sort, contentDescription = null) },
+                    )
+                }
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_library_filter)) {
+                LibraryFilter.entries.forEach { filter ->
+                    SettingsOptionRow(
+                        label = libraryFilterLabel(filter),
+                        selected = app.libraryFilter == filter,
+                        onClick = { viewModel.update { it.copy(libraryFilter = filter) } },
+                        leading = { Icon(Icons.Outlined.FilterList, contentDescription = null) },
+                    )
+                }
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_performance_cache)) {
+                SettingsRow(
+                    icon = Icons.Outlined.Speed,
+                    title = stringResource(R.string.settings_performance_cache_size),
+                    value = formatBytes(cacheBytes),
+                    showDivider = true,
+                    onClick = { viewModel.refreshCacheSize() },
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.CleaningServices,
+                    title = stringResource(
+                        if (clearingCache) R.string.settings_performance_clearing
+                        else R.string.settings_performance_clear,
+                    ),
+                    onClick = { if (!clearingCache) showClearCacheDialog = true },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_interaction)) {
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.Animation,
+                    title = stringResource(R.string.settings_interaction_reduce_motion),
+                    checked = app.reduceMotion,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(reduceMotion = value) }
+                    },
+                    showDivider = true,
+                )
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.Vibration,
+                    title = stringResource(R.string.settings_interaction_haptics),
+                    checked = app.hapticFeedback,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(hapticFeedback = value) }
+                    },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = stringResource(R.string.settings_section_behavior)) {
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.RestartAlt,
+                    title = stringResource(R.string.settings_behavior_restore_last),
+                    checked = app.restoreLastScreen,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(restoreLastScreen = value) }
+                    },
+                    showDivider = true,
+                )
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.AutoStories,
+                    title = stringResource(R.string.settings_behavior_confirm_exit),
+                    checked = app.confirmExit,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(confirmExit = value) }
+                    },
+                    showDivider = true,
+                )
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.Refresh,
+                    title = stringResource(R.string.settings_behavior_refresh_on_open),
+                    checked = app.autoRefreshOnOpen,
+                    onCheckedChange = { value ->
+                        viewModel.update { it.copy(autoRefreshOnOpen = value) }
+                    },
+                )
+            }
+        }
+
         item { Spacer(Modifier.height(Spacing.xl)) }
+    }
+
+    if (showLanguageSheet) {
+        AppBottomSheet(onDismiss = { showLanguageSheet = false }) {
+            Text(
+                text = stringResource(R.string.settings_language),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
+            )
+            listOf(
+                "ar" to R.string.language_arabic,
+                "en" to R.string.language_english,
+                "ja" to R.string.language_japanese,
+            ).forEach { (code, labelRes) ->
+                SettingsOptionRow(
+                    label = stringResource(labelRes),
+                    selected = language == code,
+                    onClick = {
+                        showLanguageSheet = false
+                        if (language != code) {
+                            LanguageTransition.begin(code)
+                            viewModel.setLanguage(code)
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(Spacing.sm))
+        }
+    }
+
+    if (showThemeSheet) {
+        AppBottomSheet(onDismiss = { showThemeSheet = false }) {
+            Text(
+                text = stringResource(R.string.settings_theme),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
+            )
+            AppTheme.entries.forEach { option ->
+                ThemeOptionRow(
+                    theme = option,
+                    label = themeLabel(option),
+                    selected = theme == option,
+                    dark = darkTheme,
+                    onClick = {
+                        showThemeSheet = false
+                        viewModel.setTheme(option)
+                    },
+                )
+            }
+            Spacer(Modifier.height(Spacing.sm))
+        }
+    }
+
+    if (showClearCacheDialog) {
+        AppDialog(
+            title = stringResource(R.string.settings_performance_clear_confirm_title),
+            message = stringResource(R.string.settings_performance_clear_confirm_message),
+            confirmLabel = stringResource(R.string.settings_performance_clear),
+            dismissLabel = stringResource(R.string.action_cancel),
+            onConfirm = {
+                showClearCacheDialog = false
+                viewModel.clearCache { freed ->
+                    scope.launch {
+                        snackbar.showSnackbar(
+                            context.appString(R.string.settings_performance_freed, formatBytes(freed)),
+                        )
+                    }
+                }
+            },
+            onDismiss = { showClearCacheDialog = false },
+        )
     }
 }
 
 @Composable
-private fun SettingsSectionRow(section: SettingsSection, onClick: () -> Unit) {
+private fun languageLabel(code: String): String = stringResource(
+    when (code) {
+        "ar" -> R.string.language_arabic
+        "ja" -> R.string.language_japanese
+        else -> R.string.language_english
+    },
+)
+
+@Composable
+private fun themeLabel(theme: AppTheme): String = stringResource(
+    when (theme) {
+        AppTheme.DEFAULT -> R.string.theme_default
+        AppTheme.SAKURA -> R.string.theme_sakura
+        AppTheme.SHANA -> R.string.theme_shana
+        AppTheme.MIKU -> R.string.theme_miku
+        AppTheme.NEON -> R.string.theme_neon
+        AppTheme.SKY -> R.string.theme_sky
+    },
+)
+
+/** A mode row records where it was tapped, so the palette can spread from that exact spot. */
+@Composable
+private fun ThemeModeOption(
+    label: String,
+    selected: Boolean,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+) {
+    var center by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = Modifier.onGloballyPositioned { coordinates ->
+            val bounds = coordinates.boundsInWindow()
+            center = Offset(bounds.center.x, bounds.center.y)
+        },
+    ) {
+        SettingsOptionRow(
+            label = label,
+            subtitle = subtitle,
+            selected = selected,
+            onClick = {
+                ThemeReveal.setOrigin(center)
+                onClick()
+            },
+            leading = { Icon(imageVector = icon, contentDescription = null) },
+        )
+    }
+}
+
+/** Compact theme row: three colour swatches, the name and a single selection mark. */
+@Composable
+private fun ThemeOptionRow(
+    theme: AppTheme,
+    label: String,
+    selected: Boolean,
+    dark: Boolean,
+    onClick: () -> Unit,
+) {
+    var center by remember { mutableStateOf(Offset.Zero) }
+    val swatches = themeSwatches(theme, dark)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = Spacing.sm),
+            .onGloballyPositioned { coordinates ->
+                val bounds = coordinates.boundsInWindow()
+                center = Offset(bounds.center.x, bounds.center.y)
+            }
+            .clip(MaterialTheme.shapes.medium)
+            .clickable {
+                ThemeReveal.setOrigin(center)
+                onClick()
+            }
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            )
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = section.icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
+        ThemeSwatch(color = swatches.background)
+        Spacer(Modifier.width(4.dp))
+        ThemeSwatch(color = swatches.surface)
+        Spacer(Modifier.width(4.dp))
+        ThemeSwatch(color = swatches.accent)
         Spacer(Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(section.titleRes),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.size(1.dp))
-            Text(
-                text = stringResource(section.descriptionRes),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
 }
 
-private data class SettingsGroup(
-    val titleRes: Int,
-    val sections: List<SettingsSection>,
+@Composable
+private fun ThemeSwatch(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+    )
+}
+
+@Composable
+private fun librarySortLabel(sort: LibrarySort): String = stringResource(
+    when (sort) {
+        LibrarySort.TITLE -> R.string.settings_sort_title
+        LibrarySort.LAST_UPDATED -> R.string.settings_sort_last_updated
+        LibrarySort.LAST_READ -> R.string.settings_sort_last_read
+    },
+)
+
+@Composable
+private fun libraryFilterLabel(filter: LibraryFilter): String = stringResource(
+    when (filter) {
+        LibraryFilter.ALL -> R.string.settings_filter_all
+        LibraryFilter.READING -> R.string.settings_filter_reading
+        LibraryFilter.UNREAD -> R.string.settings_filter_unread
+    },
 )

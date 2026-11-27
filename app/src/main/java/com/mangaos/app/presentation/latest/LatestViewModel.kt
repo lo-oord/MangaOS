@@ -184,8 +184,9 @@ class LatestViewModel : ViewModel() {
                 return@launch
             }
             nextPage = page + 1
+            // The source's own order is kept: nothing re-sorts under the reader's finger.
             _state.value = content.copy(
-                mangas = merged.values.sortedNewestFirst(),
+                mangas = merged.values.toList(),
                 loadingMore = false,
             )
             enrichNewest(merged.values.toList())
@@ -200,10 +201,10 @@ class LatestViewModel : ViewModel() {
             _state.value = LatestUiState.NoSources
             return
         }
-        // One chosen source filters the feed; no choice merges every enabled source.
+        // One source is always chosen: the first enabled one until the reader picks another.
         val scope = preferred?.let { id -> sources.filter { it.id == id } }
             ?.takeIf { it.isNotEmpty() }
-            ?: sources
+            ?: sources.take(1)
         feedSources = scope
         nextPage = 2
         loadJob = viewModelScope.launch {
@@ -258,7 +259,7 @@ class LatestViewModel : ViewModel() {
         endReached: Boolean = false,
     ) {
         _state.value = LatestUiState.Content(
-            mangas = merged.values.sortedNewestFirst(),
+            mangas = merged.values.toList(),
             loadingMore = false,
             endReached = endReached,
             failedSources = failures.toList(),
@@ -311,14 +312,15 @@ class LatestViewModel : ViewModel() {
                 )
             }
         }
-        _state.value = current.copy(mangas = updated.sortedNewestFirst())
+        // Updated in place: resolving a missing date must not move a card to another row.
+        _state.value = current.copy(mangas = updated)
     }
 
     private suspend fun search(text: String) {
         // A chosen source scopes the search; otherwise every enabled source is asked.
         val allowed = sourcesRepository.enabledSources.value
-        val chosen = selectedSourceId.value
-        val allSources = chosen?.let { id -> allowed.filter { it.id == id } } ?: allowed
+        val chosen = selectedSourceId.value ?: allowed.firstOrNull()?.id
+        val allSources = chosen?.let { id -> allowed.filter { it.id == id } }.orEmpty()
         if (allSources.isEmpty()) {
             _searchState.value = LatestSearchState.Error(SourceFailure.NO_SOURCES)
             return

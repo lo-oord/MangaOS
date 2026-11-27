@@ -54,8 +54,8 @@ fun LibraryToggleSheet(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(Spacing.xxs))
-                val subtitle = manga.sourceName?.takeIf { it.isNotBlank() }
-                    ?: manga.genres.take(2).joinToString(" · ")
+                // Never the source: a work's origin is only shown in Sources and the picker.
+                val subtitle = manga.genres.take(2).joinToString(" · ")
                 if (subtitle.isNotEmpty()) {
                     Text(
                         text = subtitle,

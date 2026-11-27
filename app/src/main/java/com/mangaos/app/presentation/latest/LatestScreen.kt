@@ -149,7 +149,7 @@ fun LatestScreen(
                 onValueChange = viewModel::onQueryChange,
                 placeholder = stringResource(
                     R.string.search_latest_in,
-                    selectedSource?.name ?: stringResource(R.string.sources_all_label),
+                    selectedSource?.name.orEmpty(),
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -395,11 +395,6 @@ private fun FeedFooter(
                 Spacer(Modifier.width(Spacing.xs))
                 Text(stringResource(R.string.state_error_retry), style = MaterialTheme.typography.labelMedium)
             }
-            content.endReached -> Text(
-                text = stringResource(R.string.feed_end),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -440,7 +435,7 @@ private fun CompactSourceButton(
         ) {
             SourceBadge(source = source)
             Text(
-                text = source?.name ?: stringResource(R.string.sources_all_label),
+                text = source?.name.orEmpty(),
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

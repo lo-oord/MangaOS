@@ -71,7 +71,7 @@ class NativeSourcesTest {
     @Test
     fun `every bundled source is complete and carries its own icon`() {
         val definitions = NativeSourceRegistry.definitions
-        assertEquals(12, definitions.size)
+        assertEquals(11, definitions.size)
         definitions.forEach { definition ->
             val source = definition.factory()
             assertEquals(definition.id, source.id)

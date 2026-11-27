@@ -514,4 +514,8 @@
     <string name="detail_story_chapters">Chapters</string>
     <string name="sources_all_label">All sources</string>
     <string name="search_latest_in">Search in %1$s</string>
+    <string name="downloads_completed_tap">Downloaded · tap to open</string>
+    <string name="detail_continue_from">Continue from chapter %1$s</string>
+    <string name="detail_chapter_word">Chapter</string>
+    <string name="detail_chapter_new">New</string>
 </resources>

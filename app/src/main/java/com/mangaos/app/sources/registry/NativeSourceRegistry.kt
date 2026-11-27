@@ -5,7 +5,6 @@ import com.mangaos.app.sources.core.MangaSource
 import com.mangaos.app.sources.core.SourceCapability
 import com.mangaos.app.sources.implementations.AzoraSource
 import com.mangaos.app.sources.implementations.DespairMangaSource
-import com.mangaos.app.sources.implementations.DilarSource
 import com.mangaos.app.sources.implementations.MangaArSource
 import com.mangaos.app.sources.implementations.MangaDarSource
 import com.mangaos.app.sources.implementations.MangaOriginSource
@@ -210,21 +209,6 @@ object NativeSourceRegistry {
             ),
             iconRes = R.drawable.source_mangatime,
             factory = ::MangaTimeSource,
-        ),
-        SourceDefinition(
-            id = "dilar",
-            name = "Dilar",
-            lang = "ar",
-            baseUrl = "https://dilar.tube",
-            description = "مانجا ومانهوا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_dilar,
-            factory = ::DilarSource,
         ),
     )
 

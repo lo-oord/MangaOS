@@ -500,4 +500,8 @@
     <string name="detail_story_chapters">الفصول</string>
     <string name="sources_all_label">كل المصادر</string>
     <string name="search_latest_in">البحث في %1$s</string>
+    <string name="downloads_completed_tap">تم التحميل · اضغط للفتح</string>
+    <string name="detail_continue_from">تابع من الفصل %1$s</string>
+    <string name="detail_chapter_word">فصل</string>
+    <string name="detail_chapter_new">جديد</string>
 </resources>

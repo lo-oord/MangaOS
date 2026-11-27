@@ -1,11 +1,14 @@
 package com.mangaos.app.presentation.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,13 +16,17 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,42 +45,46 @@ import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.domain.model.SourceInfo
 
 /**
- * Compact enabled-source picker. It never covers the whole screen: the list is capped in
- * height so the screen underneath stays visible while choosing. Picking "every source" keeps
- * the feed merged; picking one narrows both the feed and the search to that source.
+ * Compact enabled-source picker. Every source is one round-ish bubble carrying its real icon and
+ * its name, wrapped into rows instead of a long list, so the sheet stays small and the screen
+ * underneath stays visible. There is no "every source" bubble: one source is always chosen.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SourcePickerSheet(
     sources: List<SourceInfo>,
     selectedId: String?,
-    onSelect: (String?) -> Unit,
+    onSelect: (String) -> Unit,
     onManage: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AppBottomSheet(onDismiss = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.source_pick_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = Spacing.sm),
-            )
-            LazyColumn(
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.source_pick_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Icons.Outlined.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.size(Spacing.sm))
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 380.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                item(key = "all-sources") {
-                    SourcePickerRow(
-                        name = stringResource(R.string.sources_all_label),
-                        iconRes = null,
-                        selected = selectedId == null,
-                        onClick = { onSelect(null) },
-                    )
-                }
-                items(sources, key = { it.id }) { source ->
-                    SourcePickerRow(
+                sources.forEach { source ->
+                    SourceBubble(
                         name = source.name,
                         iconRes = source.iconRes,
                         selected = source.id == selectedId,
@@ -94,59 +105,67 @@ fun SourcePickerSheet(
 }
 
 @Composable
-private fun SourcePickerRow(
+private fun SourceBubble(
     name: String,
     iconRes: Int?,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Row(
+    val scheme = MaterialTheme.colorScheme
+    Surface(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(50),
+        color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
+        contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) scheme.primary.copy(alpha = 0.55f) else scheme.outlineVariant.copy(alpha = 0.5f),
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (iconRes != null) {
-                Image(
-                    painter = painterResource(iconRes),
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(scheme.surface.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (iconRes != null) {
+                    Image(
+                        painter = painterResource(iconRes),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Text(
+                        text = name.trim().take(1).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 132.dp),
+            )
+            if (selected) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Check,
                     contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(26.dp),
-                )
-            } else {
-                Text(
-                    text = name.trim().take(1).uppercase(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = scheme.primary,
+                    modifier = Modifier.size(14.dp),
                 )
             }
-        }
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (selected) {
-            Spacer(Modifier.width(Spacing.xs))
-            Icon(
-                imageVector = Icons.Outlined.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
         }
     }
 }
