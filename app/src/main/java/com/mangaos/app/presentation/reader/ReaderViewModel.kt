@@ -344,9 +344,13 @@ class ReaderViewModel : ViewModel() {
 
     fun retryImage(pageKey: String) {
         if (!isCurrentPage(pageKey)) return
-        _imageStates.value = _imageStates.value.toMutableMap().apply {
-            this[pageKey] = ImageState.Loading
-        }
+        val states = _imageStates.value.toMutableMap()
+        states[pageKey] = ImageState.Loading
+        _imageStates.value = states
+        // Drop any ratio learnt from the failed attempt so the placeholder is not kept at the
+        // size of a page that never decoded.
+        if (pageKey !in _imageRatios.value) return
+        _imageRatios.value = _imageRatios.value - pageKey
     }
 
     /**

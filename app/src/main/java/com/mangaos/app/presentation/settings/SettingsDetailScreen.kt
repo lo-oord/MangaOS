@@ -466,6 +466,8 @@ private fun themeLabel(theme: AppTheme): String = stringResource(
         AppTheme.MIKU -> R.string.theme_miku
         AppTheme.NEON -> R.string.theme_neon
         AppTheme.SKY -> R.string.theme_sky
+        AppTheme.FOREST -> R.string.theme_forest
+        AppTheme.COFFEE -> R.string.theme_coffee
     },
 )
 

@@ -131,6 +131,8 @@
     <string name="theme_miku">ميكو</string>
     <string name="theme_neon">نيون</string>
     <string name="theme_sky">Sky</string>
+    <string name="theme_coffee">القهوة</string>
+    <string name="theme_forest">الغابة</string>
     <string name="settings_reader">القارئ</string>
     <string name="settings_notifications">الإشعارات</string>
     <string name="settings_reader_soon">إعدادات القارئ</string>
@@ -496,6 +498,7 @@
     <string name="sources_last_error">آخر خطأ: %1$s</string>
     <string name="language_switching_to">جارٍ التغيير إلى اللغة %1$s</string>
     <string name="detail_publication_date">تاريخ النشر</string>
+    <string name="detail_last_update">آخر تحديث</string>
     <string name="detail_sort_by">ترتيب حسب</string>
     <string name="detail_story_chapters">الفصول</string>
     <string name="sources_all_label">كل المصادر</string>

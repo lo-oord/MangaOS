@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -328,7 +329,9 @@ fun ReaderScreen(
                                 onError = { viewModel.onImageError(page.key) },
                                 onTap = { controlsVisible = !controlsVisible },
                             )
-                            if (settings.imageSpacingDp > 0) {
+                            // A webtoon is one continuous strip: only the paged vertical mode
+                            // honours the reader's spacing, so no band ever splits a page.
+                            if (mode == ReaderMode.VERTICAL && settings.imageSpacingDp > 0) {
                                 Spacer(Modifier.height(settings.imageSpacingDp.dp))
                             }
                         }
@@ -780,11 +783,13 @@ private fun ReaderImage(
         else if (fit == ContentScale.FillWidth) ContentScale.Fit
         else fit
     }
-    // The request carries the page's own identity, so a recycled slot or a late response can
-    // never place one chapter's image where another page belongs.
+    // The request carries the page's own identity *and* the retry counter, so a recycled slot
+    // can never show another page and pressing retry is a genuinely new request instead of the
+    // same (already failed) model Coil would ignore.
     val request = remember(page.key, attempt) {
-        readerImageRequest(context, page)
+        readerImageRequest(context, page, attempt)
     }
+    val density = LocalDensity.current
 
     BoxWithConstraints(
         modifier = modifier
@@ -792,12 +797,24 @@ private fun ReaderImage(
             .padding(horizontal = if (vertical) settings.marginsDp.dp else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Reserve the real image height as soon as the ratio is known so scrolling never jumps.
+        // Vertical pages dictate their own height: the slot only reserves space while the page
+        // is loading, and the loaded bitmap sets the real height. Nothing is cropped and no
+        // letterbox band is left between pages, whatever aspect ratio the source used.
+        val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
+        // Decoding at the screen width keeps the page sharp; the height cap only stops a single
+        // enormous webtoon strip from allocating a bitmap that cannot fit in memory.
+        val sizedRequest = remember(request, widthPx) {
+            request.newBuilder().size(widthPx, widthPx * MAX_TALL_DECODE).build()
+        }
         val reservedModifier = if (vertical) {
-            val effectiveRatio = (ratio ?: 1.45f).coerceIn(0.2f, 8f)
-            Modifier
-                .fillMaxWidth()
-                .height((maxWidth.value / effectiveRatio).dp)
+            if (state is ImageState.Success) {
+                Modifier.fillMaxWidth()
+            } else {
+                val effectiveRatio = (ratio ?: 1.4f).coerceIn(0.2f, 8f)
+                Modifier
+                    .fillMaxWidth()
+                    .height((maxWidth.value / effectiveRatio).dp)
+            }
         } else {
             Modifier.fillMaxSize()
         }
@@ -805,7 +822,9 @@ private fun ReaderImage(
         Box(
             modifier = reservedModifier
                 .clipToBounds()
-                .background(Color.White.copy(alpha = 0.03f)),
+                .then(
+                    if (vertical) Modifier else Modifier.background(Color.White.copy(alpha = 0.03f)),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             if (state is ImageState.Loading) {
@@ -867,12 +886,12 @@ private fun ReaderImage(
                 }
             }
             AsyncImage(
-                model = request,
+                model = sizedRequest,
                 contentDescription = null,
                 contentScale = contentScale,
                 colorFilter = readerColorFilter(settings),
                 modifier = Modifier
-                    .fillMaxSize()
+                    .then(if (vertical) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
                     .graphicsLayer {
                         scaleX = if (zoomed) 2f else 1f
                         scaleY = if (zoomed) 2f else 1f
@@ -914,14 +933,18 @@ private fun ReaderImage(
  * the page index and the URL, so two chapters that reuse the same URL or a recycled list slot
  * can never show each other's image.
  */
-private fun readerImageRequest(context: android.content.Context, page: ReaderPage): ImageRequest {
+private fun readerImageRequest(
+    context: android.content.Context,
+    page: ReaderPage,
+    attempt: Int = 0,
+): ImageRequest {
     val headers = Headers.Builder().apply {
         page.headers.forEach { (name, value) -> add(name, value) }
     }.build()
     return ImageRequest.Builder(context)
         .data(page.data(context))
         .headers(headers)
-        .memoryCacheKey("reader:${page.key}")
+        .memoryCacheKey("reader:${page.key}:$attempt")
         .diskCacheKey(page.url)
         .crossfade(false)
         .build()
@@ -965,6 +988,9 @@ private fun readerColorFilter(settings: ReaderSettings): ColorFilter? {
 }
 
 private const val PRELOAD_BEHIND = 3
+
+/** Tallest bitmap a vertical page may decode to, relative to its width. */
+private const val MAX_TALL_DECODE = 5
 
 private fun bgColor(settings: ReaderSettings): Color = when (settings.backgroundColor) {
     com.mangaos.app.domain.model.ReaderBackground.BLACK -> Color.Black

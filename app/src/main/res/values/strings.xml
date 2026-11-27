@@ -142,6 +142,8 @@
     <string name="theme_miku">Miku</string>
     <string name="theme_neon">Neon</string>
     <string name="theme_sky">Sky</string>
+    <string name="theme_coffee">Coffee</string>
+    <string name="theme_forest">Forest</string>
     <string name="settings_reader">Reader</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_reader_soon">Reader settings</string>
@@ -510,6 +512,7 @@
     <string name="sources_last_error">Last error: %1$s</string>
     <string name="language_switching_to">Switching to %1$s</string>
     <string name="detail_publication_date">Publication date</string>
+    <string name="detail_last_update">Last update</string>
     <string name="detail_sort_by">Sort by</string>
     <string name="detail_story_chapters">Chapters</string>
     <string name="sources_all_label">All sources</string>

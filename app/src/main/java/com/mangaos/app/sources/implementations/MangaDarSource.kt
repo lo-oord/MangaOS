@@ -16,6 +16,7 @@ import com.mangaos.app.sources.network.metaContent
 import com.mangaos.app.sources.network.obj
 import com.mangaos.app.sources.network.raw
 import com.mangaos.app.sources.network.string
+import com.mangaos.app.sources.network.toInstantMillis
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -126,14 +127,32 @@ class MangaDarSource : MangaSource {
             },
             author = author,
             artist = artist,
+            updatedAt = document.metaContent("article:modified_time")?.toInstantOrNull()
+                ?: document.metaContent("og:updated_time")?.toInstantOrNull(),
+            latestChapter = CHAPTER_LABEL.find(document.text())?.groupValues?.getOrNull(1),
         )
     }
 
+    /**
+     * Three shapes have served this site's chapter list over time: an Alpine `rows:` array, a
+     * JSON blob, and plain links. All three are read, in that order, so a redesign on the site
+     * cannot leave a series with "no chapters" while its chapter links are still on the page.
+     */
     override suspend fun chapters(mangaId: String): List<SourceChapter> {
         val document = http.document(mangaUrl(mangaId))
-        for (container in document.select("div[x-data]")) {
-            val data = container.attr("x-data")
-            val rowsStart = data.indexOf("rows:")
+        embeddedRows(document)?.takeIf { it.isNotEmpty() }?.let { return it }
+        jsonChapters(document, mangaId)?.takeIf { it.isNotEmpty() }?.let { return it }
+        linkedChapters(document, mangaId)
+            .takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        throw SourceException(SourceFailure.EMPTY, "This series has no chapters")
+    }
+
+    private fun embeddedRows(document: Document): List<SourceChapter>? {
+        for (container in document.select("div[x-data], [data-rows], [x-data]")) {
+            val data = container.attr("x-data").ifBlank { container.attr("data-rows") }
+            if (data.isBlank()) continue
+            val rowsStart = data.indexOf("rows")
             if (rowsStart < 0) continue
             val bracketStart = data.indexOf("[", rowsStart)
             val bracketEnd = matchingBracket(data, bracketStart)
@@ -143,10 +162,10 @@ class MangaDarSource : MangaSource {
             }.getOrNull() ?: continue
             val chapters = rows.mapNotNull { element ->
                 val row = element as? JsonArray ?: return@mapNotNull null
-                if (row.size < 4) return@mapNotNull null
+                if (row.size < 3) return@mapNotNull null
                 val number = (row[1] as? JsonPrimitive)?.content ?: return@mapNotNull null
                 val path = (row[2] as? JsonPrimitive)?.content ?: return@mapNotNull null
-                val seconds = (row[3] as? JsonPrimitive)?.content?.toLongOrNull()
+                val seconds = (row.getOrNull(3) as? JsonPrimitive)?.content?.toLongOrNull()
                 if (path.isBlank()) return@mapNotNull null
                 SourceChapter(
                     id = path.removePrefix(baseUrl).trim('/'),
@@ -157,19 +176,97 @@ class MangaDarSource : MangaSource {
             }
             if (chapters.isNotEmpty()) return chapters
         }
-        throw SourceException(SourceFailure.EMPTY, "This series has no chapters")
+        return null
+    }
+
+    /** Any embedded JSON that carries an array of chapter objects (`number` + a link/id). */
+    private fun jsonChapters(document: Document, mangaId: String): List<SourceChapter>? {
+        val blobs = document.select("script[type=application/json], script#__NEXT_DATA__, script#__NUXT_DATA__")
+            .map { it.data() }
+            .filter { it.contains("chapter", ignoreCase = true) } +
+            document.select("div[x-data], [x-data]").map { it.attr("x-data") }
+                .filter { it.contains("chapter", ignoreCase = true) }
+        for (blob in blobs) {
+            val root = runCatching { SourceHttp.JSON.parseToJsonElement(blob) }.getOrNull() ?: continue
+            val found = mutableListOf<SourceChapter>()
+            collectChapters(root, mangaId, found, depth = 0)
+            found.distinctBy { it.id }.takeIf { it.isNotEmpty() }?.let { return it }
+        }
+        return null
+    }
+
+    private fun collectChapters(
+        element: kotlinx.serialization.json.JsonElement,
+        mangaId: String,
+        into: MutableList<SourceChapter>,
+        depth: Int,
+    ) {
+        if (depth > 8) return
+        when (element) {
+            is JsonArray -> element.forEach { collectChapters(it, mangaId, into, depth + 1) }
+            is kotlinx.serialization.json.JsonObject -> {
+                val number = (element["number"] as? JsonPrimitive)?.content
+                    ?: (element["chapter_number"] as? JsonPrimitive)?.content
+                val path = (element["slug"] as? JsonPrimitive)?.content
+                    ?: (element["url"] as? JsonPrimitive)?.content
+                    ?: (element["link"] as? JsonPrimitive)?.content
+                    ?: (element["path"] as? JsonPrimitive)?.content
+                if (number != null && !path.isNullOrBlank()) {
+                    val id = path.removePrefix(baseUrl).trim('/')
+                    if (id.isNotBlank()) {
+                        into += SourceChapter(
+                            id = id,
+                            number = number,
+                            title = "الفصل $number",
+                            publishedAt = (element["created_at"] as? JsonPrimitive)?.content
+                                ?.toInstantOrNull()
+                                ?: (element["createdAt"] as? JsonPrimitive)?.content?.toInstantOrNull(),
+                        )
+                    }
+                } else {
+                    element.values.forEach { collectChapters(it, mangaId, into, depth + 1) }
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    /** The last resort: the chapter links visible on the series page. */
+    private fun linkedChapters(document: Document, mangaId: String): List<SourceChapter> {
+        val slug = mangaId.trim('/').substringAfterLast("/")
+        return document.select("a[href]")
+            .mapNotNull { anchor ->
+                val href = anchor.absUrl("href").ifBlank { anchor.attr("href") }
+                val looksLikeChapter = href.contains("/chapter", ignoreCase = true) ||
+                    (slug.isNotBlank() && href.contains(slug) &&
+                        Regex("""\d""").containsMatchIn(href.substringAfter(slug)))
+                if (!looksLikeChapter) return@mapNotNull null
+                val text = anchor.text().trim()
+                val number = CHAPTER_NUMBER.find(text)?.value
+                    ?: CHAPTER_NUMBER.find(href.substringAfterLast("/"))?.value
+                    ?: return@mapNotNull null
+                val id = href.removePrefix(baseUrl).trim('/')
+                if (id.isBlank()) return@mapNotNull null
+                SourceChapter(id = id, number = number, title = "الفصل $number")
+            }
+            .distinctBy { it.id }
     }
 
     override suspend fun pages(mangaId: String, chapterId: String): List<SourcePage> {
         val url = if (chapterId.startsWith("http")) chapterId else "$baseUrl/${chapterId.trim('/')}/"
         val document = http.document(url)
-        val images = document.select(".reader-page img").mapNotNull { image ->
-            val value = when {
-                image.attr("src").isNotBlank() -> image.absUrl("src")
-                else -> image.absUrl("data-src")
+        val images = document
+            .select(".reader-page img, .reading-content img, article img, main img, img[data-src], img[src]")
+            .mapNotNull { image ->
+                val value = listOf("data-src", "data-lazy-src", "src")
+                    .map { attribute -> image.absUrl(attribute) }
+                    .firstOrNull { candidate ->
+                        candidate.isNotBlank() && !candidate.startsWith("data:") &&
+                            !LOGO_PATTERN.containsMatchIn(candidate)
+                    }
+                value
             }
-            value.takeIf { it.isNotBlank() }
-        }
+            .distinct()
         if (images.isEmpty()) throw SourceException(SourceFailure.EMPTY, "This chapter has no pages")
         return images.map { SourcePage(it) }
     }
@@ -180,6 +277,8 @@ class MangaDarSource : MangaSource {
 
     private fun mangaUrl(mangaId: String): String =
         if (mangaId.startsWith("http")) mangaId else "$baseUrl/manga/${mangaId.trim('/')}"
+
+    private fun String.toInstantOrNull(): Long? = this.toInstantMillis()
 
     private fun matchingBracket(text: String, start: Int): Int {
         if (start < 0 || start >= text.length) return -1
@@ -194,5 +293,11 @@ class MangaDarSource : MangaSource {
             }
         }
         return -1
+    }
+
+    private companion object {
+        val CHAPTER_NUMBER = Regex("""(\d+(?:\.\d+)?)""")
+        val CHAPTER_LABEL = Regex("""(?:الفصل|chapter)\s*#?(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
+        val LOGO_PATTERN = Regex("""(logo|favicon|avatar|banner|icon)""", RegexOption.IGNORE_CASE)
     }
 }

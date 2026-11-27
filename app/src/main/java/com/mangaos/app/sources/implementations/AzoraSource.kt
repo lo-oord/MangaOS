@@ -146,6 +146,9 @@ class AzoraSource : MangaSource {
         val genres = stringList("genres").ifEmpty {
             array("genres").orEmpty().mapNotNull { element -> element.obj()?.string("name") }
         }
+        // The list payload already carries the newest chapters, so the feed never has to ask
+        // for a series' full chapter list just to print the number and the date on its card.
+        val newest = newestChapter()
         return SourceManga(
             id = if (id != null) "$slug#$id" else slug,
             title = title,
@@ -156,9 +159,21 @@ class AzoraSource : MangaSource {
             status = status(),
             author = string("author"),
             artist = string("artist"),
-            updatedAt = string("updatedAt").toInstantMillis(),
+            latestChapter = newest?.raw("number"),
+            latestChapterId = newest?.int("id")?.toString(),
+            updatedAt = newest?.string("createdAt").toInstantMillis()
+                ?: string("updatedAt").toInstantMillis(),
         )
     }
+
+    /** The chapter with the highest number in the embedded `chapters` array, when present. */
+    private fun JsonObject.newestChapter(): JsonObject? =
+        array("chapters").orEmpty()
+            .mapNotNull { element -> element.obj() }
+            .maxWithOrNull(
+                compareBy<JsonObject> { it.raw("number")?.toFloatOrNull() ?: -1f }
+                    .thenBy { it.string("createdAt").toInstantMillis() ?: 0L },
+            )
 
     private fun JsonObject.description(): String? {
         val content = string("postContent") ?: string("description")
@@ -180,6 +195,6 @@ class AzoraSource : MangaSource {
 
     private companion object {
         const val API = "https://api.azorafly.com"
-        const val PER_PAGE = 18
+        const val PER_PAGE = 24
     }
 }

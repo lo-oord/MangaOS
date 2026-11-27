@@ -23,6 +23,10 @@ import com.mangaos.app.data.notifications.DownloadNotifications
 import com.mangaos.app.data.work.DownloadScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -32,6 +36,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import com.mangaos.app.sources.images.OverlayImageInterceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -428,58 +436,61 @@ class LocalDownloadRepository(
         setChapter(taskId, chapter.chapterId) { it.copy(pageCount = pages.size) }
         persist(force = true)
 
-        val names = ArrayList<String>(pages.size)
-        var bytes = 0L
-        pages.forEachIndexed { index, url ->
-            currentCoroutineContext().ensureActive()
-            val name = pageFileName(index, url)
-            val target = File(directory, name)
-            val part = File(directory, "$name.part")
-            val request = Request.Builder()
-                .url(url)
-                .apply {
-                    headers.forEach { (key, value) ->
-                        if (key.isNotBlank() && value.isNotBlank()) header(key, value)
+        // Pages are fetched side by side instead of one after another: a 30-page chapter used
+        // to wait for every round trip in turn, which is what made downloads feel stalled.
+        // Each page keeps its own index, so the stored order is still the reading order.
+        val storedNames = arrayOfNulls<String>(pages.size)
+        val completed = AtomicInteger(0)
+        val totalBytes = AtomicLong(0L)
+        val gate = Semaphore(PAGE_CONCURRENCY)
+        coroutineScope {
+            pages.mapIndexed { index, url ->
+                async(Dispatchers.IO) {
+                    gate.withPermit {
+                        currentCoroutineContext().ensureActive()
+                        val name = pageFileName(index, url)
+                        val target = File(directory, name)
+                        if (target.isFile && target.length() > 0L) {
+                            // A previous attempt already stored this page; never fetch it again.
+                            storedNames[index] = name
+                        } else {
+                            val part = File(directory, "$name.part")
+                            val request = Request.Builder()
+                                .url(url)
+                                .apply {
+                                    headers.forEach { (key, value) ->
+                                        if (key.isNotBlank() && value.isNotBlank()) header(key, value)
+                                    }
+                                }
+                                .build()
+                            fetchPage(request, part, index)
+                            if (!part.exists() || part.length() <= 0L) {
+                                part.delete()
+                                throw IOException("Empty page ${index + 1}")
+                            }
+                            if (!part.renameTo(target)) {
+                                part.delete()
+                                throw IOException("Could not store page ${index + 1}")
+                            }
+                            storedNames[index] = name
+                        }
+                        val bytesNow = totalBytes.addAndGet(target.length())
+                        val doneNow = completed.incrementAndGet()
+                        setChapter(taskId, chapter.chapterId) {
+                            it.copy(
+                                pageCount = pages.size,
+                                downloadedPages = doneNow,
+                                bytes = bytesNow,
+                            )
+                        }
+                        persist(force = false)
+                        notifyThrottled(taskId)
                     }
                 }
-                .build()
-            if (target.isFile && target.length() > 0L) {
-                // A previous attempt already stored this page; never download it twice.
-                bytes += target.length()
-                names += name
-                setChapter(taskId, chapter.chapterId) {
-                    it.copy(
-                        pageCount = pages.size,
-                        downloadedPages = index + 1,
-                        bytes = bytes,
-                    )
-                }
-                persist(force = false)
-                notifyThrottled(taskId)
-                return@forEachIndexed
-            }
-            fetchPage(request, part, index)
-            val partial = part
-            if (!partial.exists() || partial.length() <= 0L) {
-                partial.delete()
-                throw IOException("Empty page ${index + 1}")
-            }
-            if (!partial.renameTo(target)) {
-                partial.delete()
-                throw IOException("Could not store page ${index + 1}")
-            }
-            bytes += target.length()
-            names += name
-            setChapter(taskId, chapter.chapterId) {
-                it.copy(
-                    pageCount = pages.size,
-                    downloadedPages = index + 1,
-                    bytes = bytes,
-                )
-            }
-            persist(force = false)
-            notifyThrottled(taskId)
+            }.awaitAll()
         }
+        val names = storedNames.filterNotNull()
+        val bytes = totalBytes.get()
 
         val verified = names.all { name ->
             val page = File(directory, name)
@@ -613,6 +624,9 @@ class LocalDownloadRepository(
                 mangaRepository.imageHeaders(task.manga.sourceId),
             ) ?: return@launch
             updateTask(taskId) { it.copy(localCoverPath = path) }
+            // The cover usually arrives after the first notification was posted; re-posting
+            // once it is on disk is what puts the real artwork in the notification.
+            findTask(taskId)?.let { notifier.notify(it, appSettings) }
         }
     }
 
@@ -783,6 +797,9 @@ class LocalDownloadRepository(
         const val PERSIST_INTERVAL_MS = 800L
         const val NOTIFICATION_INTERVAL_MS = 700L
         const val PAGE_ATTEMPTS = 3
+
+        /** Pages of one chapter fetched at once. */
+        const val PAGE_CONCURRENCY = 4
         const val PAGE_RETRY_DELAY_MS = 900L
         val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
         val ACTIVE_OR_DONE = setOf(

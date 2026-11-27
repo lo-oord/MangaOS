@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface LatestUiState {
     data object Loading : LatestUiState
@@ -175,10 +176,9 @@ class LatestViewModel : ViewModel() {
                     }
                 }.awaitAll()
             }
-            var added = 0
-            pages.flatten().forEach { manga ->
-                if (merged.put(manga.key, manga) == null) added++
-            }
+            val incoming = pages.flatten().filterNot { it.key in merged }
+            val ready = withTimeoutOrNull(RESOLVE_TOTAL_MS) { resolveCards(incoming) } ?: incoming
+            val added = ready.count { merged.put(it.key, it) == null }
             if (added == 0) {
                 _state.value = content.copy(loadingMore = false, endReached = true)
                 return@launch
@@ -236,14 +236,23 @@ class LatestViewModel : ViewModel() {
                             ?: SourceFailure.NETWORK
                     }
                     feed.mangas.forEach { merged[it.key] = it }
-                    if (merged.isNotEmpty()) publish(merged, failures)
                 }
                 channel.close()
             }
             when {
                 merged.isNotEmpty() -> {
-                    publish(merged, failures, endReached = merged.size < PAGE_HINT)
-                    enrichNewest(merged.values.toList())
+                    // Every card is published complete: its chapter number and date are
+                    // resolved first, so the metadata never pops in after the card is visible.
+                    // A source that cannot answer must never hold the first paint hostage:
+                    // the page is bounded, and anything still unresolved is filled in after
+                    // the cards are on screen.
+                    val listed = merged.values.toList()
+                    val ready = withTimeoutOrNull(RESOLVE_TOTAL_MS) { resolveCards(listed) }
+                        ?: listed
+                    publish(LinkedHashMap<String, Manga>().apply {
+                        ready.forEach { put(it.key, it) }
+                    }, failures, endReached = ready.size < PAGE_HINT)
+                    enrichNewest(ready)
                 }
                 failures.size == scope.size -> _state.value = LatestUiState.Error(
                     lastFailure ?: SourceFailure.NETWORK,
@@ -275,6 +284,37 @@ class LatestViewModel : ViewModel() {
      * from the source itself, then the feed is re-sorted, so the badge and the relative time
      * appear for every work instead of only for the sources that happen to send them.
      */
+    /**
+     * Fills the newest chapter and its publication date for a page of cards before they are
+     * shown. Order is preserved exactly, and a source that cannot answer leaves its work as it
+     * is instead of blocking the page.
+     */
+    private suspend fun resolveCards(mangas: List<Manga>): List<Manga> = coroutineScope {
+        val semaphore = Semaphore(RESOLVE_CONCURRENCY)
+        mangas.map { manga ->
+            async(Dispatchers.IO) {
+                if (manga.latestChapter != null && manga.updatedAt != null) {
+                    manga
+                } else {
+                    semaphore.withPermit {
+                        runCatching {
+                            withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
+                                repository.latestChapter(manga.sourceId, manga.id)
+                            }
+                        }.getOrNull()?.let { chapter ->
+                            manga.copy(
+                                latestChapter = chapter.number.takeIf { it.isNotBlank() }
+                                    ?: manga.latestChapter,
+                                latestChapterId = chapter.id,
+                                updatedAt = chapter.publishedAt ?: manga.updatedAt,
+                            )
+                        } ?: manga
+                    }
+                }
+            }
+        }.awaitAll()
+    }
+
     private fun enrichNewest(mangas: List<Manga>) {
         enrichJob?.cancel()
         val pending = mangas
@@ -393,6 +433,11 @@ class LatestViewModel : ViewModel() {
 
         /** A page smaller than this hints that the source has nothing left to page through. */
         const val PAGE_HINT = 24
+
+        /** Cards resolved side by side; enough to be quick without hammering one source. */
+        const val RESOLVE_CONCURRENCY = 6
+        const val RESOLVE_TIMEOUT_MS = 8_000L
+        const val RESOLVE_TOTAL_MS = 14_000L
     }
 }
 

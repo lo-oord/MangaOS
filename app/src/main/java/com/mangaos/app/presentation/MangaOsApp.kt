@@ -129,13 +129,16 @@ fun MangaOsApp() {
         }
         val scheme = colorSchemeFor(target.theme, target.dark, target.amoled)
         val center = origin
+
         overlay = RevealOverlay(center = center, color = scheme.background, accent = scheme.primary)
         expansion.snapTo(0f)
         overlayAlpha.snapTo(1f)
-        expansion.animateTo(1f, tween(durationMillis = 360, easing = FastOutSlowInEasing))
+        // A shorter, softer spread and a longer fade read as a quiet palette change instead of
+        // a harsh wipe.
+        expansion.animateTo(1f, tween(durationMillis = 280, easing = FastOutSlowInEasing))
         // Swap the palette while the new canvas fully covers the old one, then fade the cover.
         applied = target
-        overlayAlpha.animateTo(0f, tween(durationMillis = 140))
+        overlayAlpha.animateTo(0f, tween(durationMillis = 220))
         overlay = null
     }
 
@@ -210,12 +213,13 @@ fun MangaOsApp() {
                             center = reveal.center,
                         )
                         if (expansion.value < 1f) {
-                            // A thin accent edge makes the spreading palette legible.
+                            // A barely-there accent edge keeps the spread legible without the
+                            // bright ring that used to flash on every theme change.
                             drawCircle(
-                                color = reveal.accent.copy(alpha = 0.45f * (1f - expansion.value) * alpha),
+                                color = reveal.accent.copy(alpha = 0.14f * (1f - expansion.value) * alpha),
                                 radius = radius,
                                 center = reveal.center,
-                                style = Stroke(width = 2.dp.toPx()),
+                                style = Stroke(width = 1.dp.toPx()),
                             )
                         }
                     }

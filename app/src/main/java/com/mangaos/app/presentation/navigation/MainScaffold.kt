@@ -124,6 +124,9 @@ fun MainScaffold(
 
         ModalNavigationDrawer(
             drawerState = drawerState,
+            // The side drawer belongs to the main tabs only. Inside a work's details the
+            // gesture must scroll the page, never slide a menu over it.
+            gesturesEnabled = isDrawerRoot,
             scrimColor = Color.Black.copy(alpha = 0.42f),
             drawerContent = {
                 AppDrawer(

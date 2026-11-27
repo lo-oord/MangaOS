@@ -3,8 +3,11 @@ package com.mangaos.app.core.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,8 +44,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -88,11 +96,24 @@ fun MangaCard(
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // A tiny press scale is the whole "bubble" feel: the card acknowledges the touch without
+    // moving its neighbours or changing the grid.
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.972f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "cardPress",
+    )
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(RoundedCornerShape(CardCorner))
-            .then(clickModifier(onClick, onLongClick)),
+            .then(clickModifier(onClick, onLongClick, interaction)),
         shape = RoundedCornerShape(CardCorner),
         color = scheme.surfaceContainerLow,
         border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.16f)),
@@ -109,8 +130,11 @@ fun MangaCard(
                 MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
 
                 // Latest only: the real newest chapter number, floating over the artwork.
+                // While the source is still resolving it, a quiet placeholder keeps the same
+                // footprint, so the card never changes shape once the number arrives.
                 if (context == MangaCardContext.LATEST) {
-                    manga.latestChapter?.takeIf { it.isNotBlank() }?.let { chapter ->
+                    val chapter = manga.latestChapter?.takeIf { it.isNotBlank() }
+                    if (chapter != null) {
                         ChapterBadge(
                             text = appString(R.string.chapter_number, chapter),
                             modifier = Modifier
@@ -144,7 +168,7 @@ fun MangaCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(12.dp),
+                            .height(16.dp),
                     ) {
                         val timestamp = manga.updatedAt
                         if (timestamp != null) {
@@ -152,7 +176,7 @@ fun MangaCard(
                                 imageVector = Icons.Outlined.Schedule,
                                 contentDescription = null,
                                 tint = scheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                modifier = Modifier.size(10.dp),
+                                modifier = Modifier.size(11.dp),
                             )
                             Spacer(Modifier.width(3.dp))
                             Text(
@@ -349,7 +373,7 @@ private fun Pill(
         shape = RoundedCornerShape(50),
         color = container,
         contentColor = if (content == Color.Unspecified) MaterialTheme.colorScheme.onSurface else content,
-        modifier = Modifier.height(20.dp),
+        modifier = Modifier.height(22.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 6.dp),
@@ -363,13 +387,32 @@ private fun Pill(
     }
 }
 
+@Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun clickModifier(onClick: () -> Unit, onLongClick: (() -> Unit)?): Modifier =
-    if (onLongClick != null) {
-        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+private fun clickModifier(
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    interaction: MutableInteractionSource? = null,
+): Modifier = if (onLongClick != null) {
+    if (interaction != null) {
+        Modifier.combinedClickable(
+            interactionSource = interaction,
+            indication = LocalIndication.current,
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
     } else {
-        Modifier.clickable(onClick = onClick)
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
     }
+} else if (interaction != null) {
+    Modifier.clickable(
+        interactionSource = interaction,
+        indication = LocalIndication.current,
+        onClick = onClick,
+    )
+} else {
+    Modifier.clickable(onClick = onClick)
+}
 
 @Composable
 fun MangaCoverArt(manga: Manga, modifier: Modifier = Modifier) {
@@ -392,8 +435,19 @@ fun CoverImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val description = appString(R.string.cd_cover, title)
+    val context = LocalContext.current
+    // A short crossfade means a cover arrives as a soft appearance instead of a hard pop, and
+    // a cached cover still shows immediately.
+    val model = remember(coverUrl) {
+        coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            coil.request.ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(180)
+                .build()
+        }
+    }
     SubcomposeAsyncImage(
-        model = coverUrl?.takeIf { it.isNotBlank() },
+        model = model,
         contentDescription = description,
         contentScale = contentScale,
         modifier = modifier,

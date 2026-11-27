@@ -54,16 +54,15 @@ class DownloadNotifications(private val context: Context) {
 
         // The real cover of the work, taken from the app-private copy the manager cached, so
         // the notification never waits on the network and never shows another work's cover.
+        // The large icon is the cover in both the collapsed and the expanded notification;
+        // BigTextStyle keeps the state line visible while BigPictureStyle used to replace it.
         if (cover != null) {
             builder.setLargeIcon(cover)
-            builder.setStyle(
-                NotificationCompat.BigPictureStyle()
-                    .bigPicture(cover)
-                    .setBigContentTitle(task.mangaTitle)
-                    .setSummaryText(text),
-            )
-        } else {
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        }
+        builder.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+
+        if (state == DownloadState.COMPLETED) {
+            builder.setProgress(0, 0, false)
         }
 
         when (state) {
@@ -244,7 +243,12 @@ class DownloadNotifications(private val context: Context) {
 
     private fun thumbnail(task: Download): Bitmap? {
         val path = task.localCoverPath?.let { uri ->
-            if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
+            // Covers are stored as a file URI; File.toURI() writes "file:/path" with a single
+            // slash, so the path is decoded instead of being string-stripped.
+            when {
+                uri.startsWith("file:") -> android.net.Uri.parse(uri).path ?: uri.removePrefix("file:")
+                else -> uri
+            }
         } ?: return null
         coverCache.get(path)?.let { return it }
         return runCatching {

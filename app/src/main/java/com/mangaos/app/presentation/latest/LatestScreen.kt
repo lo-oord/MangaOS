@@ -9,6 +9,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -31,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Layers
@@ -53,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -87,7 +93,6 @@ import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.SourceInfo
-import com.mangaos.app.presentation.common.SourcePickerSheet
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -115,7 +120,7 @@ fun LatestScreen(
     val screenWidth = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    var showSourcePicker by remember { mutableStateOf(false) }
+    var pickerOpen by remember { mutableStateOf(false) }
     var radialOpen by remember { mutableStateOf(false) }
     var radialCenter by remember { mutableStateOf(Offset.Zero) }
     var radialOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -239,7 +244,7 @@ fun LatestScreen(
                     .padding(start = Spacing.screen, bottom = Spacing.lg + Spacing.xs),
                 onClick = {
                     vibrate()
-                    showSourcePicker = true
+                    pickerOpen = !pickerOpen
                 },
                 onLongPressStart = { rootPosition ->
                     vibrate()
@@ -283,6 +288,50 @@ fun LatestScreen(
             )
         }
 
+        // The picker is part of this screen: the sources sit stacked on top of each other,
+        // right above the button that opened them. There is no separate sheet and no list page.
+        AnimatedVisibility(
+            visible = pickerOpen,
+            enter = fadeIn() + scaleIn(initialScale = 0.94f),
+            exit = fadeOut() + scaleOut(targetScale = 0.94f),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = Spacing.screen, bottom = 76.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 8.dp,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                ),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(min = 168.dp, max = 220.dp)
+                        .heightIn(max = 304.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    sources.forEach { source ->
+                        SourceStackRow(
+                            source = source,
+                            selected = source.id == selectedSource?.id,
+                            onClick = {
+                                vibrate()
+                                viewModel.selectSource(source.id)
+                                pickerOpen = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
         if (radialOpen) {
             RadialSourceSelector(
                 sources = sources.take(MAX_RADIAL),
@@ -291,21 +340,68 @@ fun LatestScreen(
             )
         }
     }
+}
 
-    if (showSourcePicker) {
-        SourcePickerSheet(
-            sources = sources,
-            selectedId = selectedSource?.id,
-            onSelect = { id ->
-                viewModel.selectSource(id)
-                showSourcePicker = false
-            },
-            onManage = {
-                showSourcePicker = false
-                onOpenSources()
-            },
-            onDismiss = { showSourcePicker = false },
-        )
+/** One stacked source chip in the Latest picker: icon, name and the current choice. */
+@Composable
+private fun SourceStackRow(
+    source: SourceInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val icon = source.iconRes
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) scheme.primaryContainer else Color.Transparent,
+        contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(scheme.surface.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) {
+                    Image(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(18.dp),
+                    )
+                } else {
+                    Text(
+                        text = source.name.trim().take(1).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = source.name,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = scheme.primary,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
     }
 }
 

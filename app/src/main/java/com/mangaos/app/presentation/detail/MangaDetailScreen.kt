@@ -122,6 +122,7 @@ import com.mangaos.app.core.ui.components.mangaStatusColor
 import com.mangaos.app.core.ui.components.mangaStatusLabel
 import com.mangaos.app.core.util.displayGenres
 import com.mangaos.app.core.util.ratingLabel
+import com.mangaos.app.core.util.relativeTime
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.MangaDetailSkeleton
 import com.mangaos.app.core.ui.components.PrimaryButton
@@ -692,17 +693,29 @@ private fun DetailHero(
                         ),
                     )
                 }
+                manga.updatedAt?.let { timestamp ->
+                    add(
+                        DetailTileData(
+                            icon = Icons.Outlined.Schedule,
+                            label = R.string.detail_last_update,
+                            value = relativeTime(LocalContext.current, timestamp),
+                        ),
+                    )
+                }
             }
             if (tiles.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.lg))
-                Row(
+                // Facts wrap instead of being squeezed: a long date is never truncated to a
+                // scrap of text, and each tile keeps enough width for its own label.
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.screen),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     tiles.forEach { tile ->
-                        DetailInfoTile(tile = tile, modifier = Modifier.weight(1f))
+                        DetailInfoTile(tile = tile, modifier = Modifier.widthIn(min = 148.dp))
                     }
                 }
             }

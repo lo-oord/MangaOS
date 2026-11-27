@@ -131,6 +131,8 @@
     <string name="theme_miku">ミク</string>
     <string name="theme_neon">ネオン</string>
     <string name="theme_sky">スカイ</string>
+    <string name="theme_coffee">コーヒー</string>
+    <string name="theme_forest">フォレスト</string>
     <string name="settings_reader">リーダー</string>
     <string name="settings_notifications">通知</string>
     <string name="settings_reader_soon">リーダー設定</string>
@@ -390,6 +392,7 @@
     <string name="error_display_name_length">表示名は40文字以内で入力してください</string>
     <string name="language_switching_to">%1$s に切り替えています</string>
     <string name="detail_publication_date">公開日</string>
+    <string name="detail_last_update">最終更新</string>
     <string name="detail_sort_by">並び替え</string>
     <string name="detail_story_chapters">チャプター</string>
     <string name="sources_all_label">すべてのソース</string>

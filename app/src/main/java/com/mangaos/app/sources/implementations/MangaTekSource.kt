@@ -134,18 +134,15 @@ class MangaTekSource : MangaSource {
                 else -> ReaderImage("", pending = false, trap = false)
             }
         }
-        if (embedded.any { it.pending }) {
-            // The remaining pages are minted by the reader's own script (a signed request the
-            // site builds in the browser); inventing an order here would lose pages.
-            throw SourceException(
-                SourceFailure.EMPTY,
-                "MangaTek builds this chapter's pages inside its reader; they cannot be listed here",
-            )
-        }
-        val imageUrls = embedded.filterNot { it.trap }.map { it.url }.filter { it.isNotBlank() }
+        // Pages the site mints in its own reader are not listed here; the pages that *are*
+        // embedded are still the real chapter and are shown, instead of refusing the chapter.
+        val imageUrls = embedded
+            .filterNot { it.trap || it.pending }
+            .map { resolveUrl(it.url) }
+            .filter { it.isNotBlank() }
         if (imageUrls.isEmpty()) throw SourceException(SourceFailure.EMPTY, "This chapter has no pages")
 
-        val overlays = overlaysFor(document, props)
+        val overlays = runCatching { overlaysFor(document, props) }.getOrDefault(emptyList())
         val offset = props.int("overlayPageOffset") ?: 0
         val byPage = overlays.associate { (offset + it.pageNumber - 1) to it.bubbles }
 
@@ -180,8 +177,18 @@ class MangaTekSource : MangaSource {
 
     override fun imageHeaders(): Map<String, String> = mapOf(
         "Referer" to "$baseUrl/",
+        "Origin" to baseUrl,
         "Accept" to "image/avif,image/webp,image/*,*/*;q=0.8",
     )
+
+    /** Pages come as absolute URLs, but a leading `/` or a protocol-relative host is resolved. */
+    private fun resolveUrl(url: String): String = when {
+        url.isBlank() -> ""
+        url.startsWith("http://") || url.startsWith("https://") -> url
+        url.startsWith("//") -> "https:$url"
+        url.startsWith("/") -> "$baseUrl$url"
+        else -> "$baseUrl/$url"
+    }
 
     override fun webUrl(mangaId: String): String = "$baseUrl/manga/${mangaId.trim('/')}"
 

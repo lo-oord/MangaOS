@@ -33,7 +33,9 @@ enum class AppTheme(val storageKey: String) {
     SHANA("shana"),
     MIKU("miku"),
     NEON("neon"),
-    SKY("sky");
+    SKY("sky"),
+    FOREST("forest"),
+    COFFEE("coffee");
 
     companion object {
         fun fromStorage(value: String?): AppTheme =
