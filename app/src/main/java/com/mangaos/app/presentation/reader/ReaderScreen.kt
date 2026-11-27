@@ -97,6 +97,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.mangaos.app.R
 import com.mangaos.app.core.util.appString
+import com.mangaos.app.core.util.findActivity
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.ui.LocalReduceMotion
@@ -166,7 +167,7 @@ fun ReaderScreen(
     val latestPages = rememberUpdatedState(pages)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val activity = context as? Activity
+    val activity = context.findActivity()
     val window = activity?.window
     val reduceMotion = LocalReduceMotion.current
 
@@ -442,16 +443,13 @@ fun ReaderScreen(
                 slideOutVertically(tween(if (reduceMotion) 0 else 130)) { -it / 3 },
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            ReaderTopToolbar(
+            ReaderTopBar(
                 title = manga?.title.orEmpty(),
                 chapterLabel = chapters.getOrNull(currentChapterIndex)?.let { chapter ->
-                    buildString {
-                        append(appString(R.string.chapter_number, chapter.number))
-                        chapter.title?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
-                    }
+                    appString(R.string.chapter_number, chapter.number)
                 }.orEmpty(),
+                coverUrl = manga?.coverUrl,
                 onBack = onBack,
-                onOpenSettings = { showQuickSettings = true },
             )
         }
 
@@ -468,8 +466,8 @@ fun ReaderScreen(
         ) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = Color.Black.copy(alpha = 0.62f),
-                contentColor = Color.White,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 4.dp),
@@ -477,14 +475,14 @@ fun ReaderScreen(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(12.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 1.5.dp,
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
                         text = stringResource(R.string.reader_loading_previous),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -521,14 +519,9 @@ fun ReaderScreen(
                 0
             }
 
-            ReaderBottomToolbar(
+            ReaderBottomBar(
                 pageInChapter = pageInChapter,
                 chapterSize = chapterSize,
-                percentLabel = if (settings.showProgressPercent) {
-                    "${(readingFraction * 100).toInt()}%"
-                } else {
-                    null
-                },
                 progress = progress,
                 onSeek = { value ->
                     dragging = true
@@ -570,6 +563,9 @@ fun ReaderScreen(
                     }
                 },
                 onOpenChapters = { showChapterSheet = true },
+                onOpenSettings = { showQuickSettings = true },
+                settings = settings,
+                onUpdateSettings = viewModel::updateSettings,
                 neighbourLoading = nextChapterLoading || previousChapterLoading,
                 neighbourError = nextChapterError || previousChapterError,
                 onRetryNeighbour = {
@@ -594,8 +590,12 @@ fun ReaderScreen(
                     .align(Alignment.Center)
                     .padding(Spacing.xl),
                 shape = RoundedCornerShape(18.dp),
-                color = Color.Black.copy(alpha = 0.7f),
-                contentColor = Color.White,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                ),
             ) {
                 Column(
                     modifier = Modifier.padding(Spacing.lg),
@@ -605,7 +605,7 @@ fun ReaderScreen(
                         imageVector = Icons.Outlined.ErrorOutline,
                         contentDescription = null,
                         modifier = Modifier.size(30.dp),
-                        tint = Color.White.copy(alpha = 0.9f),
+                        tint = MaterialTheme.colorScheme.error,
                     )
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
@@ -660,246 +660,11 @@ fun ReaderScreen(
     }
 }
 
-@Composable
-private fun ReaderTopToolbar(
-    title: String,
-    chapterLabel: String,
-    onBack: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha = 0.84f),
-                        Color.Black.copy(alpha = 0.46f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-            .statusBarsPadding()
-            // Taps on the bar itself are not "tap to hide": only the reading area toggles.
-            .pointerInput(Unit) { detectTapGestures { } },
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ReaderToolButton(
-                icon = Icons.AutoMirrored.Outlined.ArrowBack,
-                description = stringResource(R.string.cd_back),
-                enabled = true,
-                onClick = onBack,
-            )
-            Spacer(Modifier.width(Spacing.xxs))
-            Column(modifier = Modifier.weight(1f)) {
-                if (title.isNotBlank()) {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                if (chapterLabel.isNotBlank()) {
-                    Spacer(Modifier.height(1.dp))
-                    Text(
-                        text = chapterLabel,
-                        color = Color.White.copy(alpha = 0.72f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-            ReaderToolButton(
-                icon = Icons.Outlined.Settings,
-                description = stringResource(R.string.reader_settings),
-                enabled = true,
-                onClick = onOpenSettings,
-            )
-        }
-    }
-}
-
 /**
  * One compact bottom bar: a precise chapter progress line, the page counter, and only the
  * three navigation controls. Reading mode, direction and image options stay in the settings
  * sheet reachable from the top bar, so no control is duplicated between the two bars.
  */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReaderBottomToolbar(
-    pageInChapter: Int,
-    chapterSize: Int,
-    percentLabel: String?,
-    progress: Float,
-    onSeek: (Float) -> Unit,
-    onSeekFinished: () -> Unit,
-    canPrevious: Boolean,
-    canNext: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onOpenChapters: () -> Unit,
-    neighbourLoading: Boolean,
-    neighbourError: Boolean,
-    onRetryNeighbour: () -> Unit,
-) {
-    Surface(
-        color = Color.Black.copy(alpha = 0.86f),
-        contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(Unit) { detectTapGestures { } },
-    ) {
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(start = Spacing.md, end = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Text(
-                        text = if (chapterSize > 0) "$pageInChapter / $chapterSize" else "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.78f),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (neighbourLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(11.dp),
-                            color = Color.White.copy(alpha = 0.8f),
-                            strokeWidth = 1.5.dp,
-                        )
-                        Spacer(Modifier.width(Spacing.xs))
-                    }
-                    if (neighbourError) {
-                        TextButton(
-                            onClick = onRetryNeighbour,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = Spacing.xs,
-                                vertical = 0.dp,
-                            ),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Refresh,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Spacer(Modifier.width(Spacing.xxs))
-                            Text(
-                                text = stringResource(R.string.state_error_retry),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                        Spacer(Modifier.width(Spacing.xs))
-                    }
-                    if (percentLabel != null) {
-                        Text(
-                            text = percentLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f),
-                        )
-                    }
-                }
-            }
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Slider(
-                    value = progress,
-                    onValueChange = onSeek,
-                    onValueChangeFinished = onSeekFinished,
-                    enabled = chapterSize > 1,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(24.dp),
-                    thumb = {
-                        Box(
-                            Modifier
-                                .size(9.dp)
-                                .background(Color.White, CircleShape),
-                        )
-                    },
-                    track = { state ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .background(Color.White.copy(alpha = 0.22f), CircleShape),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(state.value)
-                                    .height(3.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
-                            )
-                        }
-                    },
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                ReaderToolButton(
-                    icon = Icons.Outlined.SkipPrevious,
-                    description = stringResource(R.string.reader_previous_chapter),
-                    enabled = canPrevious,
-                    onClick = onPrevious,
-                )
-                ReaderToolButton(
-                    icon = Icons.AutoMirrored.Filled.List,
-                    description = stringResource(R.string.reader_chapters_title),
-                    enabled = true,
-                    onClick = onOpenChapters,
-                )
-                ReaderToolButton(
-                    icon = Icons.Outlined.SkipNext,
-                    description = stringResource(R.string.reader_next_chapter),
-                    enabled = canNext,
-                    onClick = onNext,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReaderToolButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(44.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = if (enabled) Color.White else Color.White.copy(alpha = 0.32f),
-            modifier = Modifier.size(21.dp),
-        )
-    }
-}
-
 /** Chapter picker for the reader; the current chapter is highlighted, nothing else changes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

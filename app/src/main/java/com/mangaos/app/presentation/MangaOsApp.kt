@@ -1,6 +1,7 @@
 package com.mangaos.app.presentation
 
 import android.Manifest
+import android.content.res.Configuration
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
@@ -20,6 +21,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -42,10 +45,16 @@ import com.mangaos.app.core.designsystem.ThemeReveal
 import com.mangaos.app.core.designsystem.colorSchemeFor
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.ui.LocalSnackbarHostState
+import com.mangaos.app.core.ui.components.LanguageTransition
+import com.mangaos.app.core.ui.components.LanguageTransitionOverlay
+import com.mangaos.app.core.util.LocalizedContext
 import com.mangaos.app.core.util.LocaleManager
+import com.mangaos.app.core.util.findActivity
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.presentation.navigation.RootNavHost
+import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlin.math.hypot
 
 /** The palette actually on screen; it catches up with the preference at the end of a reveal. */
@@ -129,14 +138,33 @@ fun MangaOsApp() {
         overlay = null
     }
 
-    // Language changes rebuild the Activity so every resource and the layout direction
-    // switch together; the preference itself is already persisted.
-    var lastLanguage by remember { mutableStateOf(language) }
-    LaunchedEffect(language) {
-        if (language != lastLanguage) {
-            lastLanguage = language
-            (context as? Activity)?.recreate()
+    // Language changes are applied in place: a localized context re-renders every label and the
+    // layout direction flips with it, so the open screen, its scroll position and the reader's
+    // page all survive the switch and the app is never restarted.
+    val languageSwitch by LanguageTransition.pending.collectAsStateWithLifecycle()
+    val locale = remember(language) { LocaleManager.displayLocale(language) }
+    val localizedContext = remember(language, context) { LocalizedContext.of(context, language) }
+    val layoutDirection = if (LocaleManager.isRtl(language)) LayoutDirection.Rtl else LayoutDirection.Ltr
+
+    SideEffect {
+        if (Locale.getDefault() != locale) Locale.setDefault(locale)
+        val activity = context.findActivity() ?: return@SideEffect
+        val resources = activity.resources
+        if (resources.configuration.locales.get(0) == locale) return@SideEffect
+        val configuration = Configuration(resources.configuration).apply {
+            setLocale(locale)
+            setLayoutDirection(locale)
         }
+        @Suppress("DEPRECATION")
+        resources.updateConfiguration(configuration, resources.displayMetrics)
+    }
+
+    // The overlay stays up until the requested language is actually the active one, then leaves.
+    LaunchedEffect(languageSwitch, language) {
+        val pending = languageSwitch ?: return@LaunchedEffect
+        if (pending.code != language) return@LaunchedEffect
+        delay(620)
+        LanguageTransition.finish(pending.code)
     }
 
     MangaOsTheme(theme = applied.theme, dark = applied.dark, amoled = applied.amoled) {
@@ -144,6 +172,8 @@ fun MangaOsApp() {
         CompositionLocalProvider(
             LocalSnackbarHostState provides snackbarHostState,
             LocalReduceMotion provides appSettings.reduceMotion,
+            LocalContext provides localizedContext,
+            LocalLayoutDirection provides layoutDirection,
         ) {
             Box(
                 modifier = Modifier
@@ -159,6 +189,10 @@ fun MangaOsApp() {
                             .fillMaxSize()
                             .padding(innerPadding),
                     )
+                }
+
+                languageSwitch?.let { pending ->
+                    LanguageTransitionOverlay(switch = pending)
                 }
 
                 val reveal = overlay

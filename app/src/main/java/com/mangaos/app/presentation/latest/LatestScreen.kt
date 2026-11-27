@@ -71,6 +71,7 @@ import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.ErrorState
+import com.mangaos.app.core.ui.components.MangaCardContext
 import com.mangaos.app.core.ui.components.MangaGrid
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
 import com.mangaos.app.core.ui.components.MangaList
@@ -204,8 +205,7 @@ fun LatestScreen(
                                     mangas = current.mangas,
                                     onMangaClick = onMangaClick,
                                     gridState = gridState,
-                                    showLatestChapter = true,
-                                    showUpdatedAt = true,
+                                    context = MangaCardContext.LATEST,
                                     footer = footer,
                                 )
                             } else {
@@ -213,8 +213,7 @@ fun LatestScreen(
                                     mangas = current.mangas,
                                     onMangaClick = onMangaClick,
                                     listState = listState,
-                                    showLatestChapter = true,
-                                    showUpdatedAt = true,
+                                    context = MangaCardContext.LATEST,
                                     footer = footer,
                                 )
                             }

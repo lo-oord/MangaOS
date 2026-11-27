@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.ui.components.LanguageTransition
 import com.mangaos.app.core.designsystem.AppTheme
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.designsystem.ThemeMode
@@ -390,7 +391,11 @@ fun SettingsDetailScreen(
                     selected = language == code,
                     onClick = {
                         showLanguageSheet = false
-                        viewModel.setLanguage(code)
+                        if (language != code) {
+                            // Announce the target first: the overlay must never guess a language.
+                            LanguageTransition.begin(code)
+                            viewModel.setLanguage(code)
+                        }
                     },
                 )
             }

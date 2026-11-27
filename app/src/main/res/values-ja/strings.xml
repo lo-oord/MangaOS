@@ -388,4 +388,8 @@
     <string name="profile_username_rule">3〜20文字。英数字、ピリオド、アンダースコアのみ。</string>
     <string name="profile_value_private">非公開</string>
     <string name="error_display_name_length">表示名は40文字以内で入力してください</string>
+    <string name="language_switching_to">%1$s に切り替えています</string>
+    <string name="detail_publication_date">公開日</string>
+    <string name="detail_sort_by">並び替え</string>
+    <string name="detail_story_chapters">チャプター</string>
 </resources>

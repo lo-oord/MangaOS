@@ -2,6 +2,8 @@ package com.mangaos.app.core.util
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.core.text.TextUtilsCompat
+import androidx.core.view.ViewCompat
 import java.util.Locale
 
 /**
@@ -53,6 +55,11 @@ object LocaleManager {
      * that are formatted with arguments.
      */
     fun displayLocale(language: String): Locale = Locale.forLanguageTag("$language-u-nu-latn")
+
+    /** True when the chosen language lays out right-to-left. */
+    fun isRtl(language: String): Boolean =
+        TextUtilsCompat.getLayoutDirectionFromLocale(displayLocale(language)) ==
+            ViewCompat.LAYOUT_DIRECTION_RTL
 
     fun applyTo(context: Context): Context {
         val language = readLanguage(context)

@@ -41,6 +41,7 @@ import com.mangaos.app.core.ui.components.AppDrawer
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppTopBar
 import com.mangaos.app.core.ui.components.ViewModeToggle
+import com.mangaos.app.core.util.findActivity
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.MangaViewMode
@@ -76,7 +77,7 @@ fun MainScaffold(
     )
     var showExitDialog by remember { mutableStateOf(false) }
     var restoredDestination by remember { mutableStateOf(false) }
-    val activity = LocalContext.current as? Activity
+    val activity = LocalContext.current.findActivity()
     val pendingTarget by NavigationRequests.pending.collectAsStateWithLifecycle()
 
     // A notification tap that started the app is applied once the main graph exists.
