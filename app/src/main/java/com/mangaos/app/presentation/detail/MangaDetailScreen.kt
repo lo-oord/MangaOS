@@ -523,6 +523,7 @@ private fun DetailContent(
         )
     }
 }
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailHero(
     manga: Manga,
@@ -987,9 +988,9 @@ private fun DetailActionBar(
  * The first information tier: real rating, real status and the real chapter count, in that
  * order. Anything the source does not provide is simply absent from the row.
  */
-@OptIn(ExperimentalLayoutApi::class)
 /** Labelled rows keep author, artist, year and language aligned and never repeat each other. */
-@OptIn(ExperimentalLayoutApi::class)@Composable
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun ChapterSectionHeader(
     count: Int,
     readCount: Int,
@@ -1193,7 +1194,7 @@ private fun SelectionAction(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChapterRow(
     chapter: Chapter,
