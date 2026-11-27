@@ -1,7 +1,6 @@
 package com.mangaos.app.sources
 
 import com.mangaos.app.sources.implementations.MangaTekSource
-import com.mangaos.app.sources.implementations.ThunderScansSource
 import com.mangaos.app.sources.implementations.mangatek.MangaTekOverlay
 import com.mangaos.app.sources.network.parseEnglishDate
 import com.mangaos.app.sources.network.toEpochFromSecondsOrMillis
@@ -70,21 +69,9 @@ class NativeSourcesTest {
     }
 
     @Test
-    fun `thunder scans reads its reader payload instead of the markup`() {
-        val payload = """
-            {"post_id":707193,"sources":[
-              {"source":"Server 1","images":["https://cdn/0001.webp","https://cdn/0002.webp"]},
-              {"source":"Server 2","images":["https://cdn/other.webp"]}
-            ]}
-        """.trimIndent()
-        val images = ThunderScansSource().parseReaderPayload(payload)
-        assertEquals(listOf("https://cdn/0001.webp", "https://cdn/0002.webp"), images)
-    }
-
-    @Test
     fun `every bundled source is complete and carries its own icon`() {
         val definitions = NativeSourceRegistry.definitions
-        assertEquals(15, definitions.size)
+        assertEquals(12, definitions.size)
         definitions.forEach { definition ->
             val source = definition.factory()
             assertEquals(definition.id, source.id)
@@ -100,8 +87,11 @@ class NativeSourcesTest {
     }
 
     @Test
-    fun `mangatek and thunder scans are not the same implementation twice`() {
-        assertTrue(NativeSourceRegistry.definition("mangatek")!!.factory() !is ThunderScansSource)
-        assertTrue(NativeSourceRegistry.definition("thunderscans")!!.factory() !is MangaTekSource)
+    fun `the registry ships Arabic sources only and never two of the same id`() {
+        val definitions = NativeSourceRegistry.definitions
+        assertTrue(definitions.all { it.lang == "ar" })
+        assertEquals(definitions.size, definitions.map { it.id }.distinct().size)
+        assertTrue(definitions.none { it.id == "thunderscans" || it.id == "asurascans" })
+        assertTrue(NativeSourceRegistry.definition("mangatek")!!.factory() is MangaTekSource)
     }
 }
