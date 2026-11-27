@@ -116,6 +116,16 @@ jobs:
             grep -E "^(e: |FAILURE:|> Task .* FAILED|Could not resolve|Could not find|\\* What went wrong:|Caused by: )" release-build.log | head -40 | while IFS= read -r line; do
               echo "::error title=Gradle::${line}"
             done
+            # Lint fatal issues are only summarised in the Gradle output; print the report so
+            # the failing check is readable from the annotations.
+            for report in $(find app/build -name "lint-results*.txt" -type f 2>/dev/null); do
+              echo "::group::${report}"
+              head -120 "$report"
+              echo "::endgroup::"
+              grep -E ": (Error|Warning): " "$report" | head -40 | while IFS= read -r line; do
+                echo "::error title=Lint::${line}"
+              done
+            done
             exit "$status"
           fi
 
