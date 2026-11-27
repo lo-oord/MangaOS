@@ -34,14 +34,7 @@ val hasReleaseSigning = releaseStoreFile != null &&
 android {
     namespace = "com.mangaos.app"
 
-    // The Mihon extension API (source-api / core-common 1.1.0) is published against
-    // Android 17.2. The app compiles against the same platform so extension classes and
-    // their host implementations share one ABI.
-    compileSdk {
-        version = release(37) {
-            minorApiLevel = 2
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.mangaos.app"
@@ -140,52 +133,10 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // Mihon extension runtime. The API itself is compileOnly for extensions, so the host
-    // must ship the real implementations and every shared library they link against.
-    implementation(libs.mihon.source.api) {
-        exclude(group = "com.github.verizonkert", module = "core-common")
-        // source-api references @Stable only; keep the app's own Compose runtime version.
-        exclude(group = "androidx.compose")
-    }
-    implementation(libs.mihon.core.common) {
-        // These modules belong to the publisher's own app shell and are not on any public
-        // repository. The network/source code paths used here do not reference them.
-        exclude(group = "mihon-kit-project")
-        exclude(group = "mihon-kit-project.core")
-        exclude(group = "ca.mpreg")
-        // Runtime-only helpers for features MangaOS does not call (archive import, storage
-        // providers, Apollo). They are not on the browse/search/read path, and leaving them
-        // in would make dependency resolution depend on JitPack's build service.
-        exclude(group = "com.github.mihon", module = "unifile")
-        exclude(group = "me.zhanghai.android.libarchive", module = "library")
-        exclude(group = "com.github.gpanther", module = "java-nat-sort")
-        exclude(group = "com.apollographql.apollo", module = "apollo-runtime")
-        exclude(group = "com.github.zhanghai.quickjs-java", module = "quickjs-android")
-    }
+    // Native sources: plain HTTP + HTML/JSON parsing. No extension APK is loaded at runtime.
     implementation(libs.okhttp)
-    implementation(libs.okhttp.brotli)
-    implementation(libs.okhttp.dnsoverhttps)
-    // Modern Keiyoushi extensions reference OkHttp's zstd codecs directly. The extension
-    // APK compiles them as host-provided classes, so the host must ship this artifact.
-    implementation(libs.okhttp.zstd)
-    implementation(libs.okio)
     implementation(libs.jsoup)
-    implementation(libs.injekt)
-    implementation(libs.rxjava)
     implementation(libs.kotlinx.serialization.json)
-    // Extensions use the okio bridge for page/list JSON and the protobuf/XML formats when
-    // their source declares them. These are host dependencies, not bundled in the APK.
-    implementation(libs.kotlinx.serialization.json.okio)
-    implementation(libs.kotlinx.serialization.protobuf)
-    implementation(libs.xmlutil.core)
-    implementation(libs.xmlutil.serialization)
-    implementation(libs.androidx.preference.ktx)
-    implementation(libs.quickjs.android)
-    // Loaded by core-common's Cloudflare/WebView interceptors at runtime.
-    implementation(libs.androidx.webkit)
-    implementation(libs.logcat)
-    // Resource type used by the i18n messages those interceptors reference.
-    implementation(libs.moko.resources)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

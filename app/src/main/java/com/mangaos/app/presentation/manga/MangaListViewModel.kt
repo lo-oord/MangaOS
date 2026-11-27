@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 class MangaListViewModel : ViewModel() {
 
     private val repository = ServiceLocator.manga
-    private val extensions = ServiceLocator.extensions
+    private val sources = ServiceLocator.sources
 
     private val _state = MutableStateFlow<UiState<List<Manga>>>(UiState.Loading)
     val state: StateFlow<UiState<List<Manga>>> = _state.asStateFlow()
@@ -36,7 +36,7 @@ class MangaListViewModel : ViewModel() {
     private var loadJob: Job? = null
 
     init {
-        if (extensions.sources.value.isEmpty()) {
+        if (sources.enabledSources.value.isEmpty()) {
             _state.value = UiState.Empty
         } else {
             load()
@@ -44,8 +44,8 @@ class MangaListViewModel : ViewModel() {
         viewModelScope.launch {
             // Re-run only when the set of usable sources actually changes. The initial value is
             // dropped because it was handled above.
-            extensions.sources
-                .map { sources -> sources.map { it.id } }
+            sources.enabledSources
+                .map { list -> list.map { it.id } }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { ids ->
@@ -95,7 +95,7 @@ class MangaListViewModel : ViewModel() {
         }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            if (extensions.sources.value.isEmpty()) {
+            if (sources.enabledSources.value.isEmpty()) {
                 _state.value = UiState.Empty
                 return@launch
             }

@@ -6,31 +6,27 @@ import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.AppNotification
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.Download
-import com.mangaos.app.domain.model.ExtensionFailure
-import com.mangaos.app.domain.model.ExtensionsState
-import com.mangaos.app.domain.model.InstalledExtension
-import com.mangaos.app.domain.model.ManagedExtension
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.NotificationType
 import com.mangaos.app.domain.model.ReadingProgress
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.model.StoredWork
-import com.mangaos.app.domain.model.TransferState
 import com.mangaos.app.domain.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Browsing always happens through the extension that owns the work. */
+/** Browsing always happens through the native source that owns the work. */
 interface MangaRepository {
     suspend fun latest(sourceId: String, page: Int = 1): List<Manga>
     suspend fun popular(sourceId: String, page: Int = 1): List<Manga>
     suspend fun search(sourceId: String, query: String, page: Int = 1): List<Manga>
 
-    /** Aggregated across every installed source, used by the "Manga" tab. */
+    /** Aggregated across every enabled source, used by the "Manga" tab. */
     suspend fun catalogue(): List<Manga>
 
-    /** Aggregated search across every installed source. */
+    /** Aggregated search across every enabled source. */
     suspend fun searchAll(query: String, page: Int = 1): List<Manga>
 
     suspend fun byId(sourceId: String, mangaId: String): Manga?
@@ -46,38 +42,31 @@ interface MangaRepository {
 
 /** A failure that belongs to the source itself, never to the screen. */
 class SourceUnavailableException(
-    val failure: ExtensionFailure,
+    val failure: SourceFailure,
     message: String? = null,
 ) : Exception(message ?: failure.name)
 
-interface ExtensionRepository {
-    val state: StateFlow<ExtensionsState>
-    val installed: StateFlow<Map<String, InstalledExtension>>
-    val transfers: StateFlow<Map<String, TransferState>>
-
-    /** Sources instantiated from installed extensions by the Mihon runtime. */
+/**
+ * The bundled sources and the user's enable/disable choice. There is no installation step:
+ * every source is part of the APK and only its enabled flag changes.
+ */
+interface SourceRepository {
+    /** Every bundled source, with its current enabled flag. */
     val sources: StateFlow<List<SourceInfo>>
 
-    /** Installed extension package -> load failure, so broken extensions stay isolated. */
+    /** Sources usable for new requests, ordered for the picker. */
+    val enabledSources: StateFlow<List<SourceInfo>>
+
+    /** Source id -> last runtime failure, shown next to the source and cleared on success. */
     val failures: StateFlow<Map<String, String>>
 
-    /** True while the extension index is being refreshed (force refresh included). */
-    val refreshing: StateFlow<Boolean>
+    fun setEnabled(sourceId: String, enabled: Boolean)
+    fun isEnabled(sourceId: String): Boolean
 
-    /** Last refresh failure; the previously loaded catalogue is kept when this is set. */
-    val failureState: StateFlow<ExtensionFailure?>
+    /** Lazily created implementation, or null for an unknown id. */
+    fun source(sourceId: String): com.mangaos.app.sources.core.MangaSource?
 
-    /** True when this build can execute extension code, not only install it. */
-    val runtimeAvailable: Boolean
-
-    suspend fun refresh(force: Boolean = false)
-
-    /** Re-reads installed packages (after the system installer or an uninstall). */
-    fun reloadInstalled()
-
-    fun install(extension: ManagedExtension)
-    fun uninstall(pkgName: String)
-    fun canInstallPackages(): Boolean
+    fun reportFailure(sourceId: String, message: String?)
 }
 
 interface LibraryRepository {

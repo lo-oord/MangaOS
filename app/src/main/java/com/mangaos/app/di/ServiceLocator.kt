@@ -2,7 +2,6 @@ package com.mangaos.app.di
 
 import android.content.Context
 import com.mangaos.app.data.download.LocalDownloadRepository
-import com.mangaos.app.data.extension.ExtensionStore
 import com.mangaos.app.data.local.CoverStore
 import com.mangaos.app.data.local.ReaderSettingsRepositoryImpl
 import com.mangaos.app.data.local.SettingsRepositoryImpl
@@ -12,19 +11,20 @@ import com.mangaos.app.data.notifications.NewChapterNotifications
 import com.mangaos.app.data.repository.ChapterWatchStore
 import com.mangaos.app.data.repository.DataStoreLibraryRepository
 import com.mangaos.app.data.repository.DataStoreUserRepository
-import com.mangaos.app.data.repository.ExtensionMangaRepository
 import com.mangaos.app.data.repository.FileNotificationRepository
+import com.mangaos.app.data.repository.NativeMangaRepository
 import com.mangaos.app.data.repository.PersistentLocalStorageRepository
+import com.mangaos.app.data.sources.NativeSourceManager
 import com.mangaos.app.data.work.DownloadScheduler
 import com.mangaos.app.data.work.NewChapterScheduler
 import com.mangaos.app.domain.repository.DownloadRepository
-import com.mangaos.app.domain.repository.ExtensionRepository
 import com.mangaos.app.domain.repository.LibraryRepository
 import com.mangaos.app.domain.repository.LocalStorageRepository
 import com.mangaos.app.domain.repository.MangaRepository
 import com.mangaos.app.domain.repository.NotificationRepository
 import com.mangaos.app.domain.repository.ReaderSettingsRepository
 import com.mangaos.app.domain.repository.SettingsRepository
+import com.mangaos.app.domain.repository.SourceRepository
 import com.mangaos.app.domain.repository.UserRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +51,7 @@ object ServiceLocator {
         private set
     lateinit var user: UserRepository
         private set
-    lateinit var extensions: ExtensionRepository
+    lateinit var sources: SourceRepository
         private set
     lateinit var manga: MangaRepository
         private set
@@ -81,8 +81,9 @@ object ServiceLocator {
         readerSettings = ReaderSettingsRepositoryImpl(dataStore)
         user = DataStoreUserRepository(dataStore, appScope)
         library = DataStoreLibraryRepository(dataStore, appScope)
-        extensions = ExtensionStore(appContext, appScope, settings)
-        manga = ExtensionMangaRepository(extensions, appContext)
+        // Every source is compiled into the app; this only reads and stores the enabled set.
+        sources = NativeSourceManager(dataStore, appScope)
+        manga = NativeMangaRepository(sources)
         localStorage = PersistentLocalStorageRepository(appContext)
         notifications = FileNotificationRepository(appContext, appScope)
         coverStore = CoverStore(appContext)

@@ -7,52 +7,30 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
-import com.mangaos.app.domain.model.ExtensionEntry
-import com.mangaos.app.domain.model.ExtensionFailure
-import com.mangaos.app.domain.model.ExtensionsState
 import com.mangaos.app.domain.model.LanguageFilter
-import com.mangaos.app.domain.model.ManagedExtension
 import com.mangaos.app.domain.model.SourceInfo
-import com.mangaos.app.domain.model.TransferState
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
-sealed interface SourcesEvent {
-    data object Refreshed : SourcesEvent
-    data class Failed(val failure: ExtensionFailure) : SourcesEvent
-}
-
+/**
+ * The Sources screen: a catalogue of the sources compiled into the app and the user's
+ * enable/disable choice. There is nothing to download, install, update or remove.
+ */
 class SourcesViewModel : ViewModel() {
 
-    private val extensions = ServiceLocator.extensions
+    private val repository = ServiceLocator.sources
 
-    val state: StateFlow<ExtensionsState> = extensions.state
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ExtensionsState.Loading)
+    val sources: StateFlow<List<SourceInfo>> = repository.sources
+        .stateIn(viewModelScope, SharingStarted.Eagerly, repository.sources.value)
 
-    val sources: StateFlow<List<SourceInfo>> = extensions.sources
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val enabledCount: StateFlow<Int> = repository.sources
+        .map { list -> list.count { it.enabled } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    val transfers: StateFlow<Map<String, TransferState>> = extensions.transfers
+    val failures: StateFlow<Map<String, String>> = repository.failures
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
-
-    val failures: StateFlow<Map<String, String>> = extensions.failures
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
-
-    val refreshing: StateFlow<Boolean> = extensions.refreshing
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    val failureState: StateFlow<ExtensionFailure?> = extensions.failureState
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
-    val runtimeAvailable: Boolean = extensions.runtimeAvailable
-
-    private val _events = MutableSharedFlow<SourcesEvent>(extraBufferCapacity = 1)
-    val events: SharedFlow<SourcesEvent> = _events.asSharedFlow()
 
     var query by mutableStateOf("")
         private set
@@ -68,46 +46,19 @@ class SourcesViewModel : ViewModel() {
         languageFilter = filter
     }
 
-    fun refresh() {
-        if (refreshing.value) return
-        viewModelScope.launch {
-            runCatching { extensions.refresh(force = true) }
-            val failure = extensions.failureState.value
-                ?: (extensions.state.value as? ExtensionsState.Error)?.failure
-            if (failure != null) {
-                _events.emit(SourcesEvent.Failed(failure))
-            } else {
-                _events.emit(SourcesEvent.Refreshed)
-            }
-        }
+    fun setEnabled(sourceId: String, enabled: Boolean) {
+        repository.setEnabled(sourceId, enabled)
     }
 
-    fun reloadInstalled() = extensions.reloadInstalled()
-
-    fun canInstallPackages(): Boolean = extensions.canInstallPackages()
-
-    fun install(extension: ManagedExtension) = extensions.install(extension)
-
-    fun uninstall(pkgName: String) = extensions.uninstall(pkgName)
-
+    /** Visible sources for the active language filter and search query. */
     fun visibleSources(all: List<SourceInfo>): List<SourceInfo> {
         val empty = SearchText.normalize(query).isEmpty()
         return all.filter { source ->
             languageFilter.matches(listOf(source.lang)) &&
                 (empty ||
                     SearchText.matches(source.name, query) ||
-                    SearchText.matches(source.extensionName, query))
-        }
-    }
-
-    fun visibleExtensions(entries: List<ExtensionEntry>): List<ExtensionEntry> {
-        val empty = SearchText.normalize(query).isEmpty()
-        return entries.filter { entry ->
-            languageFilter.matches(entry.extension.languages) &&
-                (empty ||
-                    SearchText.matches(entry.extension.name, query) ||
-                    SearchText.matches(entry.extension.pkgName, query) ||
-                    entry.extension.baseUrls.any { SearchText.matches(it, query) })
+                    SearchText.matches(source.baseUrl, query) ||
+                    SearchText.matches(source.description, query))
         }
     }
 }

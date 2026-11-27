@@ -163,7 +163,7 @@
     <string name="search_library_placeholder">ابحث في مكتبتك</string>
     <string name="search_sources_placeholder">ابحث في المصادر</string>
     <string name="search_no_results">لا توجد نتائج</string>
-    <string name="state_no_source_title">لا توجد مصادر مثبتة</string>
+    <string name="state_no_source_title">لا توجد مصادر مفعّلة</string>
     <string name="state_no_source_action">فتح المصادر</string>
     <string name="state_source_unavailable">لا يمكن قراءة هذا المصدر بعد</string>
     <string name="source_choose">اختر المصدر</string>
@@ -201,20 +201,8 @@
     <string name="library_saved">في مكتبتك</string>
     <string name="library_not_saved">غير موجود في مكتبتك</string>
     <string name="sources_filter_all">الكل</string>
-    <string name="sources_refresh">تحديث المصادر</string>
-    <string name="sources_install">تثبيت</string>
-    <string name="sources_update">تحديث</string>
-    <string name="sources_installed">مثبّت</string>
-    <string name="sources_remove">حذف المصدر</string>
-    <string name="sources_downloading">جارٍ التنزيل</string>
-    <string name="sources_installing">جارٍ التثبيت</string>
-    <string name="sources_install_failed">فشل التثبيت</string>
-    <string name="sources_index_error">تعذر تحميل قائمة المصادر</string>
     <string name="sources_empty">لا توجد مصادر مطابقة لهذا الفلتر</string>
     <string name="sources_multi_language">متعدد اللغات</string>
-    <string name="sources_permission_title">السماح بتثبيت المصادر</string>
-    <string name="sources_permission_message">يحتاج Android إلى إذنك قبل أن يتمكن MangaOS من تثبيت حزمة مصدر. لن يُثبَّت أي شيء دون تأكيدك.</string>
-    <string name="sources_permission_open">فتح الإعدادات</string>
     <string name="tagline_welcome">عالمك من المانجا، في مكان واحد.</string>
     <string name="tagline_signup">أنشئ حسابك وابدأ رحلتك.</string>
     <string name="tagline_signin">مرحباً بعودتك.</string>
@@ -231,15 +219,6 @@
     <string name="action_continue">متابعة</string>
     <string name="action_sign_in">تسجيل الدخول</string>
     <string name="sources_section_sources">المصادر</string>
-    <string name="sources_section_extensions">الإضافات</string>
-    <string name="sources_open">فتح</string>
-    <string name="sources_incompatible_title">تعذر تشغيل الإضافات المثبتة</string>
-    <string name="sources_incompatible_body">إضافة غير متوافقة</string>
-    <string name="sources_no_usable_title">الإضافات المثبتة لا توفر مصادر قابلة للاستخدام</string>
-    <string name="sources_refresh_done">تم تحديث المصادر</string>
-    <string name="sources_refresh_failed">فشل التحديث: %1$s. تم الاحتفاظ بالقائمة الحالية.</string>
-    <string name="sources_refresh_failed_short">فشل التحديث. تم الاحتفاظ بالقائمة الحالية.</string>
-    <string name="state_no_usable_sources">لا توجد مصادر قابلة للاستخدام</string>
     <string name="reader_chapter_error">تعذر تحميل صفحات الفصل</string>
     <string name="info_webview_required">يتطلب هذا المصدر Android System WebView. ثبّته أو فعّله ثم أعد المحاولة.</string>
     <string name="info_cloudflare_bypass_failure">تعذر على المصدر تجاوز حماية Cloudflare. حاول مرة أخرى لاحقًا.</string>
@@ -467,7 +446,6 @@
     <string name="download_storage_ok">التخزين جاهز للتنزيل</string>
     <string name="download_storage_problem">التخزين غير جاهز: %1$s</string>
     <string name="notif_pages_progress">%1$d من %2$d صورة</string>
-    <string name="sources_section_updates">تحديثات المصادر</string>
 
     <!-- التخزين المحلي والقراءة دون إنترنت -->
     <string name="storage_summary">%1$d عملًا · %2$s</string>
@@ -509,4 +487,9 @@
     <string name="action_close">إغلاق</string>
     <string name="action_more">خيارات إضافية</string>
     <string name="detail_last_read_marker">آخر قراءة</string>
+    <string name="sources_native_summary">المفعّل %1$d من %2$d</string>
+    <string name="sources_native_subtitle">كل المصادر مدمجة داخل MangaOS. فعّل ما تريد التصفح والبحث والتنزيل منه.</string>
+    <string name="sources_state_on">مفعّل</string>
+    <string name="sources_state_off">غير مفعّل</string>
+    <string name="sources_last_error">آخر خطأ: %1$s</string>
 </resources>

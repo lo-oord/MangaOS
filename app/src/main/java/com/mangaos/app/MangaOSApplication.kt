@@ -4,14 +4,12 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
-import com.mangaos.app.data.extension.MihonRuntime
 import com.mangaos.app.di.ServiceLocator
 
 class MangaOSApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-        MihonRuntime.initialize(this)
         ServiceLocator.init(this)
     }
 

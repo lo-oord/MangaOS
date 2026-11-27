@@ -176,7 +176,7 @@
     <string name="search_library_placeholder">Search your library</string>
     <string name="search_sources_placeholder">Search sources</string>
     <string name="search_no_results">No matches</string>
-    <string name="state_no_source_title">No sources installed</string>
+    <string name="state_no_source_title">No sources enabled</string>
     <string name="state_no_source_action">Open sources</string>
     <string name="state_source_unavailable">This source cannot be read yet</string>
     <string name="source_choose">Choose source</string>
@@ -214,20 +214,8 @@
     <string name="library_saved">In your library</string>
     <string name="library_not_saved">Not in your library</string>
     <string name="sources_filter_all">All</string>
-    <string name="sources_refresh">Refresh sources</string>
-    <string name="sources_install">Install</string>
-    <string name="sources_update">Update</string>
-    <string name="sources_installed">Installed</string>
-    <string name="sources_remove">Remove source</string>
-    <string name="sources_downloading">Downloading</string>
-    <string name="sources_installing">Installing</string>
-    <string name="sources_install_failed">Install failed</string>
-    <string name="sources_index_error">The source list could not be loaded</string>
     <string name="sources_empty">No sources match this filter</string>
     <string name="sources_multi_language">Multi-language</string>
-    <string name="sources_permission_title">Allow installing sources</string>
-    <string name="sources_permission_message">Android needs your permission before MangaOS can install a source package. Nothing is installed without your confirmation.</string>
-    <string name="sources_permission_open">Open settings</string>
     <string name="tagline_welcome">Your manga world, in one place.</string>
     <string name="tagline_signup">Create your account and start your journey.</string>
     <string name="tagline_signin">Welcome back.</string>
@@ -244,27 +232,6 @@
     <string name="action_continue">Continue</string>
     <string name="action_sign_in">Sign in</string>
     <string name="sources_section_sources">Sources</string>
-    <string name="sources_section_extensions">Extensions</string>
-    <string name="sources_section_available">Available sources</string>
-    <string name="sources_section_installed">Installed sources</string>
-    <string name="sources_no_available">Every available source is installed.</string>
-    <string name="sources_no_installed">No sources installed yet.</string>
-    <string name="sources_update_available">Update available</string>
-    <string name="sources_cannot_run">This source cannot be started</string>
-    <string name="sources_uninstalling">Removing</string>
-    <string name="sources_uninstall_failed">Remove failed</string>
-    <string name="sources_remove_retry">Retry remove</string>
-    <string name="sources_remove_title">Remove source</string>
-    <string name="sources_remove_message">Remove %1$s from MangaOS? Your library, reading history and downloads will be kept.</string>
-    <string name="sources_remove_confirm">Remove</string>
-    <string name="sources_open">Open</string>
-    <string name="sources_incompatible_title">Installed extensions could not be started</string>
-    <string name="sources_incompatible_body">Incompatible extension</string>
-    <string name="sources_no_usable_title">Installed extensions provide no usable sources</string>
-    <string name="sources_refresh_done">Sources refreshed</string>
-    <string name="sources_refresh_failed">Refresh failed: %1$s. The current list was kept.</string>
-    <string name="sources_refresh_failed_short">Refresh failed. Current list kept.</string>
-    <string name="state_no_usable_sources">No usable sources</string>
     <string name="reader_chapter_error">Chapter pages could not be loaded</string>
     <string name="info_webview_required">Android System WebView is required to open this source. Install or enable it, then retry.</string>
     <string name="info_cloudflare_bypass_failure">The source could not get past Cloudflare protection. Try again later.</string>
@@ -493,7 +460,6 @@
     <string name="download_storage_ok">Storage is ready for downloads</string>
     <string name="download_storage_problem">Storage is not ready: %1$s</string>
     <string name="notif_pages_progress">%1$d / %2$d images</string>
-    <string name="sources_section_updates">Source updates</string>
 
     <!-- Local library and offline reading -->
     <string name="storage_summary">%1$d works · %2$s</string>
@@ -535,4 +501,9 @@
     <string name="action_close">Close</string>
     <string name="action_more">More options</string>
     <string name="detail_last_read_marker">Last read</string>
+    <string name="sources_native_summary">%1$d enabled of %2$d</string>
+    <string name="sources_native_subtitle">Every source is built into MangaOS. Turn on the ones you want to browse, search and download from.</string>
+    <string name="sources_state_on">Enabled</string>
+    <string name="sources_state_off">Disabled</string>
+    <string name="sources_last_error">Last error: %1$s</string>
 </resources>

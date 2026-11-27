@@ -9,7 +9,7 @@ import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Chapter
 import com.mangaos.app.domain.model.ChapterOrder
 import com.mangaos.app.domain.model.ChapterSort
-import com.mangaos.app.domain.model.ExtensionFailure
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.ReadingProgress
 import com.mangaos.app.domain.repository.SourceUnavailableException
@@ -20,12 +20,12 @@ import kotlinx.coroutines.launch
 
 sealed interface DetailUiState {
     data object Loading : DetailUiState
-    data class Error(val failure: ExtensionFailure, val cached: Manga?) : DetailUiState
+    data class Error(val failure: SourceFailure, val cached: Manga?) : DetailUiState
     data class Content(
         val manga: Manga,
         val chapters: List<Chapter>,
         val chaptersLoading: Boolean,
-        val chaptersFailure: ExtensionFailure?,
+        val chaptersFailure: SourceFailure?,
     ) : DetailUiState
 }
 
@@ -80,7 +80,7 @@ class MangaDetailViewModel : ViewModel() {
                 chapters = sortChapters(chaptersResult.getOrDefault(emptyList())),
                 chaptersLoading = false,
                 chaptersFailure = chaptersResult.exceptionOrNull()?.let { error ->
-                    (error as? SourceUnavailableException)?.failure ?: ExtensionFailure.NETWORK
+                    (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK
                 },
             )
         }
@@ -110,8 +110,8 @@ class MangaDetailViewModel : ViewModel() {
         }
     }
 
-    private fun Result<*>.failureOrDefault(): ExtensionFailure {
-        val error = exceptionOrNull() ?: return ExtensionFailure.NETWORK
-        return (error as? SourceUnavailableException)?.failure ?: ExtensionFailure.NETWORK
+    private fun Result<*>.failureOrDefault(): SourceFailure {
+        val error = exceptionOrNull() ?: return SourceFailure.NETWORK
+        return (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK
     }
 }

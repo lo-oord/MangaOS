@@ -9,21 +9,6 @@
     <!-- A download keeps running while the app is in the background. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- Installing a source package is always a user-confirmed system install. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Removing a source goes through the same user-confirmed system package installer. -->
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-    <!-- Needed to discover already installed extensions and their versions. -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
 
     <application
         android:name=".MangaOSApplication"

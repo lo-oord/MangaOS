@@ -102,7 +102,7 @@ import com.mangaos.app.domain.model.Download
 import com.mangaos.app.domain.model.DownloadChapter
 import com.mangaos.app.domain.model.DownloadChapterState
 import com.mangaos.app.domain.model.findChapter
-import com.mangaos.app.domain.model.ExtensionFailure
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.ReadingProgress
@@ -1270,7 +1270,7 @@ private fun ChapterActionRow(
 }
 
 @Composable
-private fun ChapterFailure(failure: ExtensionFailure, onRetry: () -> Unit) {
+private fun ChapterFailure(failure: SourceFailure, onRetry: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1279,7 +1279,7 @@ private fun ChapterFailure(failure: ExtensionFailure, onRetry: () -> Unit) {
     ) {
         Text(
             text = stringResource(
-                if (failure == ExtensionFailure.OFFLINE) R.string.state_offline else R.string.detail_chapters_error,
+                if (failure == SourceFailure.OFFLINE) R.string.state_offline else R.string.detail_chapters_error,
             ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1307,7 +1307,7 @@ private fun DetailLoading(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DetailFailure(
-    failure: ExtensionFailure,
+    failure: SourceFailure,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenSources: () -> Unit,
@@ -1323,7 +1323,7 @@ private fun DetailFailure(
         }
         Box(modifier = Modifier.weight(1f)) {
             when (failure) {
-                ExtensionFailure.OFFLINE, ExtensionFailure.NETWORK -> EmptyState(
+                SourceFailure.OFFLINE, SourceFailure.NETWORK -> EmptyState(
                     icon = Icons.Outlined.CloudOff,
                     title = stringResource(R.string.state_offline),
                     actionLabel = stringResource(R.string.state_error_retry),

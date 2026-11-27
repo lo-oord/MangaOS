@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
-import com.mangaos.app.domain.model.ExtensionFailure
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.repository.SourceUnavailableException
@@ -33,19 +33,16 @@ import kotlinx.coroutines.sync.withPermit
 sealed interface LatestUiState {
     data object Loading : LatestUiState
     data object NoSources : LatestUiState
-
-    /** Extensions are installed but none of them produced a usable source. */
-    data object NoUsableSources : LatestUiState
     data object Empty : LatestUiState
 
     data class Content(
         val mangas: List<Manga>,
         val loadingMore: Boolean = false,
         val endReached: Boolean = false,
-        val appendError: ExtensionFailure? = null,
+        val appendError: SourceFailure? = null,
     ) : LatestUiState
 
-    data class Error(val failure: ExtensionFailure) : LatestUiState
+    data class Error(val failure: SourceFailure) : LatestUiState
 }
 
 sealed interface LatestSearchState {
@@ -58,18 +55,18 @@ sealed interface LatestSearchState {
         val totalSources: Int,
     ) : LatestSearchState
 
-    data class Error(val failure: ExtensionFailure) : LatestSearchState
+    data class Error(val failure: SourceFailure) : LatestSearchState
 }
 
 class LatestViewModel : ViewModel() {
 
     private val repository = ServiceLocator.manga
-    private val extensions = ServiceLocator.extensions
+    private val sourcesRepository = ServiceLocator.sources
     private val settings = ServiceLocator.settings
 
-    val sources: StateFlow<List<SourceInfo>> = combine(extensions.sources, extensions.installed) { list, installed ->
-        list.filter { it.pkgName in installed }.sortedBy { source -> source.name.lowercase() }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Every enabled source: the Latest tab falls back to its popular listing when needed. */
+    val sources: StateFlow<List<SourceInfo>> = sourcesRepository.enabledSources
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val selectedSourceId: StateFlow<String?> = settings.latestSourceId
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -91,10 +88,10 @@ class LatestViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            combine(settings.latestSourceId, extensions.sources, extensions.installed) { id, sources, installed ->
-                Triple(id, sources, installed)
-            }.collectLatest { (id, sources, installed) ->
-                if (query.isBlank()) load(id, sources, installed.isNotEmpty())
+            combine(settings.latestSourceId, sourcesRepository.enabledSources) { id, enabled ->
+                id to enabled
+            }.collectLatest { (id, enabled) ->
+                if (query.isBlank()) load(id, enabled)
             }
         }
     }
@@ -124,8 +121,7 @@ class LatestViewModel : ViewModel() {
             searchJob = viewModelScope.launch { search(query.trim()) }
             return
         }
-        viewModelScope.launch { extensions.refresh(force = true) }
-        load(selectedSourceId.value, extensions.sources.value, extensions.installed.value.isNotEmpty())
+        load(selectedSourceId.value, sourcesRepository.enabledSources.value)
     }
 
     fun clearSearch() {
@@ -133,7 +129,7 @@ class LatestViewModel : ViewModel() {
         searchJob?.cancel()
         _searchState.value = LatestSearchState.Idle
         if (_state.value !is LatestUiState.Content) {
-            load(selectedSourceId.value, extensions.sources.value, extensions.installed.value.isNotEmpty())
+            load(selectedSourceId.value, sourcesRepository.enabledSources.value)
         }
     }
 
@@ -171,22 +167,18 @@ class LatestViewModel : ViewModel() {
                 if (error is CancellationException) return@onFailure
                 _state.value = content.copy(
                     loadingMore = false,
-                    appendError = (error as? SourceUnavailableException)?.failure ?: ExtensionFailure.NETWORK,
+                    appendError = (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK,
                 )
             }
         }
     }
 
-    private fun load(preferred: String?, sources: List<SourceInfo>, hasInstalledExtensions: Boolean) {
+    private fun load(preferred: String?, sources: List<SourceInfo>) {
         loadJob?.cancel()
         enrichJob?.cancel()
         if (sources.isEmpty()) {
             currentSource = null
-            _state.value = if (hasInstalledExtensions) {
-                LatestUiState.NoUsableSources
-            } else {
-                LatestUiState.NoSources
-            }
+            _state.value = LatestUiState.NoSources
             return
         }
         val chosen = sources.firstOrNull { it.id == preferred } ?: sources.first()
@@ -210,16 +202,16 @@ class LatestViewModel : ViewModel() {
             }.onFailure { error ->
                 if (error is CancellationException) return@onFailure
                 _state.value = LatestUiState.Error(
-                    (error as? SourceUnavailableException)?.failure ?: ExtensionFailure.NETWORK,
+                    (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK,
                 )
             }
         }
     }
 
     /**
-     * Latest feeds do not carry a chapter in the shared source API. Older Mihon clients get
-     * that number from the library; MangaOS resolves it from the source after showing the
-     * covers, so the feed stays fast and the badge appears as soon as it is real.
+     * Some sources do not return the newest chapter with their list payload. MangaOS resolves
+     * it from the source after showing the covers, so the feed stays fast and the badge only
+     * appears once it is real.
      */
     private fun enrichLatest(mangas: List<Manga>) {
         enrichJob?.cancel()
@@ -258,11 +250,11 @@ class LatestViewModel : ViewModel() {
     }
 
     private suspend fun search(text: String) {
-        // Search the same scope the Manga tab uses (every loaded source from the extension
-        // runtime), not the screen's filtered list, so a query never stays inside one source.
-        val allSources = extensions.sources.value
+        // Search the same scope the Manga tab uses (every enabled source), not the screen's
+        // filtered list, so a query never stays inside one source.
+        val allSources = sourcesRepository.enabledSources.value
         if (allSources.isEmpty()) {
-            _searchState.value = LatestSearchState.Error(ExtensionFailure.NO_SOURCES)
+            _searchState.value = LatestSearchState.Error(SourceFailure.NO_SOURCES)
             return
         }
         _searchState.value = LatestSearchState.Loading
@@ -302,7 +294,7 @@ class LatestViewModel : ViewModel() {
             }
             channel.close()
             if (merged.isEmpty() && failures.size == allSources.size) {
-                _searchState.value = LatestSearchState.Error(ExtensionFailure.NETWORK)
+                _searchState.value = LatestSearchState.Error(SourceFailure.NETWORK)
             }
         }
     }

@@ -67,7 +67,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.EmptyState
@@ -79,8 +78,7 @@ import com.mangaos.app.core.ui.components.MangaListSkeleton
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.AppSettings
-import com.mangaos.app.domain.model.ExtensionFailure
-import com.mangaos.app.domain.model.ExtensionsState
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.SourceInfo
@@ -103,7 +101,6 @@ fun LatestScreen(
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
     val selectedSourceId by viewModel.selectedSourceId.collectAsStateWithLifecycle()
-    val extensionState by ServiceLocator.extensions.state.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val prefs by ServiceLocator.settings.appSettings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -119,10 +116,6 @@ fun LatestScreen(
     var radialOrigin by remember { mutableStateOf(Offset.Zero) }
     var radialSelection by remember { mutableStateOf<Int?>(null) }
 
-    val icons = remember(extensionState) {
-        val content = extensionState as? ExtensionsState.Content
-        content?.entries.orEmpty().associate { it.extension.pkgName to it.extension.iconUrl }
-    }
     val selectedSource = sources.firstOrNull { it.id == selectedSourceId } ?: sources.firstOrNull()
 
     fun vibrate() {
@@ -179,20 +172,14 @@ fun LatestScreen(
                             actionLabel = stringResource(R.string.state_no_source_action),
                             onAction = onOpenSources,
                         )
-                        LatestUiState.NoUsableSources -> EmptyState(
-                            icon = Icons.Outlined.Extension,
-                            title = stringResource(R.string.state_no_usable_sources),
-                            actionLabel = stringResource(R.string.state_no_source_action),
-                            onAction = onOpenSources,
-                        )
                         LatestUiState.Empty -> EmptyState(
                             icon = Icons.Outlined.SearchOff,
                             title = stringResource(R.string.state_empty_title),
                         )
                         is LatestUiState.Error -> when (current.failure) {
-                            ExtensionFailure.OFFLINE, ExtensionFailure.NETWORK -> ErrorState(
+                            SourceFailure.OFFLINE, SourceFailure.NETWORK -> ErrorState(
                                 onRetry = viewModel::retry,
-                                offline = current.failure == ExtensionFailure.OFFLINE,
+                                offline = current.failure == SourceFailure.OFFLINE,
                             )
                             else -> EmptyState(
                                 icon = Icons.Outlined.CloudOff,
@@ -240,7 +227,6 @@ fun LatestScreen(
         if (sources.isNotEmpty()) {
             CompactSourceButton(
                 source = selectedSource,
-                iconUrl = selectedSource?.let { icons[it.pkgName] },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .navigationBarsPadding()
@@ -294,7 +280,6 @@ fun LatestScreen(
         if (radialOpen) {
             RadialSourceSelector(
                 sources = sources.take(MAX_RADIAL),
-                icons = icons,
                 center = radialCenter,
                 selectedIndex = radialSelection,
             )
@@ -304,7 +289,6 @@ fun LatestScreen(
     if (showSourcePicker) {
         SourcePickerSheet(
             sources = sources,
-            icons = icons,
             selectedId = selectedSource?.id,
             onSelect = {
                 viewModel.selectSource(it)
@@ -417,7 +401,6 @@ private fun FeedFooter(
 @Composable
 private fun CompactSourceButton(
     source: SourceInfo?,
-    iconUrl: String?,
     onClick: () -> Unit,
     onLongPressStart: (Offset) -> Unit,
     onLongPressMove: (Offset) -> Unit,
@@ -449,7 +432,7 @@ private fun CompactSourceButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            SourceBadge(source = source, iconUrl = iconUrl)
+            SourceBadge(source = source)
             Text(
                 text = source?.name ?: stringResource(R.string.source_choose),
                 style = MaterialTheme.typography.labelMedium,
@@ -524,7 +507,6 @@ private fun Modifier.radialPointerInput(
 @Composable
 private fun RadialSourceSelector(
     sources: List<SourceInfo>,
-    icons: Map<String, String?>,
     center: Offset,
     selectedIndex: Int?,
 ) {
@@ -572,7 +554,7 @@ private fun RadialSourceSelector(
                 shadowElevation = if (selected) 10.dp else 3.dp,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    SourceBadge(source = source, iconUrl = icons[source.pkgName])
+                    SourceBadge(source = source)
                 }
             }
         }
@@ -595,22 +577,22 @@ private fun RadialSourceSelector(
     }
 }
 
+/** Bundled sources have no remote icon: a stable monogram keeps the picker self-contained. */
 @Composable
-private fun SourceBadge(source: SourceInfo?, iconUrl: String?) {
-    if (iconUrl != null) {
-        AsyncImage(
-            model = iconUrl,
-            contentDescription = source?.name,
-            modifier = Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(8.dp)),
-        )
-    } else {
-        Icon(
-            imageVector = Icons.Outlined.Extension,
-            contentDescription = source?.name,
-            modifier = Modifier.size(24.dp),
-        )
+private fun SourceBadge(source: SourceInfo?) {
+    val initial = source?.name?.trim()?.take(1)?.uppercase().orEmpty()
+    Surface(
+        modifier = Modifier.size(30.dp),
+        shape = RoundedCornerShape(9.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = initial.ifBlank { "?" },
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
     }
 }
 

@@ -49,7 +49,7 @@ fun MangaListScreen(
     val viewModel: MangaListViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val libraryIds by ServiceLocator.library.ids.collectAsStateWithLifecycle()
-    val sources by ServiceLocator.extensions.sources.collectAsStateWithLifecycle()
+    val sources by ServiceLocator.sources.enabledSources.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
 

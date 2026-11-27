@@ -1,7 +1,9 @@
 package com.mangaos.app.presentation.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
@@ -36,13 +36,12 @@ import com.mangaos.app.domain.model.SourceInfo
 import java.util.Locale
 
 /**
- * Compact installed-source picker. It never covers the whole screen: the list is capped in
+ * Compact enabled-source picker. It never covers the whole screen: the list is capped in
  * height so the screen underneath stays visible while choosing.
  */
 @Composable
 fun SourcePickerSheet(
     sources: List<SourceInfo>,
-    icons: Map<String, String?>,
     selectedId: String?,
     onSelect: (String) -> Unit,
     onManage: () -> Unit,
@@ -63,9 +62,8 @@ fun SourcePickerSheet(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 items(sources, key = { it.id }) { source ->
-                    SourceRow(
+                    SourcePickerRow(
                         source = source,
-                        icon = icons[source.pkgName],
                         selected = source.id == selectedId,
                         onClick = { onSelect(source.id) },
                     )
@@ -84,9 +82,8 @@ fun SourcePickerSheet(
 }
 
 @Composable
-private fun SourceRow(
+private fun SourcePickerRow(
     source: SourceInfo,
-    icon: String?,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -98,31 +95,36 @@ private fun SourceRow(
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
-            AsyncImage(
-                model = icon,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Outlined.Extension,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp),
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = source.name.trim().take(1).uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
         Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = source.name,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = source.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = source.baseUrl.removePrefix("https://").removePrefix("http://"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Text(
             text = languageName(source.lang),
             style = MaterialTheme.typography.labelSmall,
