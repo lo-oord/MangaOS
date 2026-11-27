@@ -43,15 +43,48 @@ app/src/main/java/com/mangaos/app/
 
 ## المصادر
 
-- الفهرس مدمج في `MihonIndexParser` ويُقرأ عند فتح شاشة المصادر (مع نسخة مخبأة عند انقطاع الشبكة).
-- المستخدم يرى المصادر فقط: لا يظهر اسم المستودع ولا رابطه ولا صيغة الفهرس في أي مكان.
-- التثبيت يمرّ عبر `PackageInstaller` بعد فحص اسم الحزمة وإصدار الـ APK، وبعد موافقة المستخدم
-  على «تثبيت التطبيقات غير المعروفة» (`ACTION_MANAGE_UNKNOWN_APP_SOURCES`).
-- **وقت التشغيل**: التطبيق يضمّ تنفيذ Mihon الحقيقي (`source-api` + `core-common`) ويسجّل
-  الخدمات التي تحقنها الإضافات (Context، `NetworkHelper`، OkHttp، Jsoup، RxJava، Injekt،
-  QuickJS). تُحمَّل حزم الإضافات المثبتة بـ `DelegateLastClassLoader`، وتُقرأ الفئات المعلنة في
-  بيان الإضافة فقط. كل طلب بحث/تفاصيل/فصول/صور يمر عبر `MihonRuntime`، والفشل في إضافة واحدة
-  لا يعطّل البقية. راجع «Sources and Mihon extensions» أدناه للتفاصيل.
+خمسة عشر مصدراً أصلياً مدمجاً داخل التطبيق (`Native In-App Sources`)، كل واحد بتنفيذه الخاص
+داخل `app/src/main/java/com/mangaos/app/sources/implementations/`:
+
+| المصدر | اللغة | العنوان |
+| --- | --- | --- |
+| MangaTek | ar | mangatek.com |
+| Kawaii Manga | fr | www.mangakawaii.fr |
+| Despair Manga | ar | despair-world.com |
+| ProComic | ar | procomic.pro |
+| MangaAr | ar | mangaar.com |
+| Thunder Scans | en | en-thunderscans.com |
+| Asura Scans | en | asurascans.com |
+| Team X Manga | ar | olympustaff.com |
+| Azora | ar | azorafly.com |
+| Manga Dar | ar | mangadar.com |
+| Manga Origin | ar | teammangaorigin.blogspot.com |
+| Manga Swat | ar | meshmanga.com |
+| Manga Tik | ar | mangatik.com |
+| Manga Time | ar | mangatime.org |
+| Dilar | ar | dilar.tube |
+
+- لا يوجد تثبيت أو تحديث أو مستودع إضافات: كل مصدر جزء من الـ APK، ويُفعّل أو يُعطّل من شاشة
+  المصادر فقط. الحالة محفوظة في DataStore ولا تمسّ المكتبة أو سجل القراءة أو التنزيلات.
+- لكل مصدر آلية اتصال خاصة به: HTML مع Jsoup، أو واجهة JSON، أو feeds، أو tRPC. لا يُفرض
+  Parser موحّد على الجميع، والواجهة المشتركة (`MangaSource`) تحدّد فقط كيف يتحدّث التطبيق مع المصدر.
+- معرّف المصدر ثابت (`SourceDefinition.id`)، والعمل يُخزَّن دائماً كمفتاح `sourceId/id`، فلا تختلط
+  الأعمال المتشابهة من مصادر مختلفة.
+- أيقونة كل مصدر أصلية داخل `res/drawable-nodpi/source_<id>.png` وتظهر بجانب اسمه.
+- **MangaTek**: صفحاته قد تحمل نص الترجمة كطبقة منفصلة عن الصورة (فقاعات بمواضعها). تُفكّ
+  الطبقة (`MangaTekOverlay`) وتُرسم فوق الصورة في خطّ صور واحد يشترك فيه القارئ والتنزيلات
+  (`OverlayImageInterceptor`)، فلا تُفقد الترجمة ولا يختل موضع الفقاعات.
+
+`tools/verify_native_sources.py` يفحص المصادر الحقيقية (بحث ← تفاصيل ← فصول ← صفحات) بنفس قواعد
+الاستخراج، ويُشغَّل يدوياً من المستودع.
+
+### حدود معروفة
+
+- ProComic و Dilar يعرضان صفحات الفصول داخل قارئ برمجي على الموقع نفسه (الصور تُبنى أو تُفكّ
+  تشفيرها في المتصفح)، لذلك يظهر الفصل ورسالة واضحة بدل قائمة صفحات ناقصة.
+- بعض المواقع تحجب شبكات البيانات/الخوادم (MangaTek, Manga Dar, Dilar وبعض مسارات
+  Mangakawaii) بـ Cloudflare، فلا يمكن التحقق منها من بيئة الفحص؛ تبقى التنفيذات مبنية على
+  آلية كل إضافة أصلية.
 
 ## البناء والتوقيع
 
@@ -104,32 +137,10 @@ tools/setup-signing.sh owner/repo # أو حدّد المستودع صراحةً
 - التنزيلات تُنفَّذ بالتتابع (مهمة واحدة في الوقت نفسه) لضمان استقرار الذاكرة والشبكة.
 - لا بيانات تجريبية: التطبيق لا يعرض أي مانجا من صنعه.
 
-## Sources and Mihon extensions
+## Sources
 
-MangaOS loads the same extension APKs that Mihon/Keiyoushi publish and runs their source code
-inside the app; it does not scrape the sites itself.
-
-- The extension catalogue is the Keiyoushi `index.pb`. The parser reads the repository's
-  nested container (`field 101 -> repeated field 1`) and still accepts the older flat layout.
-- Installing/updating downloads the APK, verifies package name, version and size, and hands it
-  to Android's `PackageInstaller`. Removing uses the system uninstall dialog.
-- Installed APKs are loaded with a delegate-last class loader (child-first below Android 8).
-  Extensions resolve the real Mihon API (`source-api` + `core-common`), OkHttp, Jsoup, RxJava
-  and Injekt from the host, exactly as they do inside Mihon.
-- Only classes declared in the extension manifest (`tachiyomi.extension.class` /
-  `tachiyomi.extension.factory`) are instantiated. A broken extension is reported in the
-  Sources screen and never stops the other extensions from loading.
-- Every browse/search/detail/chapter/page call goes through `MihonRuntime`, serialized per
-  source because extension sources are stateful. Images are fetched by the reader with the
-  headers the source requires (Referer/User-Agent/cookies).
-
-The Sources screen lists the sources that actually loaded, plus the extension catalogue with
-install/update/remove actions, language filters, live search and distinct loading, empty,
-offline, error, incompatible and no-usable-source states.
-
-### Known limits
-
-- Extension installation requires the "install unknown apps" permission for MangaOS.
-- Some extensions need a WebView (Cloudflare) or a source login; sign-in screens are not
-  implemented, so only sources that work without interactive login are usable.
-- The size of the extension index and APK downloads is capped (4 MiB / 40 MiB).
+Every source is a Kotlin implementation compiled into the APK; no extension APK is installed or
+loaded at runtime. `NativeSourceRegistry` lists them, `NativeSourceManager` stores the
+enable/disable choice, and `NativeMangaRepository` runs each call isolated so one broken site
+cannot affect the others. `tools/verify_native_sources.py` checks the live sites with the same
+parsing rules as the app.

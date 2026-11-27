@@ -1,5 +1,6 @@
 package com.mangaos.app.presentation.sources
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -212,12 +215,23 @@ private fun SourceRow(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = source.name.trim().take(1).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = if (source.enabled) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val icon = source.iconRes
+            if (icon != null) {
+                // The source's own icon keeps its square aspect ratio instead of being cropped.
+                Image(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(32.dp),
+                )
+            } else {
+                Text(
+                    text = source.name.trim().take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (source.enabled) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Spacer(Modifier.width(Spacing.sm))
         Column(modifier = Modifier.weight(1f)) {

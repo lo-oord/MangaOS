@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mangaos.app.sources.images.OverlayImageInterceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -74,6 +75,9 @@ class LocalDownloadRepository(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
+        // Downloaded pages go through the same overlay pipeline as the reader, so a page whose
+        // translation is a separate text layer is stored complete.
+        .addInterceptor(OverlayImageInterceptor)
         .build()
 
     @Volatile

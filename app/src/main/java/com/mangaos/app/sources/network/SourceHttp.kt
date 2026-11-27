@@ -19,9 +19,13 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 
 /**
  * Small network layer shared by the native sources. It owns the OkHttp client, the retry
@@ -44,11 +48,54 @@ class SourceHttp(
         .retryOnConnectionFailure(true)
         .build()
 
-    suspend fun text(url: String, headers: Map<String, String> = emptyMap()): String {
+    suspend fun text(url: String, headers: Map<String, String> = emptyMap()): String =
+        execute(url, headers, body = null, contentType = null)
+
+    /** The page as a parsed document; relative links are resolved against [url]. */
+    suspend fun document(url: String, headers: Map<String, String> = emptyMap()): Document {
+        val payload = text(url, headers)
+        return try {
+            Jsoup.parse(payload, url)
+        } catch (error: Exception) {
+            throw SourceException(SourceFailure.PARSING, "Invalid HTML from $url", error)
+        }
+    }
+
+    suspend fun json(url: String, headers: Map<String, String> = emptyMap()): JsonElement {
+        val payload = text(url, headers)
+        return parseJson(payload, url)
+    }
+
+    /** POST with a JSON or form body; sites that only accept POST are never scraped with GET. */
+    suspend fun post(
+        url: String,
+        body: String,
+        contentType: String = "application/json; charset=utf-8",
+        headers: Map<String, String> = emptyMap(),
+    ): String = execute(url, headers, body, contentType)
+
+    suspend fun postJson(
+        url: String,
+        body: String,
+        headers: Map<String, String> = emptyMap(),
+    ): JsonElement = parseJson(post(url, body, headers = headers), url)
+
+    fun parseJson(payload: String, url: String): JsonElement = try {
+        JSON.parseToJsonElement(payload)
+    } catch (error: Exception) {
+        throw SourceException(SourceFailure.PARSING, "Invalid JSON from $url", error)
+    }
+
+    private suspend fun execute(
+        url: String,
+        headers: Map<String, String>,
+        body: String?,
+        contentType: String?,
+    ): String {
         var last: Throwable? = null
         repeat(ATTEMPTS) { attempt ->
             try {
-                return execute(url, headers)
+                return request(url, headers, body, contentType)
             } catch (error: IOException) {
                 last = error
                 if (attempt < ATTEMPTS - 1) kotlinx.coroutines.delay(250L * (attempt + 1))
@@ -60,27 +107,28 @@ class SourceHttp(
         throw last.toSourceException()
     }
 
-    suspend fun json(url: String, headers: Map<String, String> = emptyMap()): JsonElement {
-        val payload = text(url, headers)
-        return try {
-            JSON.parseToJsonElement(payload)
-        } catch (error: Exception) {
-            throw SourceException(SourceFailure.PARSING, "Invalid JSON from $url", error)
-        }
-    }
-
-    private suspend fun execute(url: String, headers: Map<String, String>): String {
-        val request = Request.Builder()
+    private suspend fun request(
+        url: String,
+        headers: Map<String, String>,
+        body: String?,
+        contentType: String?,
+    ): String {
+        val builder = Request.Builder()
             .url(url)
             .header("User-Agent", userAgent)
             .header("Accept-Language", "ar,en;q=0.8,ja;q=0.6")
+            .header("Accept", if (body == null) "text/html,application/json,*/*" else "*/*")
             .apply {
                 defaultHeaders.forEach { (key, value) -> header(key, value) }
                 headers.forEach { (key, value) -> header(key, value) }
             }
-            .get()
-            .build()
-        val call = client.newCall(request)
+        if (body == null) {
+            builder.get()
+        } else {
+            val mediaType = (contentType ?: "application/json; charset=utf-8").toMediaType()
+            builder.post(body.toRequestBody(mediaType))
+        }
+        val call = client.newCall(builder.build())
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { runCatching { call.cancel() } }
             call.enqueue(object : Callback {
@@ -90,7 +138,7 @@ class SourceHttp(
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
-                        val body = runCatching { it.body.string() }.getOrElse { error ->
+                        val payload = runCatching { it.body.string() }.getOrElse { error ->
                             if (continuation.isActive) {
                                 continuation.resumeWithException(error)
                             }
@@ -108,7 +156,7 @@ class SourceHttp(
                             }
                             return
                         }
-                        if (body.isBlank()) {
+                        if (payload.isBlank()) {
                             if (continuation.isActive) {
                                 continuation.resumeWithException(
                                     SourceException(SourceFailure.EMPTY, "Empty response from $url"),
@@ -116,7 +164,7 @@ class SourceHttp(
                             }
                             return
                         }
-                        if (continuation.isActive) continuation.resume(body)
+                        if (continuation.isActive) continuation.resume(payload)
                     }
                 }
             })
@@ -144,7 +192,7 @@ class SourceHttp(
 
         const val ANDROID_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
     }
 }
 
@@ -160,6 +208,8 @@ fun JsonObject?.long(key: String): Long? = when (val value = this?.get(key) as? 
     null -> null
     else -> value.longOrNull ?: value.contentOrNull?.toLongOrNull()
 }
+
+fun JsonObject?.int(key: String): Int? = long(key)?.toInt()
 
 fun JsonObject?.double(key: String): Double? = when (val value = this?.get(key) as? JsonPrimitive) {
     null -> null
@@ -178,3 +228,7 @@ fun JsonObject?.stringList(key: String): List<String> = this?.array(key)
         }
     }
     .orEmpty()
+
+/** A primitive that may be a number or a string, as several sites mix the two. */
+fun JsonObject?.raw(key: String): String? =
+    (this?.get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }

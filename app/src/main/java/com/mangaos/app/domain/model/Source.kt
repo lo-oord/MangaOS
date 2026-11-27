@@ -15,6 +15,8 @@ data class SourceInfo(
     val version: String,
     val capabilities: Set<SourceCapability>,
     val enabled: Boolean = false,
+    /** The source's own icon, drawn beside its name on the Sources screen. */
+    val iconRes: Int? = null,
 ) {
     val language: String get() = lang
     val supportsLatest: Boolean get() = SourceCapability.LATEST in capabilities

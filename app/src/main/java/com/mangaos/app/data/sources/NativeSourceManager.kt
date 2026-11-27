@@ -116,6 +116,7 @@ class NativeSourceManager(
         version = version,
         capabilities = capabilities,
         enabled = enabled,
+        iconRes = iconRes,
     )
 
     private companion object {

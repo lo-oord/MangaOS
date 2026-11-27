@@ -140,6 +140,7 @@ dependencies {
     // Native source engine: the shared HTTP/JSON layer. Bundled sources are registered in
     // NativeSourceRegistry; no extension APK is loaded at runtime.
     implementation(libs.okhttp)
+    implementation(libs.jsoup)
     implementation(libs.kotlinx.serialization.json)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)

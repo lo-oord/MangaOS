@@ -5,6 +5,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.sources.images.OverlayImageInterceptor
+import okhttp3.OkHttpClient
 
 class MangaOSApplication : Application(), ImageLoaderFactory {
 
@@ -18,6 +20,13 @@ class MangaOSApplication : Application(), ImageLoaderFactory {
      * never evicted by Coil, so cache pressure cannot remove an offline chapter.
      */
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        // Reader pages go through the shared image pipeline: a page whose translation is a
+        // separate text layer (MangaTek) is painted before it is shown.
+        .okHttpClient(
+            OkHttpClient.Builder()
+                .addInterceptor(OverlayImageInterceptor)
+                .build(),
+        )
         .diskCache {
             DiskCache.Builder()
                 .directory(cacheDir.resolve("image_cache"))
