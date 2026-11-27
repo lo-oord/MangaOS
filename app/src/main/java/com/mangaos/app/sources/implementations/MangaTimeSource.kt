@@ -30,7 +30,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 class MangaTimeSource : MangaSource {
 
     override val id: String = "mangatime"
-    override val name: String = "MangaTime"
+    override val name: String = "Manga Time"
     override val lang: String = "ar"
     override val baseUrl: String = "https://mangatime.org"
     override val capabilities: Set<SourceCapability> = setOf(
