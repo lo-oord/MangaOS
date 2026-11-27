@@ -202,6 +202,7 @@
     <string name="library_saved">في مكتبتك</string>
     <string name="library_not_saved">غير موجود في مكتبتك</string>
     <string name="sources_filter_all">الكل</string>
+    <string name="sources_none">لا توجد مصادر مضافة بعد</string>
     <string name="sources_empty">لا توجد مصادر مطابقة لهذا الفلتر</string>
     <string name="sources_multi_language">متعدد اللغات</string>
     <string name="tagline_welcome">عالمك من المانجا، في مكان واحد.</string>
@@ -492,8 +493,5 @@
     <string name="action_more">خيارات إضافية</string>
     <string name="detail_last_read_marker">آخر قراءة</string>
     <string name="sources_native_summary">المفعّل %1$d من %2$d</string>
-    <string name="sources_native_subtitle">كل المصادر مدمجة داخل MangaOS. فعّل ما تريد التصفح والبحث والتنزيل منه.</string>
-    <string name="sources_state_on">مفعّل</string>
-    <string name="sources_state_off">غير مفعّل</string>
     <string name="sources_last_error">آخر خطأ: %1$s</string>
 </resources>

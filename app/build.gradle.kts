@@ -137,12 +137,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // Native sources: plain HTTP + HTML/JSON parsing. No extension APK is loaded at runtime.
+    // Native source engine: the shared HTTP/JSON layer. Bundled sources are registered in
+    // NativeSourceRegistry; no extension APK is loaded at runtime.
     implementation(libs.okhttp)
-    implementation(libs.jsoup)
-    // jsoup 1.21+ annotates its Java API with jspecify; Kotlin needs the annotation class on
-    // the compile classpath to read the nullability annotations.
-    compileOnly(libs.jspecify)
     implementation(libs.kotlinx.serialization.json)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)

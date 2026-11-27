@@ -77,39 +77,41 @@ fun SourcesScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = stringResource(
-                        R.string.sources_native_summary,
-                        enabledCount,
-                        sources.size,
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                if (sources.isNotEmpty()) {
+                    Text(
+                        text = stringResource(
+                            R.string.sources_native_summary,
+                            enabledCount,
+                            sources.size,
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            // Search and the language filter only make sense once there is a source to narrow
+            // down; the empty state stays clean instead of showing dead controls.
+            if (sources.isNotEmpty()) {
+                Spacer(Modifier.height(Spacing.sm))
+                MangaSearchField(
+                    value = viewModel.query,
+                    onValueChange = viewModel::onQueryChange,
+                    placeholder = stringResource(R.string.search_sources_placeholder),
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                LanguageFilterRow(
+                    selected = viewModel.languageFilter,
+                    onSelect = viewModel::changeLanguageFilter,
                 )
             }
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = stringResource(R.string.sources_native_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            MangaSearchField(
-                value = viewModel.query,
-                onValueChange = viewModel::onQueryChange,
-                placeholder = stringResource(R.string.search_sources_placeholder),
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            LanguageFilterRow(
-                selected = viewModel.languageFilter,
-                onSelect = viewModel::changeLanguageFilter,
-            )
         }
 
         if (visible.isEmpty()) {
             EmptyState(
                 icon = Icons.Outlined.Extension,
-                title = stringResource(R.string.sources_empty),
+                title = stringResource(
+                    if (sources.isEmpty()) R.string.sources_none else R.string.sources_empty,
+                ),
             )
             return@Column
         }
@@ -245,23 +247,11 @@ private fun SourceRow(
             }
         }
         Spacer(Modifier.width(Spacing.xs))
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.widthIn(min = 64.dp),
-        ) {
-            Switch(
-                checked = source.enabled,
-                onCheckedChange = onToggle,
-            )
-            Text(
-                text = stringResource(
-                    if (source.enabled) R.string.sources_state_on else R.string.sources_state_off,
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (source.enabled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Switch(
+            checked = source.enabled,
+            onCheckedChange = onToggle,
+            modifier = Modifier.widthIn(min = 48.dp),
+        )
     }
 }
 

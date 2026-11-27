@@ -215,6 +215,7 @@
     <string name="library_saved">In your library</string>
     <string name="library_not_saved">Not in your library</string>
     <string name="sources_filter_all">All</string>
+    <string name="sources_none">No sources have been added yet</string>
     <string name="sources_empty">No sources match this filter</string>
     <string name="sources_multi_language">Multi-language</string>
     <string name="tagline_welcome">Your manga world, in one place.</string>
@@ -506,8 +507,5 @@
     <string name="action_more">More options</string>
     <string name="detail_last_read_marker">Last read</string>
     <string name="sources_native_summary">%1$d enabled of %2$d</string>
-    <string name="sources_native_subtitle">Every source is built into MangaOS. Turn on the ones you want to browse, search and download from.</string>
-    <string name="sources_state_on">Enabled</string>
-    <string name="sources_state_off">Disabled</string>
     <string name="sources_last_error">Last error: %1$s</string>
 </resources>

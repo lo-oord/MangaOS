@@ -2,9 +2,6 @@ package com.mangaos.app.sources.registry
 
 import com.mangaos.app.sources.core.MangaSource
 import com.mangaos.app.sources.core.SourceCapability
-import com.mangaos.app.sources.implementations.AsuraScansSource
-import com.mangaos.app.sources.implementations.MangaClubSource
-import com.mangaos.app.sources.implementations.MangaDexSource
 
 /**
  * A bundled source: identity and display metadata plus a factory. The factory is what makes the
@@ -22,76 +19,27 @@ data class SourceDefinition(
 )
 
 /**
- * The single list of sources compiled into MangaOS. Adding a source means adding one entry
- * here and its implementation class; nothing else in the app needs to know about it.
+ * The single list of sources compiled into MangaOS.
+ *
+ * It is currently empty: the previously bundled sources and their implementations were removed
+ * from the project. Adding a source means appending one [SourceDefinition] here together with
+ * its [MangaSource] implementation — the Sources screen, the enable/disable state, the picker
+ * and the repository all read this list, so nothing else has to change.
  *
  * Identity is the stable [SourceDefinition.id], never the display name.
  */
 object NativeSourceRegistry {
 
-    val definitions: List<SourceDefinition> = listOf(
-        SourceDefinition(
-            id = "mangadex-ar",
-            name = "MangaDex (العربية)",
-            lang = "ar",
-            baseUrl = "https://mangadex.org",
-            description = "أكبر فهرس مانجا مفتوح، فصول عربية.",
-            version = "1.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            factory = { MangaDexSource("ar") },
-        ),
-        SourceDefinition(
-            id = "mangadex-en",
-            name = "MangaDex (English)",
-            lang = "en",
-            baseUrl = "https://mangadex.org",
-            description = "Large open manga catalogue, English chapters.",
-            version = "1.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            factory = { MangaDexSource("en") },
-        ),
-        SourceDefinition(
-            id = "asura",
-            name = "Asura Scans",
-            lang = "en",
-            baseUrl = "https://asurascans.com",
-            description = "English manhwa releases with a public JSON catalogue.",
-            version = "1.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            factory = { AsuraScansSource() },
-        ),
-        SourceDefinition(
-            id = "mangaclub",
-            name = "Manga Club",
-            lang = "en",
-            baseUrl = "https://www.mangaclub.net",
-            description = "English manga, manhwa and manhua library.",
-            version = "1.0",
-            capabilities = setOf(
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            factory = { MangaClubSource() },
-        ),
-    )
+    val definitions: List<SourceDefinition> = emptyList()
 
     init {
         val duplicates = definitions.groupBy { it.id }.filterValues { it.size > 1 }
         require(duplicates.isEmpty()) { "Duplicate source ids: ${duplicates.keys}" }
         require(definitions.all { it.id.isNotBlank() && it.name.isNotBlank() }) {
             "Every source needs a stable id and a name"
+        }
+        require(definitions.all { it.baseUrl.startsWith("https://") }) {
+            "Every source needs an https base url"
         }
     }
 

@@ -202,6 +202,7 @@
     <string name="library_saved">ライブラリにあります</string>
     <string name="library_not_saved">ライブラリにありません</string>
     <string name="sources_filter_all">すべて</string>
+    <string name="sources_none">追加されたソースはまだありません</string>
     <string name="sources_empty">このフィルタに一致するソースはありません</string>
     <string name="sources_multi_language">多言語</string>
     <string name="tagline_welcome">マンガの世界を、ひとつの場所に。</string>
