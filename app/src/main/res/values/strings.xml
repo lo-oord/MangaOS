@@ -512,4 +512,6 @@
     <string name="detail_publication_date">Publication date</string>
     <string name="detail_sort_by">Sort by</string>
     <string name="detail_story_chapters">Chapters</string>
+    <string name="sources_all_label">All sources</string>
+    <string name="search_latest_in">Search in %1$s</string>
 </resources>

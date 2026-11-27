@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -32,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -52,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -59,6 +62,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -143,7 +147,10 @@ fun LatestScreen(
             MangaSearchField(
                 value = viewModel.query,
                 onValueChange = viewModel::onQueryChange,
-                placeholder = stringResource(R.string.search_latest_placeholder),
+                placeholder = stringResource(
+                    R.string.search_latest_in,
+                    selectedSource?.name ?: stringResource(R.string.sources_all_label),
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
@@ -289,8 +296,8 @@ fun LatestScreen(
         SourcePickerSheet(
             sources = sources,
             selectedId = selectedSource?.id,
-            onSelect = {
-                viewModel.selectSource(it)
+            onSelect = { id ->
+                viewModel.selectSource(id)
                 showSourcePicker = false
             },
             onManage = {
@@ -433,7 +440,7 @@ private fun CompactSourceButton(
         ) {
             SourceBadge(source = source)
             Text(
-                text = source?.name ?: stringResource(R.string.source_choose),
+                text = source?.name ?: stringResource(R.string.sources_all_label),
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -576,10 +583,12 @@ private fun RadialSourceSelector(
     }
 }
 
-/** Bundled sources have no remote icon: a stable monogram keeps the picker self-contained. */
+/**
+ * The source's own bundled icon, or its monogram when a definition ships without one. "Every
+ * source" has no icon of its own and shows the stacked-sources glyph instead.
+ */
 @Composable
 private fun SourceBadge(source: SourceInfo?) {
-    val initial = source?.name?.trim()?.take(1)?.uppercase().orEmpty()
     Surface(
         modifier = Modifier.size(30.dp),
         shape = RoundedCornerShape(9.dp),
@@ -587,10 +596,24 @@ private fun SourceBadge(source: SourceInfo?) {
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = initial.ifBlank { "?" },
-                style = MaterialTheme.typography.labelMedium,
-            )
+            val icon = source?.iconRes
+            when {
+                icon != null -> Image(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(24.dp),
+                )
+                source == null -> Icon(
+                    imageVector = Icons.Outlined.Layers,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                else -> Text(
+                    text = source.name.trim().take(1).uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }

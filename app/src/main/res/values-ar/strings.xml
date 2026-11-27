@@ -498,4 +498,6 @@
     <string name="detail_publication_date">تاريخ النشر</string>
     <string name="detail_sort_by">ترتيب حسب</string>
     <string name="detail_story_chapters">الفصول</string>
+    <string name="sources_all_label">كل المصادر</string>
+    <string name="search_latest_in">البحث في %1$s</string>
 </resources>

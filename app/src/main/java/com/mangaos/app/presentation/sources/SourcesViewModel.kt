@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
-import com.mangaos.app.domain.model.LanguageFilter
 import com.mangaos.app.domain.model.SourceInfo
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,8 +14,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * The Sources screen: a catalogue of the sources compiled into the app and the user's
- * enable/disable choice. There is nothing to download, install, update or remove.
+ * The Sources screen: the Arabic sources compiled into the app and the user's enable/disable
+ * choice. There is nothing to download, install, update or remove.
  */
 class SourcesViewModel : ViewModel() {
 
@@ -35,30 +34,17 @@ class SourcesViewModel : ViewModel() {
     var query by mutableStateOf("")
         private set
 
-    var languageFilter by mutableStateOf(LanguageFilter.ALL)
-        private set
-
     fun onQueryChange(value: String) {
         query = value
-    }
-
-    fun changeLanguageFilter(filter: LanguageFilter) {
-        languageFilter = filter
     }
 
     fun setEnabled(sourceId: String, enabled: Boolean) {
         repository.setEnabled(sourceId, enabled)
     }
 
-    /** Visible sources for the active language filter and search query. */
+    /** Visible sources for the current search query. */
     fun visibleSources(all: List<SourceInfo>): List<SourceInfo> {
-        val empty = SearchText.normalize(query).isEmpty()
-        return all.filter { source ->
-            languageFilter.matches(listOf(source.lang)) &&
-                (empty ||
-                    SearchText.matches(source.name, query) ||
-                    SearchText.matches(source.baseUrl, query) ||
-                    SearchText.matches(source.description, query))
-        }
+        if (SearchText.normalize(query).isEmpty()) return all
+        return all.filter { source -> SearchText.matches(source.name, query) }
     }
 }

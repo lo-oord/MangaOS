@@ -3,11 +3,9 @@ package com.mangaos.app.sources.registry
 import com.mangaos.app.R
 import com.mangaos.app.sources.core.MangaSource
 import com.mangaos.app.sources.core.SourceCapability
-import com.mangaos.app.sources.implementations.AsuraScansSource
 import com.mangaos.app.sources.implementations.AzoraSource
 import com.mangaos.app.sources.implementations.DespairMangaSource
 import com.mangaos.app.sources.implementations.DilarSource
-import com.mangaos.app.sources.implementations.KawaiiMangaSource
 import com.mangaos.app.sources.implementations.MangaArSource
 import com.mangaos.app.sources.implementations.MangaDarSource
 import com.mangaos.app.sources.implementations.MangaOriginSource
@@ -17,7 +15,6 @@ import com.mangaos.app.sources.implementations.MangaTikSource
 import com.mangaos.app.sources.implementations.MangaTimeSource
 import com.mangaos.app.sources.implementations.ProcomicSource
 import com.mangaos.app.sources.implementations.TeamXSource
-import com.mangaos.app.sources.implementations.ThunderScansSource
 
 /**
  * A bundled source: identity, display metadata, its icon and a factory. The factory is what
@@ -36,7 +33,7 @@ data class SourceDefinition(
 )
 
 /**
- * The single list of sources compiled into MangaOS.
+ * The single list of sources compiled into MangaOS: Arabic sources only.
  *
  * Every source here is a native implementation inside the APK: there is nothing to install,
  * download or update separately, and no extension APK or repository is loaded at runtime.
@@ -64,21 +61,6 @@ object NativeSourceRegistry {
             ),
             iconRes = R.drawable.source_mangatek,
             factory = ::MangaTekSource,
-        ),
-        SourceDefinition(
-            id = "mangakawaii",
-            name = "Kawaii Manga",
-            lang = "fr",
-            baseUrl = "https://www.mangakawaii.fr",
-            description = "Catalogue français de mangas et webtoons",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangakawaii,
-            factory = ::KawaiiMangaSource,
         ),
         SourceDefinition(
             id = "despairmanga",
@@ -124,36 +106,6 @@ object NativeSourceRegistry {
             ),
             iconRes = R.drawable.source_mangaar,
             factory = ::MangaArSource,
-        ),
-        SourceDefinition(
-            id = "thunderscans",
-            name = "Thunder Scans",
-            lang = "en",
-            baseUrl = "https://en-thunderscans.com",
-            description = "English manhwa and manga scans",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_thunderscans,
-            factory = ::ThunderScansSource,
-        ),
-        SourceDefinition(
-            id = "asurascans",
-            name = "Asura Scans",
-            lang = "en",
-            baseUrl = "https://asurascans.com",
-            description = "English manhwa and manga scans",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_asurascans,
-            factory = ::AsuraScansSource,
         ),
         SourceDefinition(
             id = "teamx",
@@ -283,6 +235,9 @@ object NativeSourceRegistry {
         require(names.isEmpty()) { "Duplicate source names: ${names.keys}" }
         require(definitions.all { it.id.isNotBlank() && it.name.isNotBlank() }) {
             "Every source needs a stable id and a name"
+        }
+        require(definitions.all { it.lang == "ar" }) {
+            "MangaOS ships Arabic sources only"
         }
         require(definitions.all { it.baseUrl.startsWith("https://") }) {
             "Every source needs an https base url"

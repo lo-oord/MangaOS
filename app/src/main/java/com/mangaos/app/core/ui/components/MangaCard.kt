@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -77,7 +78,7 @@ enum class MangaCardContext {
 }
 
 /** The single grid card used by every catalogue screen. */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun MangaCard(
     manga: Manga,
@@ -114,7 +115,7 @@ fun MangaCard(
                             text = appString(R.string.chapter_number, chapter),
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(Spacing.sm),
+                                .padding(6.dp),
                         )
                     }
                 }
@@ -128,51 +129,48 @@ fun MangaCard(
                     bottom = Spacing.sm,
                 ),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    Text(
-                        text = manga.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = scheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (context == MangaCardContext.LATEST) {
-                        manga.updatedAt?.let { timestamp ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.widthIn(max = 92.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Schedule,
-                                    contentDescription = null,
-                                    tint = scheme.onSurfaceVariant,
-                                    modifier = Modifier.size(11.dp),
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    text = relativeTime(LocalContext.current, timestamp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = scheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                Text(
+                    text = manga.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                // Latest only: the real publication time of the newest chapter, on its own
+                // line so a long title is never crushed against it.
+                if (context == MangaCardContext.LATEST) {
+                    manga.updatedAt?.let { timestamp ->
+                        Spacer(Modifier.height(3.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = scheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.size(10.dp),
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = relativeTime(LocalContext.current, timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = scheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
 
-                Spacer(Modifier.height(Spacing.sm))
+                Spacer(Modifier.height(Spacing.xs))
 
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     RatingPill(manga.rating)
                     StatusPill(manga.status)
@@ -184,7 +182,7 @@ fun MangaCard(
 }
 
 /** Horizontal list row: the same information in the same order, laid out for scanning. */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun MangaListRow(
     manga: Manga,
@@ -250,9 +248,9 @@ fun MangaListRow(
 
                 Spacer(Modifier.height(Spacing.sm))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     RatingPill(manga.rating)
                     StatusPill(manga.status)
@@ -272,12 +270,12 @@ private fun RatingPill(rating: Double?) {
             imageVector = Icons.Filled.Star,
             contentDescription = null,
             tint = MangaTheme.tokens.rating,
-            modifier = Modifier.size(12.dp),
+            modifier = Modifier.size(10.dp),
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(3.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
         )
@@ -291,13 +289,13 @@ private fun StatusPill(status: MangaStatus) {
     Pill(container = color.copy(alpha = 0.16f), content = color) {
         Box(
             modifier = Modifier
-                .size(6.dp)
+                .size(5.dp)
                 .background(color, RoundedCornerShape(50)),
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(3.dp))
         Text(
             text = appString(mangaStatusLabel(status)),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -312,16 +310,15 @@ private fun GenrePill(genres: List<String>) {
             imageVector = Icons.Outlined.Category,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(11.dp),
+            modifier = Modifier.size(10.dp),
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(3.dp))
         Text(
             text = genre,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
@@ -337,10 +334,10 @@ private fun Pill(
         shape = RoundedCornerShape(50),
         color = container,
         contentColor = if (content == Color.Unspecified) MaterialTheme.colorScheme.onSurface else content,
-        modifier = Modifier.height(24.dp),
+        modifier = Modifier.height(20.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp),
+            modifier = Modifier.padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
             content = {
@@ -423,21 +420,25 @@ fun CoverImage(
     )
 }
 
-/** Small translucent badge over the artwork; it takes its colours from the active theme. */
+/**
+ * The newest chapter number over the artwork. It is deliberately light: a translucent themed
+ * scrim, small type and a hairline border, so the cover stays the subject of the card.
+ */
 @Composable
 fun ChapterBadge(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.86f),
+        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.34f),
         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.14f)),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
 }

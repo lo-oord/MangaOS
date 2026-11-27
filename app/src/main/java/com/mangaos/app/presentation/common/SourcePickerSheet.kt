@@ -1,5 +1,6 @@
 package com.mangaos.app.presentation.common
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,17 +36,17 @@ import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.domain.model.SourceInfo
-import java.util.Locale
 
 /**
  * Compact enabled-source picker. It never covers the whole screen: the list is capped in
- * height so the screen underneath stays visible while choosing.
+ * height so the screen underneath stays visible while choosing. Picking "every source" keeps
+ * the feed merged; picking one narrows both the feed and the search to that source.
  */
 @Composable
 fun SourcePickerSheet(
     sources: List<SourceInfo>,
     selectedId: String?,
-    onSelect: (String) -> Unit,
+    onSelect: (String?) -> Unit,
     onManage: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -61,9 +64,18 @@ fun SourcePickerSheet(
                     .heightIn(max = 380.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                item(key = "all-sources") {
+                    SourcePickerRow(
+                        name = stringResource(R.string.sources_all_label),
+                        iconRes = null,
+                        selected = selectedId == null,
+                        onClick = { onSelect(null) },
+                    )
+                }
                 items(sources, key = { it.id }) { source ->
                     SourcePickerRow(
-                        source = source,
+                        name = source.name,
+                        iconRes = source.iconRes,
                         selected = source.id == selectedId,
                         onClick = { onSelect(source.id) },
                     )
@@ -83,7 +95,8 @@ fun SourcePickerSheet(
 
 @Composable
 private fun SourcePickerRow(
-    source: SourceInfo,
+    name: String,
+    iconRes: Int?,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -102,33 +115,29 @@ private fun SourcePickerRow(
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = source.name.trim().take(1).uppercase(),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
+            if (iconRes != null) {
+                Image(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(26.dp),
+                )
+            } else {
+                Text(
+                    text = name.trim().take(1).uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
         }
         Spacer(Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = source.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = source.baseUrl.removePrefix("https://").removePrefix("http://"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
         Text(
-            text = languageName(source.lang),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         if (selected) {
             Spacer(Modifier.width(Spacing.xs))
@@ -140,12 +149,4 @@ private fun SourcePickerRow(
             )
         }
     }
-}
-
-/** Localised language name so the picker follows the app language and reading direction. */
-private fun languageName(tag: String): String {
-    if (tag.isBlank()) return ""
-    return runCatching {
-        Locale.forLanguageTag(tag).getDisplayLanguage(Locale.getDefault())
-    }.getOrNull()?.takeIf { it.isNotBlank() } ?: tag.uppercase()
 }

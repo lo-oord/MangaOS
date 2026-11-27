@@ -7,8 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
-import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.SourceInfo
 import com.mangaos.app.domain.repository.SourceUnavailableException
 import kotlinx.coroutines.CancellationException
@@ -40,6 +40,8 @@ sealed interface LatestUiState {
         val loadingMore: Boolean = false,
         val endReached: Boolean = false,
         val appendError: SourceFailure? = null,
+        /** Sources that could not answer the first page, named for the footer note. */
+        val failedSources: List<String> = emptyList(),
     ) : LatestUiState
 
     data class Error(val failure: SourceFailure) : LatestUiState
@@ -58,16 +60,29 @@ sealed interface LatestSearchState {
     data class Error(val failure: SourceFailure) : LatestSearchState
 }
 
+/**
+ * The Latest feed.
+ *
+ * With no source chosen it is one merged feed: every enabled source's newest page is fetched
+ * side by side, deduplicated and sorted by the real publication time of the newest chapter, so
+ * the work that was updated most recently is always on top — no matter which source it came
+ * from and in what order that source answered. Choosing one source narrows both the feed and
+ * the search to it.
+ *
+ * Sources do not all carry the newest chapter number and its date in their list payload. Those
+ * items are resolved from the source afterwards, and the feed is re-sorted as soon as a real
+ * timestamp arrives, so the ordering is never guessed.
+ */
 class LatestViewModel : ViewModel() {
 
     private val repository = ServiceLocator.manga
     private val sourcesRepository = ServiceLocator.sources
     private val settings = ServiceLocator.settings
 
-    /** Every enabled source: the Latest tab falls back to its popular listing when needed. */
     val sources: StateFlow<List<SourceInfo>> = sourcesRepository.enabledSources
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Null means every enabled source, which is the default feed. */
     val selectedSourceId: StateFlow<String?> = settings.latestSourceId
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -84,7 +99,7 @@ class LatestViewModel : ViewModel() {
     private var searchJob: Job? = null
     private var enrichJob: Job? = null
     private var nextPage = 2
-    private var currentSource: SourceInfo? = null
+    private var feedSources: List<SourceInfo> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -111,7 +126,8 @@ class LatestViewModel : ViewModel() {
         }
     }
 
-    fun selectSource(sourceId: String) {
+    /** Null returns to the merged feed of every enabled source. */
+    fun selectSource(sourceId: String?) {
         viewModelScope.launch { settings.setLatestSourceId(sourceId) }
     }
 
@@ -144,32 +160,35 @@ class LatestViewModel : ViewModel() {
         if (query.isNotBlank()) return
         val content = _state.value as? LatestUiState.Content ?: return
         if (content.loadingMore || content.endReached) return
-        val source = currentSource ?: return
+        val scope = feedSources
+        if (scope.isEmpty()) return
+        val page = nextPage
         _state.value = content.copy(loadingMore = true, appendError = null)
         loadJob = viewModelScope.launch {
-            val page = nextPage
-            val result = runCatching {
-                if (source.supportsLatest) repository.latest(source.id, page)
-                else repository.popular(source.id, page)
+            val merged = LinkedHashMap<String, Manga>().apply {
+                content.mangas.forEach { put(it.key, it) }
             }
-            result.onSuccess { incoming ->
-                val existing = (content.mangas + incoming)
-                    .distinctBy { it.key }
-                val added = existing.size - content.mangas.size
-                if (incoming.isEmpty() || added == 0) {
-                    _state.value = content.copy(loadingMore = false, endReached = true)
-                } else {
-                    nextPage = page + 1
-                    _state.value = content.copy(mangas = existing, loadingMore = false)
-                    enrichLatest(incoming)
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
-                _state.value = content.copy(
-                    loadingMore = false,
-                    appendError = (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK,
-                )
+            val pages = coroutineScope {
+                scope.map { source ->
+                    async(Dispatchers.IO) {
+                        runCatching { feedOf(source, page) }.getOrDefault(emptyList())
+                    }
+                }.awaitAll()
             }
+            var added = 0
+            pages.flatten().forEach { manga ->
+                if (merged.put(manga.key, manga) == null) added++
+            }
+            if (added == 0) {
+                _state.value = content.copy(loadingMore = false, endReached = true)
+                return@launch
+            }
+            nextPage = page + 1
+            _state.value = content.copy(
+                mangas = merged.values.sortedNewestFirst(),
+                loadingMore = false,
+            )
+            enrichNewest(merged.values.toList())
         }
     }
 
@@ -177,47 +196,92 @@ class LatestViewModel : ViewModel() {
         loadJob?.cancel()
         enrichJob?.cancel()
         if (sources.isEmpty()) {
-            currentSource = null
+            feedSources = emptyList()
             _state.value = LatestUiState.NoSources
             return
         }
-        val chosen = sources.firstOrNull { it.id == preferred } ?: sources.first()
-        currentSource = chosen
-        if (preferred != chosen.id) {
-            viewModelScope.launch { settings.setLatestSourceId(chosen.id) }
-        }
+        // One chosen source filters the feed; no choice merges every enabled source.
+        val scope = preferred?.let { id -> sources.filter { it.id == id } }
+            ?.takeIf { it.isNotEmpty() }
+            ?: sources
+        feedSources = scope
         nextPage = 2
         loadJob = viewModelScope.launch {
             _state.value = LatestUiState.Loading
-            runCatching {
-                if (chosen.supportsLatest) repository.latest(chosen.id, 1)
-                else repository.popular(chosen.id, 1)
-            }.onSuccess { mangas ->
-                _state.value = if (mangas.isEmpty()) {
-                    LatestUiState.Empty
-                } else {
-                    LatestUiState.Content(mangas)
+            val merged = LinkedHashMap<String, Manga>()
+            val failures = mutableListOf<String>()
+            var lastFailure: SourceFailure? = null
+            val channel = Channel<SourceFeed>(Channel.UNLIMITED)
+            coroutineScope {
+                launch {
+                    scope.forEach { source ->
+                        launch(Dispatchers.IO) {
+                            val result = runCatching { feedOf(source, 1) }
+                            channel.send(
+                                SourceFeed(
+                                    sourceName = source.name,
+                                    mangas = result.getOrDefault(emptyList()),
+                                    failure = result.exceptionOrNull(),
+                                ),
+                            )
+                        }
+                    }
                 }
-                if (mangas.isNotEmpty()) enrichLatest(mangas)
-            }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
-                _state.value = LatestUiState.Error(
-                    (error as? SourceUnavailableException)?.failure ?: SourceFailure.NETWORK,
+                repeat(scope.size) {
+                    val feed = channel.receive()
+                    if (feed.failure != null) {
+                        failures += feed.sourceName
+                        lastFailure = (feed.failure as? SourceUnavailableException)?.failure
+                            ?: SourceFailure.NETWORK
+                    }
+                    feed.mangas.forEach { merged[it.key] = it }
+                    if (merged.isNotEmpty()) publish(merged, failures)
+                }
+                channel.close()
+            }
+            when {
+                merged.isNotEmpty() -> {
+                    publish(merged, failures, endReached = merged.size < PAGE_HINT)
+                    enrichNewest(merged.values.toList())
+                }
+                failures.size == scope.size -> _state.value = LatestUiState.Error(
+                    lastFailure ?: SourceFailure.NETWORK,
                 )
+                else -> _state.value = LatestUiState.Empty
             }
         }
     }
 
+    private fun publish(
+        merged: Map<String, Manga>,
+        failures: List<String>,
+        endReached: Boolean = false,
+    ) {
+        _state.value = LatestUiState.Content(
+            mangas = merged.values.sortedNewestFirst(),
+            loadingMore = false,
+            endReached = endReached,
+            failedSources = failures.toList(),
+        )
+    }
+
+    private suspend fun feedOf(source: SourceInfo, page: Int): List<Manga> =
+        if (source.supportsLatest) repository.latest(source.id, page)
+        else repository.popular(source.id, page)
+
     /**
-     * Some sources do not return the newest chapter with their list payload. MangaOS resolves
-     * it from the source after showing the covers, so the feed stays fast and the badge only
-     * appears once it is real.
+     * A source may list a work without the newest chapter or its timestamp. Both are resolved
+     * from the source itself, then the feed is re-sorted, so the badge and the relative time
+     * appear for every work instead of only for the sources that happen to send them.
      */
-    private fun enrichLatest(mangas: List<Manga>) {
+    private fun enrichNewest(mangas: List<Manga>) {
         enrichJob?.cancel()
+        val pending = mangas
+            .filter { it.latestChapter == null || it.updatedAt == null }
+            .take(MAX_ENRICH)
+        if (pending.isEmpty()) return
         enrichJob = viewModelScope.launch {
             val semaphore = Semaphore(4)
-            val pending = mangas.filter { it.latestChapter == null }.take(MAX_ENRICH)
             coroutineScope {
                 pending.map { manga ->
                     async(Dispatchers.IO) {
@@ -225,22 +289,7 @@ class LatestViewModel : ViewModel() {
                             runCatching {
                                 repository.latestChapter(manga.sourceId, manga.id)
                             }.getOrNull()?.let { chapter ->
-                                _state.value = when (val current = _state.value) {
-                                    is LatestUiState.Content -> current.copy(
-                                        mangas = current.mangas.map { item ->
-                                            if (item.key == manga.key) {
-                                                item.copy(
-                                                    latestChapter = chapter.number,
-                                                    latestChapterId = chapter.id,
-                                                    updatedAt = chapter.publishedAt ?: item.updatedAt,
-                                                )
-                                            } else {
-                                                item
-                                            }
-                                        },
-                                    )
-                                    else -> current
-                                }
+                                applyChapter(manga.key, chapter.number, chapter.id, chapter.publishedAt)
                             }
                         }
                     }
@@ -249,10 +298,27 @@ class LatestViewModel : ViewModel() {
         }
     }
 
+    private fun applyChapter(key: String, number: String?, chapterId: String?, publishedAt: Long?) {
+        val current = _state.value as? LatestUiState.Content ?: return
+        val updated = current.mangas.map { item ->
+            if (item.key != key) {
+                item
+            } else {
+                item.copy(
+                    latestChapter = number ?: item.latestChapter,
+                    latestChapterId = chapterId ?: item.latestChapterId,
+                    updatedAt = publishedAt ?: item.updatedAt,
+                )
+            }
+        }
+        _state.value = current.copy(mangas = updated.sortedNewestFirst())
+    }
+
     private suspend fun search(text: String) {
-        // Search the same scope the Manga tab uses (every enabled source), not the screen's
-        // filtered list, so a query never stays inside one source.
-        val allSources = sourcesRepository.enabledSources.value
+        // A chosen source scopes the search; otherwise every enabled source is asked.
+        val allowed = sourcesRepository.enabledSources.value
+        val chosen = selectedSourceId.value
+        val allSources = chosen?.let { id -> allowed.filter { it.id == id } } ?: allowed
         if (allSources.isEmpty()) {
             _searchState.value = LatestSearchState.Error(SourceFailure.NO_SOURCES)
             return
@@ -305,6 +371,12 @@ class LatestViewModel : ViewModel() {
         return if (title.isNotBlank() && author.isNotBlank()) "$title|$author" else manga.key
     }
 
+    private data class SourceFeed(
+        val sourceName: String,
+        val mangas: List<Manga>,
+        val failure: Throwable?,
+    )
+
     private data class SearchSourceResult(
         val sourceName: String,
         val mangas: List<Manga>,
@@ -313,6 +385,19 @@ class LatestViewModel : ViewModel() {
 
     private companion object {
         const val SEARCH_DEBOUNCE_MS = 350L
-        const val MAX_ENRICH = 4
+
+        /** How many undated works one refresh may resolve, to stay light on the sources. */
+        const val MAX_ENRICH = 60
+
+        /** A page smaller than this hints that the source has nothing left to page through. */
+        const val PAGE_HINT = 24
     }
 }
+
+/** Newest first, using the real publication time; works without a timestamp go last. */
+internal fun Collection<Manga>.sortedNewestFirst(): List<Manga> =
+    sortedWith(
+        compareByDescending<Manga> { it.updatedAt ?: Long.MIN_VALUE }
+            .thenByDescending { it.latestChapter?.toDoubleOrNull() ?: -1.0 }
+            .thenBy { it.title },
+    )

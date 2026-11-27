@@ -230,7 +230,8 @@ private fun DetailContent(
     }
 
     fun share() {
-        val text = manga.url?.takeIf { it.isNotBlank() } ?: manga.title
+        // The share sheet carries the work's title, never a source address.
+        val text = manga.title
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
@@ -253,18 +254,6 @@ private fun DetailContent(
                     onBack = onBack,
                     onShare = ::share,
                     onRefresh = { menuOpen = false; viewModel.retry() },
-                    onOpenSourcePage = {
-                        menuOpen = false
-                        val url = manga.url
-                        if (url != null) {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            }
-                        }
-                    },
                 )
             }
 
@@ -532,7 +521,6 @@ private fun DetailHero(
     onBack: () -> Unit,
     onShare: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenSourcePage: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -592,13 +580,6 @@ private fun DetailHero(
                             leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
                             onClick = onRefresh,
                         )
-                        if (!manga.url.isNullOrBlank()) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.detail_open_source_page)) },
-                                leadingIcon = { Icon(Icons.Outlined.OpenInNew, contentDescription = null) },
-                                onClick = onOpenSourcePage,
-                            )
-                        }
                     }
                 }
             }

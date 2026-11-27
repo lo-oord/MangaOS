@@ -32,25 +32,6 @@ enum class SourceFailure {
     NO_SOURCES,
 }
 
-/** Language chips on the Sources screen. */
-enum class LanguageFilter(val code: String) {
-    ALL("all"),
-    ARABIC("ar"),
-    ENGLISH("en"),
-    JAPANESE("ja");
-
-    /**
-     * "All" lists every source. A concrete filter accepts sources in that language, including
-     * regional tags such as `pt-BR`, and multi-language sources tagged `all`.
-     */
-    fun matches(languages: List<String>): Boolean {
-        if (this == ALL) return true
-        val normalized = languages.map { it.lowercase() }.filter { it.isNotBlank() }
-        if (normalized.isEmpty() || "all" in normalized) return true
-        return normalized.any { it == code || it.startsWith("$code-") }
-    }
-}
-
 /** Source browsing scope, used by the unified search and the Latest source picker. */
 enum class MangaViewMode { GRID, LIST;
 

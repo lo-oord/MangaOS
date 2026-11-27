@@ -88,29 +88,7 @@ fun DownloadsScreen(
     var pendingDeleteFiles by remember { mutableStateOf<Download?>(null) }
     var pendingRemoveRecord by remember { mutableStateOf<Download?>(null) }
     var pendingDeleteChapter by remember { mutableStateOf<Pair<Download, DownloadChapter>?>(null) }
-    val context = LocalContext.current
-    var storage by remember {
-        mutableStateOf((ServiceLocator.downloads as? LocalDownloadRepository)?.storageStatus())
-    }
-    var storageMessage by remember { mutableStateOf<String?>(null) }
-
     Column(modifier = modifier.fillMaxSize()) {
-        StorageBar(
-            status = storage,
-            message = storageMessage,
-            onCheck = {
-                val result = (ServiceLocator.downloads as? LocalDownloadRepository)?.storageStatus()
-                storage = result
-                storageMessage = if (result != null && result.writable) {
-                    context.getString(R.string.download_storage_ok)
-                } else {
-                    context.getString(
-                        R.string.download_storage_problem,
-                        result?.location.orEmpty(),
-                    )
-                }
-            },
-        )
         FilterRow(
             selected = viewModel.filter,
             onSelect = viewModel::selectFilter,
@@ -192,66 +170,6 @@ fun DownloadsScreen(
             },
             onDismiss = { pendingDeleteChapter = null },
         )
-    }
-}
-
-/**
- * Real storage state: the folder chapters are written to, its free space, and an on-demand
- * write probe. It explains the setup instead of guessing why a download might fail.
- */
-@Composable
-private fun StorageBar(
-    status: StorageStatus?,
-    message: String?,
-    onCheck: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.sm),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        val defaultText = if (status != null && status.freeBytes > 0L) {
-            stringResource(R.string.download_storage_location, status.location) + " · " +
-                stringResource(R.string.download_storage_free, formatBytes(status.freeBytes))
-        } else {
-            stringResource(R.string.download_storage_location, status?.location ?: "—")
-        }
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Download,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.download_storage_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = message ?: defaultText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            TextButton(onClick = onCheck) {
-                Text(
-                    text = stringResource(R.string.download_storage_check),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
-            }
-        }
     }
 }
 
