@@ -108,7 +108,6 @@ class MangaTekSource : MangaSource {
         "ملغي", "cancelled", "dropped" -> MangaStatus.CANCELLED
         else -> MangaStatus.UNKNOWN
     }
-    }
 
     override suspend fun details(mangaId: String): SourceManga? {
         val slug = mangaId.trim('/').substringAfterLast("/")
