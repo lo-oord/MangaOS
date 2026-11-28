@@ -155,14 +155,14 @@ class AccountSetupViewModel : ViewModel() {
                     step = SetupStep.USERNAME
                     return@launch
                 }
-                val fields = mutableMapOf<String, Any?>("username" to username) +
-                    mapOf(
-                        "displayName" to displayName.trim(),
-                        "language" to language,
-                        "country" to countryCode,
-                        "age" to age,
-                        "setupCompleted" to true,
-                    )
+                val fields = mutableMapOf<String, Any?>(
+                    "username" to username,
+                    "displayName" to displayName.trim(),
+                    "language" to language,
+                    "country" to countryCode,
+                    "age" to age,
+                    "setupCompleted" to true,
+                )
                 if (avatarBase64 != null) fields["photo"] = avatarBase64
                 accounts.updateAccount(uid, fields)
                 if (language.isNotBlank()) ServiceLocator.settings.setLanguage(language)

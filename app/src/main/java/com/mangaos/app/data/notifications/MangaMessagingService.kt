@@ -47,9 +47,20 @@ class MangaMessagingService : FirebaseMessagingService() {
                 ),
             )
         }
+        // The same extras the local chapter alerts use, so a push lands on the work it is about
+        // and never on a guessed tab.
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            data.forEach { (key, value) -> putExtra(key, value) }
+            data["sourceId"]?.takeIf { it.isNotBlank() }?.let {
+                putExtra(NotificationIntents.EXTRA_SOURCE_ID, it)
+            }
+            data["mangaId"]?.takeIf { it.isNotBlank() }?.let {
+                putExtra(NotificationIntents.EXTRA_MANGA_ID, it)
+            }
+            if (data["local"] == "true") putExtra(NotificationIntents.EXTRA_LOCAL, true)
+            data["notificationId"]?.let {
+                putExtra(NotificationIntents.EXTRA_NOTIFICATION_ID, it)
+            }
         }
         val pending = PendingIntent.getActivity(
             this,

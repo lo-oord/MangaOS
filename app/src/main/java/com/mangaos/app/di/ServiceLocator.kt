@@ -130,7 +130,7 @@ object ServiceLocator {
                 val scheduler = NewChapterScheduler(appContext)
                 if (uid == null) scheduler.cancelAll() else scheduler.schedule(uid)
             },
-            registerDevice = { uid -> registerMessagingToken(uid) },
+            registerDevice = { uid -> registerMessagingTokenFor(uid) },
             clearDevice = { clearMessagingToken() },
         )
         account.start()
@@ -159,10 +159,10 @@ object ServiceLocator {
     /** Called by the messaging service when Firebase rotates the registration token. */
     fun registerMessagingToken(token: String? = null) {
         val uid = sessionUid ?: return
-        registerMessagingToken(uid, token)
+        registerMessagingTokenFor(uid, token)
     }
 
-    private fun registerMessagingToken(uid: String, token: String? = null) {
+    private fun registerMessagingTokenFor(uid: String, token: String? = null) {
         appScope.launch {
             val resolved = token ?: runCatching {
                 FirebaseMessaging.getInstance().token.awaitResult()

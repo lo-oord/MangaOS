@@ -80,8 +80,7 @@ class CloudSync(
         }
         collector = scope.launch {
             dataStore.data
-                .map { preferences -> preferences.asMap() }
-                .map { values -> values.filterKeys { isSynced(it.name) }.mapValues { toRemote(it.value) } }
+                .map { preferences -> syncedValues(preferences) }
                 .distinctUntilChanged()
                 .collect { remote ->
                     if (applyingRemote || !remoteReady) return@collect
@@ -164,9 +163,13 @@ class CloudSync(
             !key.startsWith("local_auth") &&
             !key.startsWith("install_")
 
-    private suspend fun syncedMap(): Map<String, Any?> = dataStore.data.first().asMap()
-        .filterKeys { isSynced(it.name) }
-        .mapValues { toRemote(it.value) }
+    private suspend fun syncedMap(): Map<String, Any?> = syncedValues(dataStore.data.first())
+
+    /** Preference keys are typed; the cloud document needs their names and plain values. */
+    private fun syncedValues(preferences: Preferences): Map<String, Any?> =
+        preferences.asMap().entries
+            .filter { entry -> isSynced(entry.key.name) }
+            .associate { entry -> entry.key.name to toRemote(entry.value) }
 
     private fun toRemote(value: Any?): Any? = when (value) {
         is Set<*> -> value.filterIsInstance<String>().sorted()

@@ -1,6 +1,5 @@
 package com.mangaos.app.presentation.auth
 
-import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +69,3 @@ fun rememberGoogleSignIn(onResult: (Result<String>) -> Unit): () -> Unit {
 private object GoogleSignInStatusCodes {
     const val SIGN_IN_CANCELLED = 12501
 }
-
-@Suppress("unused")
-private fun Context.unusedKeepImport() = Unit
