@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<reservers>
+<resources>
     <string name="app_name" translatable="false">MangaOS</string>
 
     <!-- Content descriptions -->
@@ -118,24 +118,24 @@
     <string name="state_error_title">Could not load content</string>
     <string name="state_error_retry">Retry</string>
 
-    <!-- Phase 2: details, servers, profile -->
-    <string name="nav_servers">Servers</string>
+    <!-- Phase 2: details, sources, profile -->
+    <string name="nav_sources">Servers</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_grid_view">Grid view</string>
     <string name="cd_list_view">List view</string>
     <string name="status_unknown">Unknown</string>
-    <string name="search_servers_failed">%1$d servers could not be searched</string>
-    <string name="server_radial_hint">Slide to a server</string>
+    <string name="search_sources_failed">%1$d servers could not be searched</string>
+    <string name="source_radial_hint">Slide to a server</string>
     <string name="detail_start_reading">Start reading</string>
     <string name="search_manga_placeholder">Search every server</string>
     <string name="search_library_placeholder">Search your library</string>
-    <string name="search_servers_placeholder">Search servers</string>
+    <string name="search_sources_placeholder">Search servers</string>
     <string name="search_no_results">No matches</string>
-    <string name="state_no_server_title">No servers enabled</string>
-    <string name="state_no_server_action">Open servers</string>
-    <string name="state_server_unavailable">This server cannot be read yet</string>
-    <string name="server_pick_title">Latest from</string>
-    <string name="server_manage">Manage servers</string>
+    <string name="state_no_source_title">No servers enabled</string>
+    <string name="state_no_source_action">Open servers</string>
+    <string name="state_source_unavailable">This server cannot be read yet</string>
+    <string name="source_pick_title">Latest from</string>
+    <string name="source_manage">Manage servers</string>
     <string name="detail_share">Share</string>
     <string name="detail_more">More options</string>
     <string name="detail_refresh">Refresh details</string>
@@ -152,8 +152,8 @@
     <string name="detail_downloaded">Downloaded</string>
     <string name="detail_read">Read</string>
     <string name="detail_last_read">Last read: chapter %1$s</string>
-    <string name="detail_server_unavailable">This work cannot be opened yet</string>
-    <string name="servers_none">No servers have been added yet</string>
+    <string name="detail_source_unavailable">This work cannot be opened yet</string>
+    <string name="sources_none">No servers have been added yet</string>
     <string name="tagline_welcome">Your manga world, in one place.</string>
     <string name="label_preferred_language">Preferred language</string>
     <string name="label_country">Country</string>
@@ -161,7 +161,7 @@
     <string name="value_not_set">Not set</string>
     <string name="country_search_hint">Search countries</string>
     <string name="age_privacy_note">Your age is used for content rules only and is never shown publicly.</string>
-    <string name="servers_section_servers">Servers</string>
+    <string name="sources_section_sources">Servers</string>
     <string name="reader_chapter_error">Chapter pages could not be loaded</string>
     <string name="reader_chapters_title">Chapters</string>
     <string name="reader_current_chapter">Current chapter</string>
@@ -381,8 +381,8 @@
     <string name="action_clear_selection">Clear</string>
     <string name="action_close">Close</string>
     <string name="action_more">More options</string>
-    <string name="servers_native_summary">%1$d enabled of %2$d</string>
-    <string name="servers_last_error">Last error: %1$s</string>
+    <string name="sources_native_summary">%1$d enabled of %2$d</string>
+    <string name="sources_last_error">Last error: %1$s</string>
     <string name="language_switching_to">Switching to %1$s</string>
     <string name="detail_publication_date">Publication date</string>
     <string name="detail_last_update">Last update</string>
@@ -466,4 +466,4 @@
     <string name="sign_out_message">Your library, downloads and settings stay on this device.</string>
     <string name="profile_password_unavailable">Passwords are stored and verified on this device only.</string>
     <string name="profile_privacy_note">Country, age and language stay private. You can change or remove them here.</string>
-</reservers>
+</resources>
