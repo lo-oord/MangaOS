@@ -11,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -76,6 +77,9 @@ import coil.request.ImageRequest
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Dimens
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
+import com.mangaos.app.core.designsystem.goldBorderStroke
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.displayGenres
@@ -149,9 +153,8 @@ fun MangaCard(
     onLongClick: (() -> Unit)? = null,
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
-    // A card is opaque on purpose. No blur, no translucent panel over the artwork and no
-    // gradient sheen: the cover is the picture and the text under it has to stay legible in
-    // every theme. The app's glass surfaces remain for dialogs and the top bar.
+    // The card is the same glass pane as every other panel in the app, so the page wash shows
+    // through it, and its cover carries the one golden hairline the design system owns.
     val scheme = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
     val pressScale by cardPressScale(interaction)
@@ -166,9 +169,9 @@ fun MangaCard(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick, interaction)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = scheme.surfaceContainerLow,
+        color = glassPanelFill(),
         contentColor = scheme.onSurface,
-        border = BorderStroke(MangaCardMetrics.hairline, scheme.outlineVariant.copy(alpha = 0.55f)),
+        border = glassPanelBorder(),
         shadowElevation = 0.dp,
     ) {
         Column {
@@ -206,9 +209,9 @@ fun MangaListRow(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = scheme.surfaceContainerLow,
+        color = glassPanelFill(),
         contentColor = scheme.onSurface,
-        border = BorderStroke(MangaCardMetrics.hairline, scheme.outlineVariant.copy(alpha = 0.55f)),
+        border = glassPanelBorder(),
         shadowElevation = 0.dp,
     ) {
         // The row is as tall as its cover, and the text sits against it vertically so a short
@@ -286,16 +289,15 @@ private fun MangaCardCover(
     badgeAlignment: Alignment = Alignment.TopEnd,
     badgePadding: Dp = MangaCardMetrics.badgePadding,
 ) {
+    val coverShape = RoundedCornerShape(
+        topStart = MangaCardMetrics.corner,
+        topEnd = MangaCardMetrics.corner,
+        bottomStart = MangaCardMetrics.innerCorner,
+        bottomEnd = MangaCardMetrics.innerCorner,
+    )
     Box(
         modifier = modifier
-            .clip(
-                RoundedCornerShape(
-                    topStart = MangaCardMetrics.corner,
-                    topEnd = MangaCardMetrics.corner,
-                    bottomStart = MangaCardMetrics.innerCorner,
-                    bottomEnd = MangaCardMetrics.innerCorner,
-                ),
-            )
+            .clip(coverShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
@@ -311,6 +313,14 @@ private fun MangaCardCover(
                 )
             }
         }
+
+        // The golden frame sits over the artwork, not under it: one hairline, drawn last, so
+        // the picture keeps its exact crop and the line stays crisp at every size.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .border(goldBorderStroke(), coverShape),
+        )
     }
 }
 

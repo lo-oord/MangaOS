@@ -49,6 +49,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.BrandColors
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
 import com.mangaos.app.core.ui.components.CoverImage
@@ -170,8 +172,9 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
         color = if (notification.isRead) {
             Color.Transparent
         } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+            glassPanelFill()
         },
+        border = if (notification.isRead) null else glassPanelBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

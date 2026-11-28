@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
 import com.mangaos.app.core.util.Numbers
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.domain.model.ImageFit
 import com.mangaos.app.domain.model.ReaderMode
 import com.mangaos.app.domain.model.ReaderSettings
@@ -55,7 +56,7 @@ fun ReaderQuickSettingsSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = glassPanelFill(),
     ) {
         Column(
             modifier = Modifier

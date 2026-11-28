@@ -1,10 +1,12 @@
 package com.mangaos.app.core.designsystem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +93,63 @@ fun glassTokens(): GlassTokens {
             dark = dark,
         )
     }
+}
+
+/**
+ * The fill of a glass panel. Screens use this instead of an opaque container colour so every
+ * card, row and sheet is the same pane of glass over the page wash.
+ */
+@Composable
+fun glassPanelFill(): Color = glassTokens().background
+
+/** The hairline that outlines a glass panel. */
+@Composable
+fun glassPanelBorder(): BorderStroke = BorderStroke(MangaGlass.borderWidth, glassTokens().border)
+
+/**
+ * The page background every screen sits on: the theme's canvas with two very soft accent glows,
+ * one under the header and one low on the opposite side. It is what the translucent panels are
+ * made of — without a wash behind them, glass would just read as a flat grey.
+ *
+ * Two static radial gradients, drawn once: no animation, no blur pass, no extra layer.
+ */
+@Composable
+fun GlassBackdrop(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit = {},
+) {
+    val scheme = MaterialTheme.colorScheme
+    val dark = glassTokens().dark
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(scheme.background)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            scheme.primary.copy(alpha = if (dark) 0.20f else 0.12f),
+                            Color.Transparent,
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(width * 0.18f, -height * 0.05f),
+                        radius = width * 1.05f,
+                    ),
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            scheme.tertiary.copy(alpha = if (dark) 0.14f else 0.08f),
+                            Color.Transparent,
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(width * 0.95f, height * 0.88f),
+                        radius = width * 0.95f,
+                    ),
+                )
+            },
+        content = content,
+    )
 }
 
 /**

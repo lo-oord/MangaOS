@@ -41,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -54,6 +55,7 @@ import com.mangaos.app.core.designsystem.IconRole
 import com.mangaos.app.core.designsystem.MangaGlass
 import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.ui.components.AppLogo
 import com.mangaos.app.core.ui.components.AppTextField
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.core.ui.components.ProfileAvatar
@@ -102,7 +104,7 @@ fun AccountSetupScreen(onFinished: () -> Unit = {}) {
     val stepIndex = viewModel.step.ordinal + 1
     val stepCount = SetupStep.entries.size
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -112,26 +114,27 @@ fun AccountSetupScreen(onFinished: () -> Unit = {}) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg),
         ) {
-            Spacer(Modifier.height(Spacing.lg))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.height(Spacing.xl))
+            // The brand block and the glass card are the account flow's own shell; finishing
+            // sign-up therefore looks like the page the reader just came from.
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AppLogo(size = 62.dp)
+                Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = stringResource(R.string.setup_title),
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = "$stepIndex/$stepCount",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = stringResource(R.string.setup_title),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(Spacing.sm))
-            LinearProgressIndicator(
-                progress = { stepIndex.toFloat() / stepCount },
-                modifier = Modifier.fillMaxWidth(),
-            )
             Spacer(Modifier.height(Spacing.lg))
 
             GlassSurface(
@@ -140,6 +143,19 @@ fun AccountSetupScreen(onFinished: () -> Unit = {}) {
                 contentPadding = PaddingValues(Spacing.lg),
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(
+                            progress = { stepIndex.toFloat() / stepCount },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.size(Spacing.sm))
+                        Text(
+                            text = "$stepIndex/$stepCount",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.lg))
                     AnimatedContent(
                         targetState = viewModel.step,
                         transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },

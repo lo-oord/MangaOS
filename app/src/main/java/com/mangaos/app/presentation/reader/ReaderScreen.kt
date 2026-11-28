@@ -100,6 +100,7 @@ import com.mangaos.app.R
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.findActivity
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.session.ReaderSession
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.domain.model.Chapter
@@ -797,7 +798,7 @@ private fun ReaderChapterSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = glassPanelFill(),
     ) {
         Text(
             text = stringResource(R.string.reader_chapters_title),

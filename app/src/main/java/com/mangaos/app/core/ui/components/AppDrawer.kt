@@ -31,8 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
-import com.mangaos.app.core.designsystem.Dimens
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.domain.model.SessionType
 import com.mangaos.app.domain.model.UserProfile
 import com.mangaos.app.presentation.navigation.DrawerDestination
@@ -47,10 +47,14 @@ fun AppDrawer(
     onProfileClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The drawer is the same pane of glass as the auth card: the page behind it stays visible
+    // through the sheet, and one golden-free hairline marks where it ends.
+    val sheetShape = RoundedCornerShape(24.dp)
     ModalDrawerSheet(
         modifier = modifier,
-        drawerShape = RoundedCornerShape(20.dp),
-        drawerContainerColor = MaterialTheme.colorScheme.surface,
+        drawerShape = sheetShape,
+        drawerContainerColor = glassPanelFill(),
+        drawerContentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier
@@ -121,7 +125,8 @@ private fun DrawerHeader(
             ProfileAvatar(
                 name = displayName.ifBlank { username },
                 avatarUri = profile?.avatarUri,
-                size = 64.dp,
+                size = 68.dp,
+                verified = profile?.verified == true,
             )
             Spacer(Modifier.height(Spacing.sm))
             // The badge and the gold name follow the account: a verified reader is recognised

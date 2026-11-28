@@ -51,6 +51,8 @@ import com.mangaos.app.core.designsystem.IconRole
 import com.mangaos.app.core.designsystem.MangaGlass
 import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.designsystem.goldColor
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppBottomSheet
@@ -316,11 +318,13 @@ fun ProfileScreen(
         }
 
         item {
-            SettingsRow(
-                icon = MangaOsIcons.logout,
-                title = stringResource(R.string.action_sign_out),
-                onClick = { showSignOut = true },
-            )
+            ProfileCard {
+                SettingsRow(
+                    icon = MangaOsIcons.logout,
+                    title = stringResource(R.string.action_sign_out),
+                    onClick = { showSignOut = true },
+                )
+            }
         }
 
         // Deliberately apart from the ordinary actions: this is the only destructive row.
@@ -595,12 +599,15 @@ private fun ProfileHeader(
                     ProfileAvatar(
                         name = state.displayName,
                         avatarUri = avatarUri,
-                        size = 72.dp,
+                        size = 76.dp,
+                        verified = state.verified,
                     )
+                    // The camera sits at the top corner so the golden verified badge keeps the
+                    // lower one to itself.
                     TextButton(
                         onClick = onPhoto,
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
+                            .align(Alignment.TopEnd)
                             .size(28.dp),
                         contentPadding = PaddingValues(0.dp),
                     ) {
@@ -657,6 +664,19 @@ private fun ProfileHeader(
     }
 }
 
+/** The one glass card every group of account rows sits on. */
+@Composable
+private fun ProfileCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(MangaGlass.corner),
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(vertical = Spacing.xxs), content = content)
+    }
+}
+
 @Composable
 private fun AccountSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -667,13 +687,7 @@ private fun AccountSection(title: String, content: @Composable ColumnScope.() ->
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = Spacing.xs, bottom = Spacing.xs),
         )
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(modifier = Modifier.padding(vertical = Spacing.xxs), content = content)
-        }
+        ProfileCard(content = content)
     }
 }
 

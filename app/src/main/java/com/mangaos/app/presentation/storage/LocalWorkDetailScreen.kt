@@ -2,6 +2,7 @@ package com.mangaos.app.presentation.storage
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +64,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
+import com.mangaos.app.core.designsystem.goldBorderStroke
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
@@ -198,7 +202,8 @@ fun LocalWorkDetailScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+            color = glassPanelFill(),
+            border = glassPanelBorder(),
             shadowElevation = 14.dp,
             shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
         ) {
@@ -368,6 +373,12 @@ private fun LocalDetailHero(
                         coverUrl = work.coverModel,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    // The same golden hairline the catalogue covers carry.
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .border(goldBorderStroke(1.5.dp), RoundedCornerShape(18.dp)),
+                    )
                 }
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
@@ -486,8 +497,8 @@ private fun LocalDetailBody(work: StoredWork) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+            color = glassPanelFill(),
+            border = glassPanelBorder(),
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
@@ -551,8 +562,8 @@ private fun LocalChapterRow(
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onOpen),
         shape = RoundedCornerShape(14.dp),
-        color = scheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.45f)),
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
     ) {
         Row(
             modifier = Modifier

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.glassPanelFill
 
 @Composable
 fun AppTextField(
@@ -106,9 +107,11 @@ fun AppTextField(
             cursorColor = MaterialTheme.colorScheme.primary,
             focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
             unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-            errorContainerColor = MaterialTheme.colorScheme.surface,
+            // Translucent fields so the card behind them shows through: the form is glass all
+            // the way down, not just its outer frame.
+            focusedContainerColor = glassPanelFill(),
+            unfocusedContainerColor = glassPanelFill(),
+            errorContainerColor = glassPanelFill(),
         ),
     )
 }

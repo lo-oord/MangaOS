@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,9 +71,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.AppIcon
 import com.mangaos.app.core.designsystem.AppTheme
+import com.mangaos.app.core.designsystem.GlassSurface
 import com.mangaos.app.core.designsystem.IconRole
+import com.mangaos.app.core.designsystem.MangaGlass
 import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.designsystem.themeSwatches
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.ui.components.AppLogo
@@ -137,7 +142,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        color = Color.Transparent,
     ) {
         Column(
             modifier = Modifier
@@ -147,49 +152,79 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 .imePadding()
                 .padding(horizontal = Spacing.lg),
         ) {
-            Spacer(Modifier.height(Spacing.md))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppLogo(size = 40.dp)
-                Spacer(Modifier.width(Spacing.sm))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.onboarding_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = stringResource(
-                            R.string.onboarding_step_of,
-                            step + 1,
-                            OnboardingViewModel.STEP_COUNT,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            // A plain two-layer bar: the reached share of the wizard, animated between steps.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                        RoundedCornerShape(50),
-                    ),
+            Spacer(Modifier.height(Spacing.lg))
+            // The same brand block the account screens open with, so the wizard and the auth
+            // flow read as one product instead of two.
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progress)
-                        .height(6.dp)
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
+                AppLogo(size = 66.dp)
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = stringResource(R.string.tagline_welcome),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(Spacing.lg))
 
-            Spacer(Modifier.height(Spacing.md))
-            Box(modifier = Modifier.weight(1f)) {
+            GlassSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(MangaGlass.dialogCorner),
+                contentPadding = PaddingValues(Spacing.lg),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.onboarding_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.onboarding_step_of,
+                                step + 1,
+                                OnboardingViewModel.STEP_COUNT,
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    // A two-layer bar: the reached share of the wizard, animated between steps.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
+                                RoundedCornerShape(50),
+                            ),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .height(6.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    RoundedCornerShape(50),
+                                ),
+                        )
+                    }
+
+                    Spacer(Modifier.height(Spacing.md))
+                    Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = step,
                     transitionSpec = {
@@ -241,54 +276,61 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                AnimatedVisibility(visible = step > 0) {
-                    TextButton(onClick = { viewModel.back() }) {
-                        Text(
-                            text = stringResource(R.string.onboarding_back),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (step == OnboardingViewModel.STEP_GENRES || step == OnboardingViewModel.STEP_TYPES) {
-                    TextButton(onClick = viewModel::next) {
-                        Text(
-                            text = stringResource(R.string.onboarding_skip),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                PrimaryButton(
-                    text = if (step == OnboardingViewModel.STEP_COUNT - 1) {
-                        stringResource(R.string.onboarding_finish)
-                    } else {
-                        stringResource(R.string.onboarding_continue)
-                    },
-                    onClick = {
-                        if (step == OnboardingViewModel.STEP_COUNT - 1) {
-                            viewModel.finish(onFinished)
-                        } else {
-                            viewModel.next()
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        AnimatedVisibility(visible = step > 0) {
+                            TextButton(onClick = { viewModel.back() }) {
+                                Text(
+                                    text = stringResource(R.string.onboarding_back),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                    },
-                    icon = if (step == OnboardingViewModel.STEP_COUNT - 1) {
-                        Icons.Outlined.Check
-                    } else {
-                        MangaOsIcons.next
-                    },
-                    modifier = Modifier.weight(1.1f),
-                )
+                        if (step == OnboardingViewModel.STEP_GENRES ||
+                            step == OnboardingViewModel.STEP_TYPES
+                        ) {
+                            TextButton(onClick = viewModel::next) {
+                                Text(
+                                    text = stringResource(R.string.onboarding_skip),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        PrimaryButton(
+                            text = if (step == OnboardingViewModel.STEP_COUNT - 1) {
+                                stringResource(R.string.onboarding_finish)
+                            } else {
+                                stringResource(R.string.onboarding_continue)
+                            },
+                            onClick = {
+                                if (step == OnboardingViewModel.STEP_COUNT - 1) {
+                                    viewModel.finish(onFinished)
+                                } else {
+                                    viewModel.next()
+                                }
+                            },
+                            icon = if (step == OnboardingViewModel.STEP_COUNT - 1) {
+                                Icons.Outlined.Check
+                            } else {
+                                MangaOsIcons.next
+                            },
+                            modifier = Modifier.weight(1.1f),
+                        )
+                    }
+                }
             }
+            Spacer(Modifier.height(Spacing.md))
         }
     }
 }
@@ -313,14 +355,14 @@ private fun StepScaffold(content: @Composable () -> Unit) {
 private fun StepHeader(@StringRes title: Int, @StringRes subtitle: Int) {
     Text(
         text = stringResource(title),
-        style = MaterialTheme.typography.headlineSmall,
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
+        color = MaterialTheme.colorScheme.onSurface,
     )
     Spacer(Modifier.height(4.dp))
     Text(
         text = stringResource(subtitle),
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(Spacing.md))
@@ -504,18 +546,15 @@ private fun GenresStep(selected: Set<String>, onToggle: (String) -> Unit) {
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = if (active) {
-                        MaterialTheme.colorScheme.primaryContainer
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                     } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
+                        glassPanelFill()
                     },
-                    border = BorderStroke(
-                        1.dp,
-                        if (active) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        },
-                    ),
+                    border = if (active) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    } else {
+                        glassPanelBorder()
+                    },
                     modifier = Modifier
                         .animateContentSize()
                         .clickable { onToggle(option.id) },
@@ -630,25 +669,24 @@ private fun SelectionSurface(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    // Every option is the same glass pane as the card it sits on; the selected one is tinted
+    // with the accent instead of switching to an opaque container.
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = if (active) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+            glassPanelFill()
         },
-        border = BorderStroke(
-            1.dp,
-            if (active) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-            },
-        ),
+        border = if (active) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+        } else {
+            glassPanelBorder()
+        },
         content = content,
     )
 }

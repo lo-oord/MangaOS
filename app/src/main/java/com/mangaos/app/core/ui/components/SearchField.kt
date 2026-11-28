@@ -32,6 +32,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.domain.model.MangaViewMode
 
 /**
@@ -53,8 +55,8 @@ fun MangaSearchField(
             .fillMaxWidth()
             .heightIn(min = 46.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .background(glassPanelFill())
+            .border(glassPanelBorder(), shape)
             .padding(start = 12.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangaos.app.core.designsystem.AppTheme
+import com.mangaos.app.core.designsystem.GlassBackdrop
 import com.mangaos.app.core.designsystem.MangaOsTheme
 import com.mangaos.app.core.designsystem.ThemeMode
 import com.mangaos.app.core.designsystem.ThemeReveal
@@ -169,8 +170,12 @@ fun MangaOsApp() {
                     .fillMaxSize()
                     .onSizeChanged { rootSize = it },
             ) {
+                // Every screen is drawn over the same wash, and the scaffold itself is
+                // transparent: that is what turns the app's panels from opaque slabs into
+                // panes of glass in one place instead of one screen at a time.
+                GlassBackdrop()
                 Scaffold(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { innerPadding ->
                     RootNavHost(

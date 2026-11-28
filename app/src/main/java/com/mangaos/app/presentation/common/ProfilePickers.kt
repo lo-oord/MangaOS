@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.SettingsOptionRow
 import com.mangaos.app.core.util.ArabCountries
@@ -141,7 +142,7 @@ fun CountryPickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = glassPanelFill(),
         title = { Text(stringResource(R.string.label_country), style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {
@@ -205,7 +206,7 @@ fun AgePickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = glassPanelFill(),
         title = { Text(stringResource(R.string.label_age), style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {

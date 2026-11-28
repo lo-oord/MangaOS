@@ -2,6 +2,7 @@ package com.mangaos.app.presentation.sources
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,8 @@ import com.mangaos.app.core.designsystem.AppIcon
 import com.mangaos.app.core.designsystem.IconRole
 import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.domain.model.SourceInfo
@@ -141,7 +144,8 @@ private fun SourceRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(glassPanelFill())
+            .border(glassPanelBorder(), shape)
             .clickable(enabled = source.enabled, onClick = onOpen)
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,

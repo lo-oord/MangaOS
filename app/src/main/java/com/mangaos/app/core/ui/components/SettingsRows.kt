@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.core.designsystem.MangaShapes
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
 
 @Composable
 fun SettingsSection(
@@ -37,9 +39,11 @@ fun SettingsSection(
             title = title,
             modifier = Modifier.padding(start = Spacing.xs, end = Spacing.xs),
         )
+        // One glass pane per group: the rows sit on the page wash instead of on an opaque slab.
         Surface(
             shape = MangaShapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            color = glassPanelFill(),
+            border = glassPanelBorder(),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(vertical = Spacing.xs), content = content)

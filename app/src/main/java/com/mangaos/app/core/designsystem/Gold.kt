@@ -1,10 +1,13 @@
 package com.mangaos.app.core.designsystem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /**
  * The verification colour. It is a single, deliberately warm gold that stays readable on every
@@ -19,6 +22,10 @@ object MangaGold {
 
 @Composable
 fun goldColor(): Color = if (glassTokens().dark) MangaGold.dark else MangaGold.light
+
+/** True when the active palette is dark, so gold can pick its brighter pair. */
+@Composable
+fun goldTokensDark(): Boolean = glassTokens().dark
 
 @Composable
 fun goldBrush(shift: Float = 0f): Brush {
@@ -35,6 +42,13 @@ fun goldBrush(shift: Float = 0f): Brush {
         end = Offset(end + offset, 260f),
     )
 }
+
+/**
+ * The one golden hairline shared by covers and frames. A brush, not a flat colour, so the line
+ * carries the same two-tone warmth as the verified name instead of reading as yellow paint.
+ */
+@Composable
+fun goldBorderStroke(width: Dp = 1.dp): BorderStroke = BorderStroke(width, goldBrush())
 
 /** Kept out of the theme: gold is the verification colour, not a brand accent. */
 @Composable

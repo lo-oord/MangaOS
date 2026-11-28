@@ -2,6 +2,7 @@ package com.mangaos.app.presentation.downloads
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
+import com.mangaos.app.core.designsystem.goldBorderStroke
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppIconButton
 import com.mangaos.app.core.ui.components.CoverImage
@@ -185,7 +189,8 @@ private fun DownloadCard(
 
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
         modifier = Modifier
             .fillMaxWidth()
             // A finished download opens its local copy; nothing else on the card navigates.
@@ -196,14 +201,23 @@ private fun DownloadCard(
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CoverImage(
-                    title = task.mangaTitle,
-                    coverUrl = task.coverModel,
+                Box(
                     modifier = Modifier
                         .width(46.dp)
                         .aspectRatio(2f / 3f)
                         .clip(RoundedCornerShape(8.dp)),
-                )
+                ) {
+                    CoverImage(
+                        title = task.mangaTitle,
+                        coverUrl = task.coverModel,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .border(goldBorderStroke(), RoundedCornerShape(8.dp)),
+                    )
+                }
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

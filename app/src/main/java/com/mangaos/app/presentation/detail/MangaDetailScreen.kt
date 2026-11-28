@@ -112,6 +112,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassPanelBorder
+import com.mangaos.app.core.designsystem.glassPanelFill
+import com.mangaos.app.core.designsystem.goldBorderStroke
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppBottomSheet
@@ -606,17 +609,18 @@ private fun DetailHero(
                         .width(128.dp)
                         .aspectRatio(2f / 3f)
                         .clip(RoundedCornerShape(18.dp))
-                        .border(
-                            width = 1.5.dp,
-                            color = scheme.primary.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(18.dp),
-                        )
                         .background(scheme.surfaceContainerHigh),
                 ) {
                     CoverImage(
                         title = manga.title,
                         coverUrl = manga.coverUrl,
                         modifier = Modifier.fillMaxSize(),
+                    )
+                    // Drawn after the artwork so the hairline is never covered by it.
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .border(goldBorderStroke(1.5.dp), RoundedCornerShape(18.dp)),
                     )
                 }
                 Spacer(Modifier.width(Spacing.md))
@@ -783,8 +787,8 @@ private fun DetailInfoTile(tile: DetailTileData, modifier: Modifier = Modifier) 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = scheme.surfaceContainerLow.copy(alpha = 0.92f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.6f)),
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
@@ -829,8 +833,8 @@ private fun DescriptionSection(
             .fillMaxWidth()
             .padding(horizontal = Spacing.screen, vertical = Spacing.md),
         shape = RoundedCornerShape(20.dp),
-        color = scheme.surfaceContainerLow,
-        border = androidx.compose.foundation.BorderStroke(1.dp, scheme.primary.copy(alpha = 0.15f)),
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1088,7 +1092,7 @@ private fun SelectionActions(
             .fillMaxWidth()
             .padding(horizontal = Spacing.screen, vertical = Spacing.xs),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = glassPanelFill(),
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xxs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1220,15 +1224,15 @@ private fun ChapterRow(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         shape = RoundedCornerShape(14.dp),
         color = if (selected && selectionMode) {
-            scheme.primaryContainer.copy(alpha = 0.42f)
+            scheme.primary.copy(alpha = 0.14f)
         } else {
-            scheme.surfaceContainerLow
+            glassPanelFill()
         },
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (selected && selectionMode) scheme.primary.copy(alpha = 0.5f)
-            else scheme.outlineVariant.copy(alpha = 0.45f),
-        ),
+        border = if (selected && selectionMode) {
+            androidx.compose.foundation.BorderStroke(1.dp, scheme.primary.copy(alpha = 0.5f))
+        } else {
+            glassPanelBorder()
+        },
     ) {
         Row(
             modifier = Modifier
