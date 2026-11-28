@@ -60,7 +60,6 @@ import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppTextField
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.core.ui.components.ProfileAvatar
-import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.core.ui.components.ProfileSkeleton
 import com.mangaos.app.core.ui.components.SettingsRow
 import com.mangaos.app.core.ui.components.VerifiedBadge
@@ -74,6 +73,7 @@ import com.mangaos.app.presentation.auth.messageRes
 import com.mangaos.app.presentation.auth.rememberGoogleSignIn
 import com.mangaos.app.presentation.common.AgePickerDialog
 import com.mangaos.app.presentation.common.CountryPickerDialog
+import com.mangaos.app.presentation.common.GuestAccountCard
 import com.mangaos.app.presentation.common.LanguagePickerSheet
 import com.mangaos.app.presentation.common.LocalGuestGate
 import com.mangaos.app.presentation.common.countryDisplayName
@@ -723,38 +723,39 @@ private fun GuestProfile(
         item {
             GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(MangaGlass.dialogCorner),
                 contentPadding = PaddingValues(Spacing.lg),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ProfileAvatar(name = name, avatarUri = avatarUri, size = 72.dp)
+                    ProfileAvatar(name = name, avatarUri = avatarUri, size = 56.dp)
                     Spacer(Modifier.width(Spacing.md))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(Modifier.height(Spacing.xxs))
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = stringResource(R.string.guest_mode),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(
-                                    horizontal = Spacing.xs,
-                                    vertical = 2.dp,
-                                ),
+                                text = name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
+                            Spacer(Modifier.width(Spacing.sm))
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.guest_mode),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(
+                                        horizontal = Spacing.sm,
+                                        vertical = 2.dp,
+                                    ),
+                                )
+                            }
                         }
                         Spacer(Modifier.height(Spacing.xs))
                         Text(
                             text = stringResource(R.string.guest_profile_note),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -763,39 +764,12 @@ private fun GuestProfile(
         }
 
         item {
-            GlassSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(MangaGlass.corner),
-                contentPadding = PaddingValues(Spacing.lg),
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(R.string.guest_register_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(Spacing.xxs))
-                    Text(
-                        text = stringResource(R.string.guest_register_message),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.md))
-                    PrimaryButton(
-                        text = stringResource(R.string.auth_flow_create),
-                        onClick = onCreate,
-                        icon = MangaOsIcons.account,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    SecondaryButton(
-                        text = stringResource(R.string.auth_flow_sign_in),
-                        onClick = onSignIn,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
+            GuestAccountCard(
+                titleRes = R.string.guest_register_title,
+                messageRes = R.string.guest_register_message,
+                onCreate = onCreate,
+                onSignIn = onSignIn,
+            )
         }
 
         item {

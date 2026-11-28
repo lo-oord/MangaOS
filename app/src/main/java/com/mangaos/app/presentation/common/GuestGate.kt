@@ -1,18 +1,24 @@
 package com.mangaos.app.presentation.common
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.GlassSurface
 import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.PrimaryButton
-import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.presentation.auth.AuthMode
 
 /**
@@ -63,19 +69,76 @@ fun GuestAccountDialog(
         onDismiss = onDismiss,
         icon = MangaOsIcons.account,
         content = {
-            Spacer(Modifier.height(Spacing.xs))
             PrimaryButton(
                 text = stringResource(R.string.auth_flow_create),
                 onClick = onSignUp,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            GuestSignInButton(onClick = onSignIn)
+        },
+    )
+}
+
+/**
+ * The one account card a guest meets, on the profile and in the library: a title, one short
+ * sentence and the two ways out of the guest session. Both screens render exactly this card, so
+ * its type scale, padding and button sizes cannot drift apart.
+ */
+@Composable
+fun GuestAccountCard(
+    titleRes: Int,
+    messageRes: Int,
+    onCreate: () -> Unit,
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GlassSurface(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(Spacing.lg),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(titleRes),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = stringResource(messageRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(Spacing.lg))
+            PrimaryButton(
+                text = stringResource(R.string.auth_flow_create),
+                onClick = onCreate,
                 icon = MangaOsIcons.account,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(Spacing.xs))
-            SecondaryButton(
-                text = stringResource(R.string.auth_flow_sign_in),
-                onClick = onSignIn,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-    )
+            GuestSignInButton(onClick = onSignIn)
+        }
+    }
+}
+
+/**
+ * Signing in never competes with creating an account, so it is a quiet full-width text action at
+ * the same footprint as a button instead of a second outlined block.
+ */
+@Composable
+private fun GuestSignInButton(onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = Spacing.sm),
+    ) {
+        Text(
+            text = stringResource(R.string.auth_flow_sign_in),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 }
