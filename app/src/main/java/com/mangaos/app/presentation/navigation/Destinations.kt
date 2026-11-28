@@ -19,6 +19,8 @@ object Routes {
     const val ONBOARDING = "onboarding"
     const val AUTH = "auth"
     const val MAIN = "main"
+    /** Completing the account a new sign-up still lacks; it is not part of the main graph. */
+    const val ACCOUNT_SETUP = "account-setup"
 
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"

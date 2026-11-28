@@ -39,6 +39,22 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <!-- Firebase Cloud Messaging: account notices and new-chapter pushes. -->
+        <service
+            android:name=".data.notifications.MangaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="mangaos_updates" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
         <receiver
             android:name=".data.notifications.NotificationActionReceiver"
             android:exported="false">

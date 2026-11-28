@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.presentation.auth.AccountSetupScreen
 import com.mangaos.app.presentation.auth.AuthScreen
 import com.mangaos.app.presentation.onboarding.OnboardingScreen
 import com.mangaos.app.presentation.splash.SplashDestination
@@ -30,6 +31,7 @@ import com.mangaos.app.presentation.splash.SplashScreen
 fun RootNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val profile by ServiceLocator.user.profile.collectAsStateWithLifecycle()
+    val account by ServiceLocator.account.state.collectAsStateWithLifecycle()
     val unreadNotifications by ServiceLocator.notifications.unreadCount.collectAsStateWithLifecycle()
     val reduceMotion = LocalReduceMotion.current
     val transitionMillis = if (reduceMotion) 0 else 220
@@ -48,6 +50,15 @@ fun RootNavHost(modifier: Modifier = Modifier) {
                 popUpTo(Routes.MAIN) { inclusive = true }
                 launchSingleTop = true
             }
+        }
+    }
+
+    // A new account is not finished until it has a username and a name: the setup screen is a
+    // real destination, and the flag survives a restart because it lives in the account document.
+    LaunchedEffect(account.needsSetup, account.uid) {
+        if (!account.needsSetup) return@LaunchedEffect
+        navController.navigate(Routes.ACCOUNT_SETUP) {
+            launchSingleTop = true
         }
     }
 
@@ -90,6 +101,16 @@ fun RootNavHost(modifier: Modifier = Modifier) {
                 onSignedIn = {
                     navController.navigate(Routes.MAIN) {
                         popUpTo(Routes.AUTH) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(Routes.ACCOUNT_SETUP) {
+            AccountSetupScreen(
+                onFinished = {
+                    navController.navigate(Routes.MAIN) {
+                        popUpTo(Routes.ACCOUNT_SETUP) { inclusive = true }
                     }
                 },
             )

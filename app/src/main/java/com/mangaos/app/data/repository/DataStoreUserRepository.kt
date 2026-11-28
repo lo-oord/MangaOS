@@ -2,6 +2,7 @@ package com.mangaos.app.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -36,6 +37,7 @@ class DataStoreUserRepository(
         val country = stringPreferencesKey("user_country")
         val age = intPreferencesKey("user_age")
         val preferredLanguage = stringPreferencesKey("user_preferred_language")
+        val verified = booleanPreferencesKey("user_verified")
     }
 
     override val profile: StateFlow<UserProfile?> = dataStore.data
@@ -51,6 +53,7 @@ class DataStoreUserRepository(
                 countryCode = preferences[Keys.country],
                 age = preferences[Keys.age],
                 preferredLanguage = preferences[Keys.preferredLanguage],
+                verified = preferences[Keys.verified] ?: false,
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, null)
@@ -125,6 +128,28 @@ class DataStoreUserRepository(
         }
     }
 
+    /**
+     * Writes the account identity in one edit. The UID becomes the local id, so a library entry
+     * saved on this device stays attached to the same account after signing in again.
+     */
+    override suspend fun adoptAccount(profile: UserProfile) {
+        dataStore.edit { preferences ->
+            preferences[Keys.id] = profile.id
+            preferences[Keys.username] = profile.username
+            preferences[Keys.displayName] = profile.displayName
+            preferences[Keys.session] = if (profile.sessionType == SessionType.GUEST) "guest" else "account"
+            preferences[Keys.verified] = profile.verified
+            writeProfile(
+                preferences,
+                profile.avatarUri,
+                profile.email,
+                profile.countryCode,
+                profile.age,
+                profile.preferredLanguage,
+            )
+        }
+    }
+
     override fun signOut() {
         scope.launch {
             dataStore.edit { preferences ->
@@ -137,6 +162,7 @@ class DataStoreUserRepository(
                 preferences.remove(Keys.country)
                 preferences.remove(Keys.age)
                 preferences.remove(Keys.preferredLanguage)
+                preferences.remove(Keys.verified)
             }
         }
     }

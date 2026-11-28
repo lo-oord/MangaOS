@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 /** The check runs every 20 minutes; Android only guarantees an approximate interval. */
 class NewChapterScheduler(private val context: Context) {
 
-    fun schedule() {
+    fun schedule(accountId: String? = null) {
         val request = PeriodicWorkRequestBuilder<NewChapterCheckWorker>(
             CHECK_INTERVAL_MINUTES,
             TimeUnit.MINUTES,
@@ -37,20 +37,28 @@ class NewChapterScheduler(private val context: Context) {
             .addTag(TAG)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            UNIQUE_NAME,
+            uniqueName(accountId),
             ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }
 
-    fun cancel() {
-        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
+    fun cancel(accountId: String? = null) {
+        WorkManager.getInstance(context).cancelUniqueWork(uniqueName(accountId))
+    }
+
+    /** Signing out stops the check for the account instead of leaving it running for nobody. */
+    fun cancelAll() {
+        WorkManager.getInstance(context).cancelAllWorkByTag(TAG)
     }
 
     companion object {
         const val CHECK_INTERVAL_MINUTES = 20L
-        private const val UNIQUE_NAME = "mangaos_new_chapter_check"
         private const val TAG = "mangaos_new_chapter_check"
+
+        /** One periodic job per account, so two signed-in accounts cannot overwrite each other. */
+        private fun uniqueName(accountId: String?): String =
+            "mangaos_new_chapter_check_${accountId ?: "local"}"
     }
 }
 

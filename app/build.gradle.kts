@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 /**
@@ -73,7 +74,8 @@ android {
             }
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // Firebase registers one package per app, so the debug build keeps the application id
+            // and only its version name marks it as a debug build.
             versionNameSuffix = "-debug"
         }
     }
@@ -136,6 +138,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // Firebase: accounts, cloud sync and notifications.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.messaging)
+    implementation(libs.play.services.auth)
 
     // Native source engine: the shared HTTP/JSON layer. Bundled sources are registered in
     // NativeSourceRegistry; no extension APK is loaded at runtime.

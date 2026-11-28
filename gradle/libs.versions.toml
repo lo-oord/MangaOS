@@ -25,6 +25,9 @@ quickjs = "547f5b1597"
 webkit = "1.18.0"
 logcat = "0.4"
 mokoResources = "0.27.1"
+firebaseBom = "33.7.0"
+googleServices = "4.4.2"
+playServicesAuth = "21.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -70,7 +73,15 @@ androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "w
 logcat = { group = "com.squareup.logcat", name = "logcat", version.ref = "logcat" }
 moko-resources = { group = "dev.icerock.moko", name = "resources", version.ref = "mokoResources" }
 
+# Firebase: authentication, account documents and Cloud Messaging. Versions come from the BOM.
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

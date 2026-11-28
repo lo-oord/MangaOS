@@ -12,6 +12,8 @@ data class UserProfile(
     val age: Int? = null,
     /** Preferred content language (ar/en/ja), separate from the interface language. */
     val preferredLanguage: String? = null,
+    /** Read from the protected badge document, never from a value the user can edit. */
+    val verified: Boolean = false,
 )
 
 enum class SessionType { GUEST, ACCOUNT }

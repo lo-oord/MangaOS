@@ -63,6 +63,22 @@ import androidx.compose.material.icons.outlined.Theaters
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Cake
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Verified
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -160,6 +176,25 @@ object MangaOsIcons {
     val help = Icons.Outlined.HelpOutline
     val home = Icons.Outlined.Home
     val storage = Icons.Outlined.SdStorage
+
+    // Account, security, sync and notifications. One entry per concept, so a screen never picks
+    // a one-off glyph for something that already has a place here.
+    val mail = Icons.Outlined.MailOutline
+    val login = Icons.AutoMirrored.Outlined.Login
+    val logout = Icons.AutoMirrored.Outlined.Logout
+    val link = Icons.Outlined.Link
+    val unlink = Icons.Outlined.LinkOff
+    val verified = Icons.Outlined.Verified
+    val shield = Icons.Outlined.Shield
+    val key = Icons.Outlined.VpnKey
+    val cloud = Icons.Outlined.CloudQueue
+    val cloudOff = Icons.Outlined.CloudOff
+    val camera = Icons.Outlined.PhotoCamera
+    val edit = Icons.Outlined.Edit
+    val trash = Icons.Outlined.DeleteForever
+    val sync = Icons.Outlined.Sync
+    val account = Icons.Outlined.AccountCircle
+    val cake = Icons.Outlined.Cake
 
     val theme: ImageVector = Icons.Outlined.Palette
 }

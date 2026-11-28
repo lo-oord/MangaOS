@@ -1,9 +1,13 @@
 package com.mangaos.app.di
 
 import android.content.Context
+import com.google.firebase.messaging.FirebaseMessaging
 import com.mangaos.app.data.download.LocalDownloadRepository
+import com.mangaos.app.data.firebase.AccountRepository
+import com.mangaos.app.data.firebase.AccountSession
+import com.mangaos.app.data.firebase.CloudSync
+import com.mangaos.app.data.firebase.awaitResult
 import com.mangaos.app.data.local.CoverStore
-import com.mangaos.app.data.local.LocalAuthStore
 import com.mangaos.app.data.local.ReaderSettingsRepositoryImpl
 import com.mangaos.app.data.local.SettingsRepositoryImpl
 import com.mangaos.app.data.local.mangaOsDataStore
@@ -27,6 +31,7 @@ import com.mangaos.app.domain.repository.ReaderSettingsRepository
 import com.mangaos.app.domain.repository.SettingsRepository
 import com.mangaos.app.domain.repository.SourceRepository
 import com.mangaos.app.domain.repository.UserRepository
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,9 +78,16 @@ object ServiceLocator {
     lateinit var chapterWatch: ChapterWatchStore
         private set
 
-    /** Local credential store used by the authentication flow until a backend is connected. */
-    lateinit var localAuth: LocalAuthStore
+    /** Account documents, the live session and the two-way preference sync. */
+    lateinit var accounts: AccountRepository
         private set
+    lateinit var cloudSync: CloudSync
+        private set
+    lateinit var account: AccountSession
+        private set
+
+    private var sessionUid: String? = null
+    private var messagingToken: String? = null
 
     fun init(context: Context) {
         if (initialized) return
@@ -83,7 +95,6 @@ object ServiceLocator {
         val dataStore = appContext.mangaOsDataStore
 
         settings = SettingsRepositoryImpl(appContext, dataStore)
-        localAuth = LocalAuthStore(appContext)
         readerSettings = ReaderSettingsRepositoryImpl(dataStore)
         user = DataStoreUserRepository(dataStore, appScope)
         library = DataStoreLibraryRepository(dataStore, appScope)
@@ -107,6 +118,23 @@ object ServiceLocator {
             coverStore = coverStore,
         )
 
+        accounts = AccountRepository()
+        cloudSync = CloudSync(dataStore, appScope, clientId = installId())
+        account = AccountSession(
+            scope = appScope,
+            accounts = accounts,
+            cloudSync = cloudSync,
+            users = user,
+            scheduleWork = { uid ->
+                sessionUid = uid
+                val scheduler = NewChapterScheduler(appContext)
+                if (uid == null) scheduler.cancelAll() else scheduler.schedule(uid)
+            },
+            registerDevice = { uid -> registerMessagingToken(uid) },
+            clearDevice = { clearMessagingToken() },
+        )
+        account.start()
+
         // The periodic check is only registered while the user wants it. WorkManager keeps
         // the schedule across app restarts and reboots by itself.
         appScope.launch {
@@ -115,7 +143,11 @@ object ServiceLocator {
                 .distinctUntilChanged()
                 .collect { enabled ->
                     val scheduler = NewChapterScheduler(appContext)
-                    if (enabled) scheduler.schedule() else scheduler.cancel()
+                    if (enabled) {
+                        scheduler.schedule(sessionUid)
+                    } else {
+                        scheduler.cancelAll()
+                    }
                 }
         }
 
@@ -123,4 +155,42 @@ object ServiceLocator {
     }
 
     fun context(): Context = appContext
+
+    /** Called by the messaging service when Firebase rotates the registration token. */
+    fun registerMessagingToken(token: String? = null) {
+        val uid = sessionUid ?: return
+        registerMessagingToken(uid, token)
+    }
+
+    private fun registerMessagingToken(uid: String, token: String? = null) {
+        appScope.launch {
+            val resolved = token ?: runCatching {
+                FirebaseMessaging.getInstance().token.awaitResult()
+            }.getOrNull() ?: return@launch
+            messagingToken = resolved
+            runCatching { accounts.saveDeviceToken(uid, resolved) }
+        }
+    }
+
+    private fun clearMessagingToken() {
+        val uid = sessionUid
+        val token = messagingToken
+        if (uid != null && token != null) {
+            appScope.launch {
+                runCatching { accounts.removeDeviceToken(uid, token) }
+            }
+        }
+        messagingToken = null
+        runCatching { FirebaseMessaging.getInstance().deleteToken() }
+    }
+
+    /** A per-install identifier used only to recognise this device's own cloud writes. */
+    private fun installId(): String {
+        val preferences = appContext.getSharedPreferences("mangaos_install", Context.MODE_PRIVATE)
+        val existing = preferences.getString("client_id", null)
+        if (existing != null) return existing
+        val created = UUID.randomUUID().toString()
+        preferences.edit().putString("client_id", created).apply()
+        return created
+    }
 }

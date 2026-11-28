@@ -124,19 +124,27 @@ private fun DrawerHeader(
                 size = 64.dp,
             )
             Spacer(Modifier.height(Spacing.sm))
-            Text(
-                text = "@$username",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // The badge and the gold name follow the account: a verified reader is recognised
+            // in the drawer exactly as on the profile page.
+            VerifiedName(
+                name = "@$username",
+                verified = profile?.verified == true,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                badgeSize = 13.dp,
+                showBadge = !isGuest,
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = displayName,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (profile?.verified == true) {
+                    com.mangaos.app.core.designsystem.goldColor()
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

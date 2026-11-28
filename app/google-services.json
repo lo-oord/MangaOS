@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "508550400647",
+    "project_id": "mangaos2814",
+    "storage_bucket": "mangaos2814.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508550400647:android:923316d17b53103e5a4622",
+        "android_client_info": {
+          "package_name": "com.mangaos.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508550400647-sp5fo1na37b34i12jb6sbu1q7bqokvvg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mangaos.app",
+            "certificate_hash": "54a14e452c61e4de9c80cb2aa0a061fc30016df9"
+          }
+        },
+        {
+          "client_id": "508550400647-6ijgh9sg6190jukd4qrue38k81s5pnsk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7k3mOffKqxZLbmSY6XPL03pzxib0GC3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508550400647-6ijgh9sg6190jukd4qrue38k81s5pnsk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

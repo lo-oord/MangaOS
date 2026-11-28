@@ -185,6 +185,12 @@ interface UserRepository {
     )
 
     fun signOut()
+
+    /**
+     * Binds the session to the identity of a signed-in account (the Firebase UID), so the local
+     * profile and every screen that reads it follow the account instead of a random local id.
+     */
+    suspend fun adoptAccount(profile: UserProfile)
 }
 
 interface SettingsRepository {

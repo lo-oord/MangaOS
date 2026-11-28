@@ -4,45 +4,26 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.Badge
-import androidx.compose.material.icons.outlined.Cake
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Public
-import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,20 +34,24 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
-import com.mangaos.app.core.designsystem.Dimens
+import com.mangaos.app.core.designsystem.AppIcon
+import com.mangaos.app.core.designsystem.GlassSurface
+import com.mangaos.app.core.designsystem.IconRole
+import com.mangaos.app.core.designsystem.MangaGlass
+import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.goldColor
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.AppDialog
@@ -74,10 +59,14 @@ import com.mangaos.app.core.ui.components.AppTextField
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.core.ui.components.ProfileAvatar
 import com.mangaos.app.core.ui.components.ProfileSkeleton
-import com.mangaos.app.core.ui.components.SecondaryButton
-import com.mangaos.app.domain.model.SessionType
-import com.mangaos.app.domain.model.UserProfile
+import com.mangaos.app.core.ui.components.SettingsRow
+import com.mangaos.app.core.ui.components.VerifiedBadge
+import com.mangaos.app.core.ui.components.VerifiedName
+import com.mangaos.app.data.firebase.AccountState
+import com.mangaos.app.data.firebase.CloudSync
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.presentation.auth.messageRes
+import com.mangaos.app.presentation.auth.rememberGoogleSignIn
 import com.mangaos.app.presentation.common.AgePickerDialog
 import com.mangaos.app.presentation.common.CountryPickerDialog
 import com.mangaos.app.presentation.common.LanguagePickerSheet
@@ -85,158 +74,234 @@ import com.mangaos.app.presentation.common.countryDisplayName
 import com.mangaos.app.presentation.common.languageDisplayName
 import kotlinx.coroutines.launch
 
+/**
+ * The account page: who is signed in, what the account can sign in with, and the two actions
+ * that end a session or an account. There is no public profile here, no follower count and no
+ * placeholder data — every row is a real value from the account document.
+ */
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel(),
 ) {
-    val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val sync by viewModel.syncStatus.collectAsStateWithLifecycle()
+    val localProfile by ServiceLocator.user.profile.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
 
-    var editTarget by remember { mutableStateOf<ProfileEditTarget?>(null) }
+    var editing by remember { mutableStateOf<ProfileField?>(null) }
     var pendingPhoto by remember { mutableStateOf<Uri?>(null) }
-    var showLanguagePicker by remember { mutableStateOf(false) }
-    var showCountryPicker by remember { mutableStateOf(false) }
-    var showAgePicker by remember { mutableStateOf(false) }
-    var showPasswordInfo by remember { mutableStateOf(false) }
-    var showSignOutConfirm by remember { mutableStateOf(false) }
-    var avatarReloadKey by remember(profile?.avatarUri) { mutableStateOf(0) }
-    var avatarFailed by remember(profile?.avatarUri) { mutableStateOf(false) }
-
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null) pendingPhoto = uri
-    }
+    var showLanguages by remember { mutableStateOf(false) }
+    var showCountries by remember { mutableStateOf(false) }
+    var showAges by remember { mutableStateOf(false) }
+    var passwordDialog by remember { mutableStateOf<PasswordDialog?>(null) }
+    var showSignOut by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
+    var showUnlink by remember { mutableStateOf(false) }
 
     fun message(res: Int) {
         scope.launch { snackbar.showSnackbar(context.getString(res)) }
     }
 
-    val current = profile
-    if (current == null) {
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) pendingPhoto = uri }
+
+    val launchGoogle = rememberGoogleSignIn { result ->
+        result
+            .onSuccess { token ->
+                viewModel.linkGoogle(token) { success ->
+                    message(if (success) R.string.profile_google_linked else R.string.profile_save_failed)
+                }
+            }
+            .onFailure { message(R.string.profile_save_failed) }
+    }
+
+    if (state.loading && state.account == null) {
         ProfileSkeleton(modifier = modifier)
         return
     }
 
+    val account = state.account
+
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        modifier = modifier.fillMaxSize().imePadding(),
+        contentPadding = PaddingValues(
             start = Spacing.screen,
             end = Spacing.screen,
-            top = Spacing.lg,
+            top = Spacing.md,
             bottom = Spacing.xxl,
         ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item {
-            ProfileHero(
-                profile = current,
-                avatarReloadKey = avatarReloadKey,
-                avatarFailed = avatarFailed,
-                onAvatarError = { avatarFailed = true },
-                onRetryAvatar = {
-                    avatarFailed = false
-                    avatarReloadKey += 1
-                },
-                onPhotoClick = {
+            ProfileHeader(
+                state = state,
+                avatarUri = localProfile?.avatarUri,
+                onPhoto = {
                     photoPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 },
-                onUsernameClick = {
-                    viewModel.clearEditError()
-                    editTarget = ProfileEditTarget.USERNAME
-                },
-                onDisplayNameClick = {
-                    viewModel.clearEditError()
-                    editTarget = ProfileEditTarget.DISPLAY_NAME
-                },
+                onEditName = { editing = ProfileField.DISPLAY_NAME },
             )
         }
 
         item {
-            ProfileCard(title = stringResource(R.string.profile_account_info)) {
-                InfoRow(
-                    icon = Icons.Outlined.Language,
-                    label = stringResource(R.string.label_preferred_language),
-                    value = languageDisplayName(current.preferredLanguage ?: "ar"),
-                    onClick = { showLanguagePicker = true },
+            AccountSection(title = stringResource(R.string.profile_account_info)) {
+                SettingsRow(
+                    icon = MangaOsIcons.account,
+                    title = stringResource(R.string.setup_display_label),
+                    value = state.displayName.ifBlank { stringResource(R.string.value_not_set) },
+                    onClick = { editing = ProfileField.DISPLAY_NAME },
+                    showDivider = true,
                 )
-                RowDivider()
-                InfoRow(
-                    icon = Icons.Outlined.Public,
-                    label = stringResource(R.string.label_country),
-                    value = current.countryCode?.let(::countryDisplayName)
+                SettingsRow(
+                    icon = MangaOsIcons.verified,
+                    title = stringResource(R.string.setup_username_label),
+                    value = state.username.ifBlank { stringResource(R.string.value_not_set) },
+                    onClick = { editing = ProfileField.USERNAME },
+                    showDivider = true,
+                )
+                SettingsRow(
+                    icon = MangaOsIcons.mail,
+                    title = stringResource(R.string.profile_email),
+                    value = state.email ?: stringResource(R.string.value_not_set),
+                    showDivider = true,
+                )
+                SettingsRow(
+                    icon = MangaOsIcons.languages,
+                    title = stringResource(R.string.label_preferred_language),
+                    value = languageDisplayName(account?.language ?: "ar"),
+                    onClick = { showLanguages = true },
+                    showDivider = true,
+                )
+                SettingsRow(
+                    icon = MangaOsIcons.globe,
+                    title = stringResource(R.string.label_country),
+                    value = account?.country?.let(::countryDisplayName)
                         ?: stringResource(R.string.value_not_set),
-                    onClick = { showCountryPicker = true },
+                    onClick = { showCountries = true },
+                    showDivider = true,
                 )
-                RowDivider()
-                InfoRow(
-                    icon = Icons.Outlined.Cake,
-                    label = stringResource(R.string.label_age),
-                    value = current.age?.toString() ?: stringResource(R.string.value_not_set),
-                    onClick = { showAgePicker = true },
-                )
-                RowDivider()
-                InfoRow(
-                    icon = Icons.Outlined.AlternateEmail,
-                    label = stringResource(R.string.profile_email),
-                    value = current.email ?: stringResource(R.string.value_not_set),
-                )
-                RowDivider()
-                InfoRow(
-                    icon = Icons.Outlined.Lock,
-                    label = stringResource(R.string.profile_password),
-                    value = stringResource(R.string.profile_change_password),
-                    onClick = { showPasswordInfo = true },
+                SettingsRow(
+                    icon = MangaOsIcons.cake,
+                    title = stringResource(R.string.label_age),
+                    value = account?.age?.toString() ?: stringResource(R.string.value_not_set),
+                    onClick = { showAges = true },
                 )
             }
         }
 
         item {
-            ProfileCard(title = stringResource(R.string.profile_auth_sync)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Sync,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(Spacing.md))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.profile_auto_sync),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+            AccountSection(title = stringResource(R.string.profile_linked_accounts)) {
+                SettingsRow(
+                    icon = MangaOsIcons.mail,
+                    title = stringResource(R.string.profile_password_row),
+                    value = stringResource(
+                        if (state.hasPassword) R.string.profile_password_set
+                        else R.string.profile_password_missing,
+                    ),
+                    enabled = !viewModel.isSaving,
+                    onClick = {
+                        passwordDialog = if (state.hasPassword) PasswordDialog.CHANGE else PasswordDialog.SET
+                    },
+                    showDivider = true,
+                    trailing = {
+                        if (state.hasPassword) {
+                            AppIcon(
+                                icon = MangaOsIcons.success,
+                                contentDescription = null,
+                                role = IconRole.Success,
+                                size = 18.dp,
+                            )
+                        }
+                    },
+                )
+                SettingsRow(
+                    icon = MangaOsIcons.globe,
+                    title = stringResource(R.string.profile_google_row),
+                    value = stringResource(
+                        if (state.hasGoogle) R.string.profile_linked else R.string.profile_not_linked,
+                    ),
+                    enabled = !viewModel.isSaving,
+                    onClick = {
+                        if (state.hasGoogle) {
+                            if (state.hasPassword) showUnlink = true
+                            else message(R.string.profile_unlink_last_method)
+                        } else {
+                            launchGoogle()
+                        }
+                    },
+                    trailing = {
+                        if (viewModel.busyAction == "link") {
+                            AppIcon(
+                                icon = MangaOsIcons.loading,
+                                contentDescription = null,
+                                role = IconRole.Muted,
+                                size = 18.dp,
+                            )
+                        } else if (state.hasGoogle) {
+                            VerifiedBadge(size = 18.dp)
+                        }
+                    },
+                )
+            }
+        }
+
+        item {
+            AccountSection(title = stringResource(R.string.profile_security)) {
+                SettingsRow(
+                    icon = MangaOsIcons.shield,
+                    title = stringResource(R.string.profile_email_status),
+                    value = stringResource(
+                        if (state.emailVerified) R.string.profile_email_verified
+                        else R.string.profile_email_unverified,
+                    ),
+                    onClick = if (state.emailVerified) null else viewModel::refreshVerification,
+                    showDivider = true,
+                    trailing = {
+                        if (!state.emailVerified) {
+                            TextButton(
+                                onClick = {
+                                    viewModel.sendVerification { sent ->
+                                        message(
+                                            if (sent) R.string.auth_verify_sent
+                                            else R.string.auth_error_generic,
+                                        )
+                                    }
+                                },
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.auth_verify_resend),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                    },
+                )
+                SettingsRow(
+                    icon = MangaOsIcons.cloud,
+                    title = stringResource(R.string.profile_sync_row),
+                    value = sync.label(),
+                    trailing = {
+                        AppIcon(
+                            icon = when (sync) {
+                                CloudSync.Status.OFFLINE -> MangaOsIcons.cloudOff
+                                CloudSync.Status.SYNCED -> MangaOsIcons.success
+                                else -> MangaOsIcons.sync
+                            },
+                            contentDescription = null,
+                            role = when (sync) {
+                                CloudSync.Status.OFFLINE -> IconRole.Warning
+                                CloudSync.Status.SYNCED -> IconRole.Success
+                                else -> IconRole.Muted
+                            },
+                            size = 18.dp,
                         )
-                        Text(
-                            text = stringResource(R.string.profile_auto_sync_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = false,
-                        onCheckedChange = null,
-                        enabled = false,
-                    )
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text(
-                    text = stringResource(R.string.profile_sync_unavailable),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = Spacing.md),
+                    },
                 )
             }
         }
@@ -246,77 +311,121 @@ fun ProfileScreen(
                 text = stringResource(R.string.profile_privacy_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Spacing.xs),
             )
         }
 
-        // Ending the session only returns to the authentication screen: the library, downloads,
-        // reading history and every preference stay exactly where they are on this device.
         item {
-            SecondaryButton(
-                text = stringResource(R.string.action_sign_out),
-                icon = Icons.AutoMirrored.Outlined.Logout,
-                onClick = { showSignOutConfirm = true },
+            SettingsRow(
+                icon = MangaOsIcons.logout,
+                title = stringResource(R.string.action_sign_out),
+                onClick = { showSignOut = true },
+            )
+        }
+
+        // Deliberately apart from the ordinary actions: this is the only destructive row.
+        item {
+            Spacer(Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                TextButton(
+                    onClick = { showDelete = true },
+                    enabled = !viewModel.isSaving,
+                ) {
+                    AppIcon(
+                        icon = MangaOsIcons.trash,
+                        contentDescription = null,
+                        role = IconRole.Error,
+                        size = 18.dp,
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        text = stringResource(R.string.delete_account),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+    }
+
+    viewModel.failure?.let { reason ->
+        AppDialog(
+            title = stringResource(R.string.profile_action_failed),
+            message = stringResource(reason.messageRes()),
+            confirmLabel = stringResource(R.string.action_done),
+            onConfirm = viewModel::clearMessages,
+            onDismiss = viewModel::clearMessages,
+            icon = MangaOsIcons.error,
+        )
+    }
+    if (viewModel.failure == null) {
+        viewModel.notice?.let { notice ->
+            AppDialog(
+                title = stringResource(notice),
+                confirmLabel = stringResource(R.string.action_done),
+                onConfirm = viewModel::clearMessages,
+                onDismiss = viewModel::clearMessages,
+                icon = MangaOsIcons.info,
             )
         }
     }
 
-    editTarget?.let { target ->
-        EditProfileSheet(
-            target = target,
-            profile = current,
+    editing?.let { field ->
+        EditFieldSheet(
+            field = field,
+            initial = if (field == ProfileField.USERNAME) state.username else state.displayName,
             isSaving = viewModel.isSaving,
-            errorRes = viewModel.editError,
-            onValueChange = viewModel::clearEditError,
+            usernameCheck = viewModel.usernameCheck,
+            onCheck = viewModel::checkUsername,
             onDismiss = {
-                viewModel.clearEditError()
-                editTarget = null
+                viewModel.clearMessages()
+                editing = null
             },
             onSave = { value ->
-                val onResult: (Boolean) -> Unit = { success ->
+                val done: (Boolean) -> Unit = { success ->
                     if (success) {
-                        editTarget = null
+                        editing = null
                         message(R.string.profile_saved)
-                    } else if (viewModel.editError == null) {
+                    } else {
                         message(R.string.profile_save_failed)
                     }
                 }
-                when (target) {
-                    ProfileEditTarget.DISPLAY_NAME -> viewModel.saveDisplayName(value, onResult)
-                    ProfileEditTarget.USERNAME -> viewModel.saveUsername(value, onResult)
+                when (field) {
+                    ProfileField.DISPLAY_NAME -> viewModel.saveDisplayName(value, done)
+                    ProfileField.USERNAME -> viewModel.saveUsername(value, done)
                 }
             },
         )
     }
 
     pendingPhoto?.let { uri ->
-        AppBottomSheet(onDismiss = { if (!viewModel.isSavingPhoto) pendingPhoto = null }) {
+        AppBottomSheet(onDismiss = { if (!viewModel.isSaving) pendingPhoto = null }) {
             Text(
                 text = stringResource(R.string.profile_photo_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.md))
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 ProfileAvatar(
-                    name = current.displayName,
+                    name = state.displayName,
                     avatarUri = uri.toString(),
-                    size = 156.dp,
-                    modifier = Modifier.border(
-                        width = 3.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                        shape = CircleShape,
-                    ),
+                    size = 148.dp,
+                    modifier = Modifier.size(148.dp),
                 )
             }
             Spacer(Modifier.height(Spacing.md))
             Text(
-                text = stringResource(R.string.profile_photo_upload_note),
+                text = stringResource(R.string.profile_photo_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.md))
             PrimaryButton(
                 text = stringResource(R.string.profile_save),
                 onClick = {
@@ -329,368 +438,426 @@ fun ProfileScreen(
                         }
                     }
                 },
-                loading = viewModel.isSavingPhoto,
-                enabled = !viewModel.isSavingPhoto,
+                loading = viewModel.isSaving,
             )
-            Spacer(Modifier.height(Spacing.sm))
-            SecondaryButton(
-                text = stringResource(R.string.action_cancel),
+            Spacer(Modifier.height(Spacing.xs))
+            TextButton(
                 onClick = { pendingPhoto = null },
-                enabled = !viewModel.isSavingPhoto,
-            )
+                enabled = !viewModel.isSaving,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(R.string.action_cancel))
+            }
         }
     }
 
-    if (showLanguagePicker) {
+    if (showLanguages) {
         LanguagePickerSheet(
-            selected = current.preferredLanguage ?: "ar",
+            selected = account?.language ?: "ar",
             onSelect = {
-                showLanguagePicker = false
-                viewModel.setLanguage(it) { success ->
-                    message(if (success) R.string.profile_saved else R.string.profile_save_failed)
+                showLanguages = false
+                viewModel.saveLanguage(it) { ok ->
+                    message(if (ok) R.string.profile_saved else R.string.profile_save_failed)
                 }
             },
-            onDismiss = { showLanguagePicker = false },
+            onDismiss = { showLanguages = false },
         )
     }
-
-    if (showCountryPicker) {
+    if (showCountries) {
         CountryPickerDialog(
-            selectedCode = current.countryCode,
+            selectedCode = account?.country,
             onSelect = {
-                showCountryPicker = false
-                viewModel.setCountry(it) { success ->
-                    message(if (success) R.string.profile_saved else R.string.profile_save_failed)
+                showCountries = false
+                viewModel.saveCountry(it) { ok ->
+                    message(if (ok) R.string.profile_saved else R.string.profile_save_failed)
                 }
             },
-            onDismiss = { showCountryPicker = false },
+            onDismiss = { showCountries = false },
         )
     }
-
-    if (showAgePicker) {
+    if (showAges) {
         AgePickerDialog(
-            selectedAge = current.age,
+            selectedAge = account?.age,
             onSelect = {
-                showAgePicker = false
-                viewModel.setAge(it) { success ->
-                    message(if (success) R.string.profile_saved else R.string.profile_save_failed)
+                showAges = false
+                viewModel.saveAge(it) { ok ->
+                    message(if (ok) R.string.profile_saved else R.string.profile_save_failed)
                 }
             },
-            onDismiss = { showAgePicker = false },
+            onDismiss = { showAges = false },
         )
     }
 
-    if (showSignOutConfirm) {
+    passwordDialog?.let { dialog ->
+        PasswordSheet(
+            dialog = dialog,
+            isSaving = viewModel.isSaving,
+            onDismiss = { if (!viewModel.isSaving) passwordDialog = null },
+            onSubmit = { current, newPassword, confirmation ->
+                if (newPassword != confirmation) {
+                    message(R.string.auth_error_password_mismatch)
+                } else if (newPassword.length < 8) {
+                    message(R.string.auth_error_password_weak)
+                } else {
+                    val done: (Boolean) -> Unit = { success ->
+                        if (success) {
+                            passwordDialog = null
+                            message(R.string.profile_password_saved)
+                        } else {
+                            message(R.string.profile_save_failed)
+                        }
+                    }
+                    when (dialog) {
+                        PasswordDialog.SET -> viewModel.setPassword(newPassword, done)
+                        PasswordDialog.CHANGE -> viewModel.changePassword(current, newPassword, done)
+                    }
+                }
+            },
+        )
+    }
+
+    if (showUnlink) {
+        AppDialog(
+            title = stringResource(R.string.profile_unlink_title),
+            message = stringResource(R.string.profile_unlink_message),
+            confirmLabel = stringResource(R.string.profile_unlink),
+            onConfirm = {
+                showUnlink = false
+                viewModel.unlinkGoogle { ok ->
+                    message(if (ok) R.string.profile_unlinked else R.string.profile_save_failed)
+                }
+            },
+            onDismiss = { showUnlink = false },
+            icon = MangaOsIcons.unlink,
+        )
+    }
+
+    if (showSignOut) {
         AppDialog(
             title = stringResource(R.string.sign_out_title),
             message = stringResource(R.string.sign_out_message),
             confirmLabel = stringResource(R.string.action_sign_out),
             onConfirm = {
-                showSignOutConfirm = false
-                ServiceLocator.user.signOut()
+                showSignOut = false
+                viewModel.signOut()
             },
-            onDismiss = { showSignOutConfirm = false },
+            onDismiss = { showSignOut = false },
+            icon = MangaOsIcons.logout,
         )
     }
 
-    if (showPasswordInfo) {
-        AppDialog(
-            title = stringResource(R.string.profile_change_password),
-            message = stringResource(R.string.profile_password_unavailable),
-            confirmLabel = stringResource(R.string.action_done),
-            onConfirm = { showPasswordInfo = false },
-            onDismiss = { showPasswordInfo = false },
+    if (showDelete) {
+        DeleteAccountDialog(
+            username = state.username,
+            needsPassword = state.hasPassword,
+            isSaving = viewModel.isSaving,
+            onDismiss = { if (!viewModel.isSaving) showDelete = false },
+            onDelete = { typed, password, confirmation ->
+                viewModel.deleteAccount(typed, password, confirmation) {
+                    showDelete = false
+                    message(R.string.delete_account_done)
+                }
+            },
         )
     }
+
 }
 
-private enum class ProfileEditTarget { DISPLAY_NAME, USERNAME }
+@Composable
+private fun CloudSync.Status.label(): String = stringResource(
+    when (this) {
+        CloudSync.Status.IDLE -> R.string.profile_sync_idle
+        CloudSync.Status.SYNCING -> R.string.profile_sync_running
+        CloudSync.Status.SYNCED -> R.string.profile_sync_done
+        CloudSync.Status.OFFLINE -> R.string.profile_sync_offline
+    },
+)
+
+private enum class ProfileField { DISPLAY_NAME, USERNAME }
+
+private enum class PasswordDialog { SET, CHANGE }
 
 @Composable
-private fun ProfileHero(
-    profile: UserProfile,
-    avatarReloadKey: Int,
-    avatarFailed: Boolean,
-    onAvatarError: () -> Unit,
-    onRetryAvatar: () -> Unit,
-    onPhotoClick: () -> Unit,
-    onUsernameClick: () -> Unit,
-    onDisplayNameClick: () -> Unit,
+private fun ProfileHeader(
+    state: AccountState,
+    avatarUri: String?,
+    onPhoto: () -> Unit,
+    onEditName: () -> Unit,
 ) {
-    val isGuest = profile.sessionType == SessionType.GUEST
-    Column(
+    GlassSurface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        shape = RoundedCornerShape(MangaGlass.dialogCorner),
+        contentPadding = PaddingValues(Spacing.lg),
     ) {
-        Box {
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(onClick = onPhotoClick)
-                    .padding(3.dp),
-            ) {
-                ProfileAvatar(
-                    name = profile.displayName.ifBlank { profile.username },
-                    avatarUri = profile.avatarUri,
-                    size = Dimens.avatarLarge,
-                    reloadKey = avatarReloadKey,
-                    onError = onAvatarError,
-                    modifier = Modifier.border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                        shape = CircleShape,
-                    ),
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(x = (-2).dp, y = (-2).dp)
-                    .size(30.dp)
-                    .clickable(onClick = onPhotoClick),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.PhotoCamera,
-                        contentDescription = stringResource(R.string.cd_change_photo),
-                        modifier = Modifier.size(15.dp),
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    ProfileAvatar(
+                        name = state.displayName,
+                        avatarUri = avatarUri,
+                        size = 72.dp,
+                    )
+                    TextButton(
+                        onClick = onPhoto,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(28.dp),
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
+                            AppIcon(
+                                icon = MangaOsIcons.camera,
+                                contentDescription = null,
+                                role = IconRole.Primary,
+                                size = 16.dp,
+                                modifier = Modifier.padding(5.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(Spacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    VerifiedName(
+                        name = state.displayName.ifBlank { state.username },
+                        verified = state.verified,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "@${state.username.ifBlank { "reader" }}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (state.verified) goldColor()
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        text = state.email.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-        }
-
-        Spacer(Modifier.height(Spacing.md))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(enabled = !isGuest, onClick = onUsernameClick)
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
-        ) {
-            Text(
-                text = "@${profile.username}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!isGuest) {
-                Spacer(Modifier.width(Spacing.xs))
-                Icon(
-                    imageVector = Icons.Outlined.Edit,
-                    contentDescription = stringResource(R.string.profile_edit_username),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(Spacing.xxs))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(enabled = !isGuest, onClick = onDisplayNameClick)
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
-        ) {
-            Text(
-                text = profile.displayName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!isGuest) {
-                Spacer(Modifier.width(Spacing.xs))
-                Icon(
-                    imageVector = Icons.Outlined.Edit,
-                    contentDescription = stringResource(R.string.profile_edit_display_name),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(15.dp),
-                )
-            }
-        }
-        if (avatarFailed && profile.avatarUri != null) {
-            TextButton(onClick = onRetryAvatar) {
-                Text(
-                    text = stringResource(R.string.profile_image_retry),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        if (isGuest) {
+            Spacer(Modifier.height(Spacing.sm))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
             Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = stringResource(R.string.guest_display_name),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            TextButton(onClick = onEditName, contentPadding = PaddingValues(0.dp)) {
+                Text(
+                    text = stringResource(R.string.profile_edit_name),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ProfileCard(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column {
+private fun AccountSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = Spacing.xs, bottom = Spacing.sm),
+            modifier = Modifier.padding(start = Spacing.xs, bottom = Spacing.xs),
         )
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = Spacing.md),
-            ) {
-                content()
-            }
+            Column(modifier = Modifier.padding(vertical = Spacing.xxs), content = content)
         }
     }
 }
 
 @Composable
-private fun InfoRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    onClick: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (onClick != null) {
-                    Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(onClick = onClick)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(vertical = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 160.dp),
-            textAlign = TextAlign.End,
-        )
-        if (onClick != null) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(start = Spacing.xs)
-                    .size(17.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun RowDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 36.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-    )
-}
-
-@Composable
-private fun EditProfileSheet(
-    target: ProfileEditTarget,
-    profile: UserProfile,
+private fun EditFieldSheet(
+    field: ProfileField,
+    initial: String,
     isSaving: Boolean,
-    errorRes: Int?,
-    onValueChange: () -> Unit,
+    usernameCheck: UsernameCheck,
+    onCheck: (String) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    val initial = when (target) {
-        ProfileEditTarget.DISPLAY_NAME -> profile.displayName
-        ProfileEditTarget.USERNAME -> profile.username
-    }
-    var value by remember(target) { mutableStateOf(initial) }
-    val isUsername = target == ProfileEditTarget.USERNAME
-    val title = stringResource(
-        if (isUsername) R.string.profile_edit_username else R.string.profile_edit_display_name,
-    )
-    val label = stringResource(
-        if (isUsername) R.string.label_username else R.string.label_display_name,
-    )
-
-    AppBottomSheet(onDismiss = { if (!isSaving) onDismiss() }) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(Spacing.lg))
+    var value by remember(field, initial) { mutableStateOf(initial) }
+    AppBottomSheet(
+        onDismiss = onDismiss,
+        title = stringResource(
+            if (field == ProfileField.USERNAME) R.string.setup_username_label
+            else R.string.setup_display_label,
+        ),
+        icon = if (field == ProfileField.USERNAME) MangaOsIcons.verified else MangaOsIcons.account,
+    ) {
         AppTextField(
             value = value,
             onValueChange = {
-                value = if (isUsername) it.filterNot(Char::isWhitespace).take(24) else it.take(48)
-                onValueChange()
+                value = it
+                if (field == ProfileField.USERNAME) onCheck(it)
             },
-            label = label,
-            leadingIcon = if (isUsername) Icons.Outlined.AlternateEmail else Icons.Outlined.Badge,
-            prefix = if (isUsername) "@" else null,
+            label = stringResource(
+                if (field == ProfileField.USERNAME) R.string.setup_username_label
+                else R.string.setup_display_label,
+            ),
+            prefix = if (field == ProfileField.USERNAME) "@" else null,
             imeAction = ImeAction.Done,
             enabled = !isSaving,
-            error = errorRes?.let { stringResource(it) },
         )
-        if (isUsername) {
+        if (field == ProfileField.USERNAME) {
+            val (text, color) = when (usernameCheck) {
+                UsernameCheck.AVAILABLE ->
+                    stringResource(R.string.setup_username_available) to MaterialTheme.colorScheme.primary
+                UsernameCheck.TAKEN ->
+                    stringResource(R.string.setup_username_taken) to MaterialTheme.colorScheme.error
+                UsernameCheck.CHECKING ->
+                    stringResource(R.string.setup_username_checking) to MaterialTheme.colorScheme.onSurfaceVariant
+                UsernameCheck.IDLE -> null to MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            if (text != null) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                    modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        PrimaryButton(
+            text = stringResource(R.string.profile_save),
+            onClick = { onSave(value) },
+            loading = isSaving,
+        )
+    }
+}
+
+@Composable
+private fun PasswordSheet(
+    dialog: PasswordDialog,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String, String) -> Unit,
+) {
+    var current by remember { mutableStateOf("") }
+    var next by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    AppBottomSheet(
+        onDismiss = onDismiss,
+        title = stringResource(
+            if (dialog == PasswordDialog.SET) R.string.profile_set_password
+            else R.string.profile_change_password,
+        ),
+        icon = MangaOsIcons.key,
+    ) {
+        if (dialog == PasswordDialog.CHANGE) {
+            AppTextField(
+                value = current,
+                onValueChange = { current = it },
+                label = stringResource(R.string.profile_current_password),
+                leadingIcon = MangaOsIcons.lock,
+                isPassword = true,
+                keyboardType = KeyboardType.Password,
+                enabled = !isSaving,
+            )
+        }
+        AppTextField(
+            value = next,
+            onValueChange = { next = it },
+            label = stringResource(R.string.auth_flow_new_password),
+            leadingIcon = MangaOsIcons.key,
+            isPassword = true,
+            keyboardType = KeyboardType.Password,
+            enabled = !isSaving,
+        )
+        AppTextField(
+            value = confirm,
+            onValueChange = { confirm = it },
+            label = stringResource(R.string.auth_flow_confirm),
+            leadingIcon = MangaOsIcons.key,
+            isPassword = true,
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Done,
+            enabled = !isSaving,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        PrimaryButton(
+            text = stringResource(R.string.profile_save),
+            onClick = { onSubmit(current, next, confirm) },
+            loading = isSaving,
+        )
+    }
+}
+
+@Composable
+private fun DeleteAccountDialog(
+    username: String,
+    needsPassword: Boolean,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: (String, String, String) -> Unit,
+) {
+    var typed by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    AppDialog(
+        title = stringResource(R.string.delete_account),
+        message = stringResource(R.string.delete_account_message),
+        confirmLabel = stringResource(R.string.delete_account_confirm),
+        dismissLabel = stringResource(R.string.action_cancel),
+        destructive = true,
+        icon = MangaOsIcons.trash,
+        onConfirm = {
+            if (!isSaving) onDelete(typed, password, confirmation)
+        },
+        onDismiss = onDismiss,
+    ) {
+        AppTextField(
+            value = typed,
+            onValueChange = { typed = it },
+            label = stringResource(R.string.delete_username_label, username),
+            leadingIcon = MangaOsIcons.verified,
+            enabled = !isSaving,
+        )
+        if (needsPassword) {
+            AppTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = stringResource(R.string.profile_current_password),
+                leadingIcon = MangaOsIcons.lock,
+                isPassword = true,
+                keyboardType = KeyboardType.Password,
+                enabled = !isSaving,
+            )
+            AppTextField(
+                value = confirmation,
+                onValueChange = { confirmation = it },
+                label = stringResource(R.string.auth_flow_confirm),
+                leadingIcon = MangaOsIcons.lock,
+                isPassword = true,
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+                enabled = !isSaving,
+            )
+        } else {
             Text(
-                text = stringResource(R.string.profile_username_rule),
+                text = stringResource(R.string.delete_need_password),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = Spacing.xs),
             )
         }
-        Spacer(Modifier.height(Spacing.lg))
-        PrimaryButton(
-            text = stringResource(if (isSaving) R.string.profile_saving else R.string.profile_save),
-            onClick = { onSave(value) },
-            loading = isSaving,
-            enabled = !isSaving,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        TextButton(
-            onClick = onDismiss,
-            enabled = !isSaving,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        if (isSaving) {
+            Spacer(Modifier.height(Spacing.sm))
             Text(
-                text = stringResource(R.string.action_cancel),
+                text = stringResource(R.string.delete_in_progress),
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
