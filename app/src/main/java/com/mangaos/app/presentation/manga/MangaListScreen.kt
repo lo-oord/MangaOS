@@ -27,9 +27,8 @@ import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.UiState
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.ErrorState
-import com.mangaos.app.core.ui.components.MangaGrid
+import com.mangaos.app.core.ui.components.MangaCollection
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
-import com.mangaos.app.core.ui.components.MangaList
 import com.mangaos.app.core.ui.components.MangaListSkeleton
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.core.util.SearchText
@@ -93,19 +92,14 @@ fun MangaListScreen(
                         icon = Icons.Outlined.SearchOff,
                         title = stringResource(R.string.search_no_results),
                     )
-                } else if (viewMode == MangaViewMode.GRID) {
-                    MangaGrid(
-                        mangas = visible,
-                        onMangaClick = onMangaClick,
-                        gridState = gridState,
-                        onMangaLongClick = { sheetManga = it },
-                    )
                 } else {
-                    MangaList(
+                    MangaCollection(
                         mangas = visible,
+                        viewMode = viewMode,
                         onMangaClick = onMangaClick,
-                        listState = listState,
                         onMangaLongClick = { sheetManga = it },
+                        gridState = gridState,
+                        listState = listState,
                     )
                 }
             }

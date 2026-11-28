@@ -2,46 +2,59 @@ package com.mangaos.app.presentation.storage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.EmptyState
-import com.mangaos.app.core.ui.components.MangaCard
+import com.mangaos.app.core.ui.components.MangaCollection
 import com.mangaos.app.core.util.formatBytes
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.domain.model.MangaViewMode
 
-/** The offline library: one card per work, however many chapters it holds. */
+/**
+ * The offline library: one card per work, however many chapters it holds. It draws the shared
+ * manga collection, so its covers, facts, spacing and Grid/List behaviour match every catalogue.
+ */
 @Composable
 fun LocalStorageScreen(
+    viewMode: MangaViewMode,
     onOpenWork: (Manga) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: LocalStorageViewModel = viewModel()
     val works by viewModel.works.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+
+    // The stored cover and the downloaded chapter count are the only offline-only facts; the
+    // cards themselves stay the same component used online.
+    val mangas = remember(works) {
+        works.map { work ->
+            work.manga.copy(
+                coverUrl = work.coverModel,
+                latestChapter = work.latestChapterNumber,
+            )
+        }
+    }
+    val chapterCounts = remember(works) { works.associate { it.manga.key to it.chapters.size } }
 
     if (works.isEmpty()) {
         EmptyState(
@@ -70,43 +83,24 @@ fun LocalStorageScreen(
                 fontWeight = FontWeight.Medium,
             )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            state = gridState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.screen,
-                end = Spacing.screen,
-                top = Spacing.xs,
-                bottom = Spacing.xl,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.gridGap),
-        ) {
-            items(items = works, key = { it.manga.key }) { work ->
-                Column {
-                    MangaCard(
-                        manga = work.manga.copy(
-                            coverUrl = work.coverModel,
-                            latestChapter = work.latestChapterNumber,
-                        ),
-                        onClick = { onOpenWork(work.manga) },
-                        // Latest-chapter metadata belongs to the Latest screen only; offline
-                        // cards carry the downloaded-chapter count right below the cover.
-                    )
-                    Spacer(Modifier.height(Spacing.xxs))
-                    Text(
-                        text = stringResource(
-                            R.string.storage_chapter_count,
-                            work.chapters.size,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
+        MangaCollection(
+            mangas = mangas,
+            viewMode = viewMode,
+            onMangaClick = onOpenWork,
+            gridState = gridState,
+            listState = listState,
+            caption = { manga ->
+                Text(
+                    text = stringResource(
+                        R.string.storage_chapter_count,
+                        chapterCounts[manga.key] ?: 0,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+        )
     }
 }

@@ -1,18 +1,22 @@
 package com.mangaos.app.core.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -38,55 +43,122 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.BrokenImage
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.mangaos.app.R
-import com.mangaos.app.core.designsystem.MangaTheme
+import com.mangaos.app.core.designsystem.Dimens
+import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.displayGenres
 import com.mangaos.app.core.util.ratingLabel
 import com.mangaos.app.core.util.relativeTime
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
+import com.mangaos.app.domain.model.MangaViewMode
+
+/*
+ * The manga card system.
+ *
+ * Every screen that lists works draws the same card through [MangaCard] / [MangaListRow] and the
+ * same scroll containers through [MangaCollection]; no screen builds its own card. A surface only
+ * chooses a [MangaCardContext], which decides whether the newest-chapter facts are present — never
+ * the shape, spacing, type or colours of the card.
+ */
+
+/** Every size the card uses, so no screen can introduce a near-miss value of its own. */
+object MangaCardMetrics {
+    /** One cover proportion for grid, list and detail thumbnails; covers are cropped, never squashed. */
+    val CoverAspect = Dimens.coverAspect
+
+    /** Title lines reserved in every card, so a short name never produces a shorter card. */
+    const val TitleLines = 2
+
+    val corner = 16.dp
+    val innerCorner = 12.dp
+    val contentPadding = Spacing.sm
+    val titleMetaGap = 5.dp
+    val chipGap = 4.dp
+    val chipHeight = 20.dp
+    val chipHorizontalPadding = 6.dp
+    val factIconSize = 11.dp
+    val listCoverWidth = 66.dp
+    val listGap = Spacing.md
+    val gridMinWidth = 96.dp
+    val gridGap = Spacing.gridGap
+    val gridVerticalGap = Spacing.sm
+    val badgePadding = 6.dp
+    val listBadgePadding = 5.dp
+    val pressScale = 0.974f
+}
 
 /**
- * What a card is being shown for. The layout is shared; only the Latest feed carries the newest
- * chapter's number over the cover and its publication date beside the title, and it does so by
- * changing the structure — never by hiding text in a reserved gap.
+ * What a card is being shown for. The layout and every measurement stay identical; the context
+ * only decides whether the newest-chapter number and its publication date belong on this surface.
  */
 enum class MangaCardContext {
-    /** The "Latest" feed: newest chapter badge + real publication time. */
+    /** The "Latest" feed: newest chapter badge on the cover plus the real publication time. */
     LATEST,
 
-    /** Every other surface: cover, title, rating, status and genre only. */
+    /** Every other surface (catalogue, search, library, downloads): cover, title, facts. */
     CATALOG,
 }
 
+/** The translucent surface every card in the app shares, resolved from the active theme. */
+data class MangaCardGlass(
+    val container: Color,
+    val border: Color,
+    val sheen: Color,
+)
+
+@Composable
+fun mangaCardGlass(): MangaCardGlass {
+    val scheme = MaterialTheme.colorScheme
+    // A soft tint of the theme surface, a hairline accent border and a light sheen: a glass edge
+    // without a blur pass, which keeps long lists scrolling smoothly and stays legible in both
+    // the light and the dark palette.
+    return remember(scheme) {
+        MangaCardGlass(
+            container = scheme.surfaceContainerLow.copy(alpha = 0.82f),
+            border = scheme.primary.copy(alpha = 0.16f),
+            sheen = scheme.surface.copy(alpha = 0.28f),
+        )
+    }
+}
+
 /** The single grid card used by every catalogue screen. */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MangaCard(
     manga: Manga,
@@ -96,15 +168,10 @@ fun MangaCard(
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // A tiny press scale is the whole "bubble" feel: the card acknowledges the touch without
-    // moving its neighbours or changing the grid.
+    val glass = mangaCardGlass()
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.972f else 1f,
-        animationSpec = tween(durationMillis = 120),
-        label = "cardPress",
-    )
+    val pressScale by cardPressScale(interaction)
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -112,115 +179,34 @@ fun MangaCard(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clip(RoundedCornerShape(CardCorner))
+            .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick, interaction)),
-        shape = RoundedCornerShape(CardCorner),
-        color = scheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.16f)),
-        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(MangaCardMetrics.corner),
+        color = glass.container,
+        border = BorderStroke(1.dp, glass.border),
+        shadowElevation = 0.dp,
     ) {
         Column {
-            Box(
+            MangaCardCover(
+                manga = manga,
+                context = context,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(CoverAspect)
-                    .clip(RoundedCornerShape(topStart = CardCorner, topEnd = CardCorner))
-                    .background(scheme.surfaceContainerHigh),
-            ) {
-                MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
-
-                // Latest only: the real newest chapter number, floating over the artwork.
-                // While the source is still resolving it, a quiet placeholder keeps the same
-                // footprint, so the card never changes shape once the number arrives.
-                if (context == MangaCardContext.LATEST) {
-                    val chapter = manga.latestChapter?.takeIf { it.isNotBlank() }
-                    if (chapter != null) {
-                        ChapterBadge(
-                            text = appString(R.string.chapter_number, chapter),
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp),
-                        )
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-            ) {
-                // Exactly two lines are always reserved, so every card in a row ends at the same
-                // height whether its title is one word or ten.
-                Text(
-                    text = manga.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = scheme.onSurface,
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    .aspectRatio(MangaCardMetrics.CoverAspect),
+            )
+            CardInfoSurface(sheen = glass.sheen) {
+                MangaCardInfo(
+                    title = manga.title,
+                    facts = cardFacts(manga, context),
+                    scheme = scheme,
                 )
-
-                // Latest only: the real publication time of the newest chapter. The slot keeps a
-                // fixed height even when the source sent no date, so the row never staggers.
-                if (context == MangaCardContext.LATEST) {
-                    Spacer(Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp),
-                    ) {
-                        val timestamp = manga.updatedAt
-                        if (timestamp != null) {
-                            Icon(
-                                imageVector = Icons.Outlined.Schedule,
-                                contentDescription = null,
-                                tint = scheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                modifier = Modifier.size(11.dp),
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = relativeTime(LocalContext.current, timestamp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = scheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(5.dp))
-
-                // A single, non-wrapping pill row: two facts at most, chosen deterministically.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f, fill = false),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (ratingLabel(manga.rating) != null) {
-                            RatingPill(manga.rating)
-                        } else if (manga.status != MangaStatus.UNKNOWN) {
-                            StatusPill(manga.status)
-                        }
-                    }
-                    if (ratingLabel(manga.rating) != null && manga.status != MangaStatus.UNKNOWN) {
-                        StatusPill(manga.status)
-                    } else {
-                        GenrePill(manga.genres)
-                    }
-                }
             }
         }
     }
 }
 
 /** Horizontal list row: the same information in the same order, laid out for scanning. */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MangaListRow(
     manga: Manga,
@@ -230,161 +216,315 @@ fun MangaListRow(
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val glass = mangaCardGlass()
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(CardCorner))
+            .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick)),
-        shape = RoundedCornerShape(CardCorner),
-        color = scheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.14f)),
+        shape = RoundedCornerShape(MangaCardMetrics.corner),
+        color = glass.container,
+        border = BorderStroke(1.dp, glass.border),
+        shadowElevation = 0.dp,
     ) {
-        Row(modifier = Modifier.padding(Spacing.sm)) {
-            Box(
+        Row(modifier = Modifier.padding(MangaCardMetrics.contentPadding)) {
+            MangaCardCover(
+                manga = manga,
+                context = context,
+                badgeAlignment = Alignment.TopEnd,
+                badgePadding = MangaCardMetrics.listBadgePadding,
                 modifier = Modifier
-                    .width(ListCoverWidth)
-                    .aspectRatio(CoverAspect)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(scheme.surfaceContainerHigh),
-            ) {
-                MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
-                if (context == MangaCardContext.LATEST) {
-                    manga.latestChapter?.takeIf { it.isNotBlank() }?.let { chapter ->
-                        ChapterBadge(
-                            text = appString(R.string.chapter_number, chapter),
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(3.dp),
-                        )
+                    .width(MangaCardMetrics.listCoverWidth)
+                    .aspectRatio(MangaCardMetrics.CoverAspect),
+            )
+
+            Spacer(Modifier.width(MangaCardMetrics.listGap))
+
+            CardInfoSurface(sheen = glass.sheen, modifier = Modifier.weight(1f)) {
+                // In a list there is room to set the publication date beside the name, which is
+                // exactly where the Latest feed needs it; every other surface never computes it.
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = manga.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onSurface,
+                        minLines = MangaCardMetrics.TitleLines,
+                        maxLines = MangaCardMetrics.TitleLines,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    latestDateLabel(manga, context)?.let { date ->
+                        Spacer(Modifier.width(Spacing.xs))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 1.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CalendarMonth,
+                                contentDescription = null,
+                                tint = scheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.size(MangaCardMetrics.factIconSize),
+                            )
+                            Spacer(Modifier.width(Spacing.xxs))
+                            Text(
+                                text = date,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = scheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 88.dp),
+                            )
+                        }
                     }
                 }
-            }
-
-            Spacer(Modifier.width(Spacing.md))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = manga.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = scheme.onSurface,
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                if (context == MangaCardContext.LATEST) {
-                    manga.updatedAt?.let { timestamp ->
-                        Spacer(Modifier.height(Spacing.xxs))
-                        Text(
-                            text = relativeTime(LocalContext.current, timestamp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(Spacing.xs))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RatingPill(manga.rating)
-                    StatusPill(manga.status)
-                    GenrePill(manga.genres)
-                }
+                CardFactRow(facts = cardFacts(manga, context))
             }
         }
     }
 }
 
-/** A real rating only; a source without one drops the whole pill. */
-@Composable
-private fun RatingPill(rating: Double?) {
-    val label = ratingLabel(rating) ?: return
-    Pill {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = null,
-            tint = MangaTheme.tokens.rating,
-            modifier = Modifier.size(10.dp),
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-        )
-    }
-}
+/* --------------------------------------------------------------------------------------- */
+/* Shared card pieces                                                                      */
+/* --------------------------------------------------------------------------------------- */
 
+/** The rounded cover with a chapter badge for the Latest feed; identical in both layouts. */
 @Composable
-private fun StatusPill(status: MangaStatus) {
-    if (status == MangaStatus.UNKNOWN) return
-    val color = mangaStatusColor(status)
-    Pill(container = color.copy(alpha = 0.16f), content = color) {
-        Box(
-            modifier = Modifier
-                .size(5.dp)
-                .background(color, RoundedCornerShape(50)),
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = appString(mangaStatusLabel(status)),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun GenrePill(genres: List<String>) {
-    val genre = displayGenres(genres, 1).firstOrNull() ?: return
-    Pill {
-        Icon(
-            imageVector = Icons.Outlined.Category,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(10.dp),
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            text = genre,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun Pill(
-    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
-    content: Color = Color.Unspecified,
-    trailing: (@Composable () -> Unit)? = null,
-    body: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+private fun MangaCardCover(
+    manga: Manga,
+    context: MangaCardContext,
+    modifier: Modifier = Modifier,
+    badgeAlignment: Alignment = Alignment.TopEnd,
+    badgePadding: Dp = MangaCardMetrics.badgePadding,
 ) {
+    Box(
+        modifier = modifier
+            .clip(
+                RoundedCornerShape(
+                    topStart = MangaCardMetrics.corner,
+                    topEnd = MangaCardMetrics.corner,
+                    bottomStart = MangaCardMetrics.innerCorner,
+                    bottomEnd = MangaCardMetrics.innerCorner,
+                ),
+            )
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        MangaCoverArt(manga = manga, modifier = Modifier.fillMaxSize())
+
+        // Latest only, and only with a real number: no placeholder ever holds this slot.
+        if (context == MangaCardContext.LATEST) {
+            manga.latestChapter?.takeIf { it.isNotBlank() }?.let { chapter ->
+                ChapterBadge(
+                    text = appString(R.string.chapter_number, chapter),
+                    modifier = Modifier
+                        .align(badgeAlignment)
+                        .padding(badgePadding),
+                )
+            }
+        }
+    }
+}
+
+/** The glass information panel under the cover, with a single subtle sheen. */
+@Composable
+private fun CardInfoSurface(
+    sheen: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .background(
+                Brush.verticalGradient(
+                    listOf(sheen.copy(alpha = 0.35f), Color.Transparent),
+                ),
+            )
+            .padding(
+                start = MangaCardMetrics.contentPadding,
+                end = MangaCardMetrics.contentPadding,
+                top = MangaCardMetrics.contentPadding,
+                bottom = MangaCardMetrics.contentPadding,
+            ),
+    ) {
+        content()
+    }
+}
+
+/** Title on top, one fact row below it; the gap between them is a single shared token. */
+@Composable
+private fun MangaCardInfo(
+    title: String,
+    facts: List<CardFact>,
+    scheme: androidx.compose.material3.ColorScheme,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = scheme.onSurface,
+        minLines = MangaCardMetrics.TitleLines,
+        maxLines = MangaCardMetrics.TitleLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+    if (facts.isNotEmpty()) {
+        Spacer(Modifier.height(MangaCardMetrics.titleMetaGap))
+        CardFactRow(facts = facts)
+    }
+}
+
+/**
+ * One fact row that can never overlap itself: at most two facts, each measured with an equal share
+ * of the width and ellipsised inside that share, so a long genre cannot push the status away.
+ */
+@Composable
+private fun CardFactRow(facts: List<CardFact>) {
+    if (facts.isEmpty()) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(MangaCardMetrics.chipGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        facts.forEach { fact ->
+            CardPill(fact = fact, modifier = Modifier.weight(1f, fill = false))
+        }
+    }
+}
+
+/**
+ * The facts a card may show, in one fixed order: publication date (Latest only), rating, status,
+ * genre. Anything the source did not provide is simply absent, and the row is capped at two facts
+ * so the card keeps one line of secondary information.
+ */
+@Composable
+private fun cardFacts(manga: Manga, context: MangaCardContext): List<CardFact> {
+    val facts = mutableListOf<CardFact>()
+    latestDateLabel(manga, context)?.let { facts += CardFact.Updated(it) }
+    ratingLabel(manga.rating)?.let { facts += CardFact.Rating(it) }
+    if (manga.status != MangaStatus.UNKNOWN) facts += CardFact.Status(manga.status)
+    displayGenres(manga.genres, 1).firstOrNull()?.let { facts += CardFact.Genre(it) }
+    // A source that sends neither a rating, a state nor a genre still has its own name, which
+    // keeps the fact row (and therefore the card height) present with real data instead of a gap.
+    if (facts.isEmpty()) {
+        manga.sourceName?.takeIf { it.isNotBlank() }?.let { facts += CardFact.Source(it) }
+    }
+    return facts.take(MaxCardFacts)
+}
+
+/** Only the Latest feed has a publication date to show, and only when the source sent one. */
+@Composable
+private fun latestDateLabel(manga: Manga, context: MangaCardContext): String? {
+    if (context != MangaCardContext.LATEST) return null
+    val timestamp = manga.updatedAt ?: return null
+    val context0 = LocalContext.current
+    return remember(timestamp, context0) { relativeTime(context0, timestamp) }
+}
+
+private const val MaxCardFacts = 2
+
+/** A fact as data, so the chip row decides presentation and never the calling screen. */
+private sealed interface CardFact {
+    data class Rating(val label: String) : CardFact
+    data class Status(val status: MangaStatus) : CardFact
+    data class Genre(val label: String) : CardFact
+    data class Updated(val label: String) : CardFact
+    data class Source(val label: String) : CardFact
+}
+
+/** One resolved look for a pill, so every fact is drawn with the same measurements. */
+private data class PillStyle(
+    val container: Color,
+    val content: Color,
+    val icon: ImageVector,
+    val label: String,
+)
+
+@Composable
+private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val style = when (fact) {
+        is CardFact.Rating -> PillStyle(
+            container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
+            content = scheme.onSurface,
+            icon = Icons.Filled.Star,
+            label = fact.label,
+        )
+        is CardFact.Status -> {
+            val color = mangaStatusColor(fact.status)
+            PillStyle(
+                container = color.copy(alpha = 0.16f),
+                content = color,
+                icon = statusIcon(fact.status),
+                label = appString(mangaStatusLabel(fact.status)),
+            )
+        }
+        is CardFact.Genre -> PillStyle(
+            container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
+            content = scheme.onSurfaceVariant,
+            icon = Icons.Outlined.Category,
+            label = fact.label,
+        )
+        is CardFact.Updated -> PillStyle(
+            container = scheme.primary.copy(alpha = 0.10f),
+            content = scheme.primary,
+            icon = Icons.Outlined.CalendarMonth,
+            label = fact.label,
+        )
+        is CardFact.Source -> PillStyle(
+            container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
+            content = scheme.onSurfaceVariant,
+            icon = Icons.Outlined.Public,
+            label = fact.label,
+        )
+    }
     Surface(
+        modifier = modifier.height(MangaCardMetrics.chipHeight),
         shape = RoundedCornerShape(50),
-        color = container,
-        contentColor = if (content == Color.Unspecified) MaterialTheme.colorScheme.onSurface else content,
-        modifier = Modifier.height(22.dp),
+        color = style.container,
+        contentColor = style.content,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(
+                horizontal = MangaCardMetrics.chipHorizontalPadding,
+            ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
-            content = {
-                body()
-                trailing?.invoke()
-            },
-        )
+        ) {
+            Icon(
+                imageVector = style.icon,
+                contentDescription = null,
+                tint = style.content,
+                modifier = Modifier.size(MangaCardMetrics.factIconSize),
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                text = style.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = style.content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
+}
+
+/** The state of a work, drawn from the shared icon vocabulary rather than a generic glyph. */
+private fun statusIcon(status: MangaStatus): ImageVector = when (status) {
+    MangaStatus.ONGOING -> MangaOsIcons.stateOngoing
+    MangaStatus.COMPLETED -> MangaOsIcons.stateCompleted
+    MangaStatus.HIATUS -> MangaOsIcons.stateHiatus
+    MangaStatus.CANCELLED -> MangaOsIcons.stateCancelled
+    MangaStatus.UNKNOWN -> Icons.Outlined.Category
+}
+
+/** A tiny press scale is the whole acknowledgement: no neighbours move, the grid never reflows. */
+@Composable
+private fun cardPressScale(interaction: MutableInteractionSource): State<Float> {
+    val pressed by interaction.collectIsPressedAsState()
+    return animateFloatAsState(
+        targetValue = if (pressed) MangaCardMetrics.pressScale else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "cardPress",
+    )
 }
 
 @Composable
@@ -436,11 +576,9 @@ fun CoverImage(
 ) {
     val description = appString(R.string.cd_cover, title)
     val context = LocalContext.current
-    // A short crossfade means a cover arrives as a soft appearance instead of a hard pop, and
-    // a cached cover still shows immediately.
     val model = remember(coverUrl) {
         coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            coil.request.ImageRequest.Builder(context)
+            ImageRequest.Builder(context)
                 .data(url)
                 .crossfade(180)
                 .build()
@@ -496,12 +634,10 @@ fun CoverImage(
 @Composable
 fun ChapterBadge(text: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    // The badge borrows the active theme's surface and accent, so its text colour follows the
-    // interface (and therefore the language's typography) instead of a fixed white.
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = scheme.surface.copy(alpha = 0.78f),
+        color = scheme.surface.copy(alpha = 0.82f),
         contentColor = scheme.primary,
         border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.22f)),
     ) {
@@ -510,10 +646,15 @@ fun ChapterBadge(text: String, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
 }
+
+/* --------------------------------------------------------------------------------------- */
+/* Containers                                                                              */
+/* --------------------------------------------------------------------------------------- */
 
 @Composable
 fun MangaGrid(
@@ -524,9 +665,12 @@ fun MangaGrid(
     onMangaLongClick: ((Manga) -> Unit)? = null,
     context: MangaCardContext = MangaCardContext.CATALOG,
     footer: (@Composable () -> Unit)? = null,
+    caption: (@Composable (Manga) -> Unit)? = null,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        // Adaptive columns keep the same card proportion on phones and tablets instead of
+        // stretching three enormous cards across a wide screen.
+        columns = GridCells.Adaptive(minSize = MangaCardMetrics.gridMinWidth),
         state = gridState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -535,16 +679,22 @@ fun MangaGrid(
             top = Spacing.xs,
             bottom = Spacing.xl,
         ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(MangaCardMetrics.gridVerticalGap),
+        horizontalArrangement = Arrangement.spacedBy(MangaCardMetrics.gridGap),
     ) {
         items(items = mangas, key = { it.key }) { manga ->
-            MangaCard(
-                manga = manga,
-                onClick = { onMangaClick(manga) },
-                onLongClick = onMangaLongClick?.let { callback -> { callback(manga) } },
-                context = context,
-            )
+            Column {
+                MangaCard(
+                    manga = manga,
+                    onClick = { onMangaClick(manga) },
+                    onLongClick = onMangaLongClick?.let { callback -> { callback(manga) } },
+                    context = context,
+                )
+                caption?.let { slot ->
+                    Spacer(Modifier.height(Spacing.xxs))
+                    slot(manga)
+                }
+            }
         }
         if (footer != null) {
             item(span = { GridItemSpan(maxLineSpan) }) { footer() }
@@ -561,6 +711,7 @@ fun MangaList(
     onMangaLongClick: ((Manga) -> Unit)? = null,
     context: MangaCardContext = MangaCardContext.CATALOG,
     footer: (@Composable () -> Unit)? = null,
+    caption: (@Composable (Manga) -> Unit)? = null,
 ) {
     LazyColumn(
         state = listState,
@@ -568,18 +719,24 @@ fun MangaList(
         contentPadding = PaddingValues(
             start = Spacing.screen,
             end = Spacing.screen,
-            top = Spacing.sm,
+            top = Spacing.xs,
             bottom = Spacing.xl,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         items(items = mangas, key = { it.key }) { manga ->
-            MangaListRow(
-                manga = manga,
-                onClick = { onMangaClick(manga) },
-                onLongClick = onMangaLongClick?.let { callback -> { callback(manga) } },
-                context = context,
-            )
+            Column {
+                MangaListRow(
+                    manga = manga,
+                    onClick = { onMangaClick(manga) },
+                    onLongClick = onMangaLongClick?.let { callback -> { callback(manga) } },
+                    context = context,
+                )
+                caption?.let { slot ->
+                    Spacer(Modifier.height(Spacing.xxs))
+                    slot(manga)
+                }
+            }
         }
         if (footer != null) {
             item { footer() }
@@ -587,7 +744,79 @@ fun MangaList(
     }
 }
 
-// Slightly wider than 3:4, so the grid cards are shorter and read as one uniform block.
-private const val CoverAspect = 0.78f
-private val CardCorner = 16.dp
-private val ListCoverWidth = 72.dp
+/**
+ * The one place that switches a list of works between the two layouts.
+ *
+ * Both layouts read the same list, keep their own scroll state and cross-fade into each other, and
+ * the work the reader was looking at is scrolled back into view in the new layout. Nothing is
+ * re-fetched, re-ordered or re-selected by the switch.
+ */
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+fun MangaCollection(
+    mangas: List<Manga>,
+    viewMode: MangaViewMode,
+    onMangaClick: (Manga) -> Unit,
+    modifier: Modifier = Modifier,
+    context: MangaCardContext = MangaCardContext.CATALOG,
+    onMangaLongClick: ((Manga) -> Unit)? = null,
+    gridState: LazyGridState = rememberLazyGridState(),
+    listState: LazyListState = rememberLazyListState(),
+    footer: (@Composable () -> Unit)? = null,
+    caption: (@Composable (Manga) -> Unit)? = null,
+) {
+    val reduceMotion = LocalReduceMotion.current
+    var previousMode by remember { mutableStateOf(viewMode) }
+
+    LaunchedEffect(viewMode) {
+        if (previousMode == viewMode) return@LaunchedEffect
+        val anchor = if (previousMode == MangaViewMode.GRID) {
+            gridState.firstVisibleItemIndex
+        } else {
+            listState.firstVisibleItemIndex
+        }
+        previousMode = viewMode
+        if (anchor > 0) {
+            // The new layout is measured on the next frame; only then can it be positioned.
+            withFrameNanos { }
+            if (viewMode == MangaViewMode.GRID) {
+                gridState.scrollToItem(anchor)
+            } else {
+                listState.scrollToItem(anchor)
+            }
+        }
+    }
+
+    AnimatedContent(
+        targetState = viewMode,
+        transitionSpec = {
+            fadeIn(tween(if (reduceMotion) 0 else 180)) togetherWith
+                fadeOut(tween(if (reduceMotion) 0 else 120))
+        },
+        label = "mangaCollectionMode",
+    ) { mode ->
+        if (mode == MangaViewMode.GRID) {
+            MangaGrid(
+                mangas = mangas,
+                onMangaClick = onMangaClick,
+                modifier = modifier,
+                gridState = gridState,
+                onMangaLongClick = onMangaLongClick,
+                context = context,
+                footer = footer,
+                caption = caption,
+            )
+        } else {
+            MangaList(
+                mangas = mangas,
+                onMangaClick = onMangaClick,
+                modifier = modifier,
+                listState = listState,
+                onMangaLongClick = onMangaLongClick,
+                context = context,
+                footer = footer,
+                caption = caption,
+            )
+        }
+    }
+}

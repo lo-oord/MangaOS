@@ -24,8 +24,8 @@ object Dimens {
     val iconButtonSize = 40.dp
     val iconSize = 22.dp
     val buttonHeight = 52.dp
-    val coverAspect = 2f / 3f
-    val cardTitleHeight = 38.dp
+/** The one cover proportion used by cards, skeletons and thumbnails (width / height). */
+    const val coverAspect = 0.72f
     val avatarSmall = 32.dp
     val avatarMedium = 48.dp
     val avatarLarge = 96.dp

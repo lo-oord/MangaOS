@@ -179,7 +179,7 @@ fun MangaGridSkeleton(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(MangaCardMetrics.gridVerticalGap),
     ) {
         repeat(3) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.gridGap)) {
@@ -223,10 +223,11 @@ fun MangaListSkeleton(modifier: Modifier = Modifier) {
         repeat(6) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ShimmerBlock(
+                    // Mirrors the real row's cover box exactly, so the list never jumps on load.
                     modifier = Modifier
-                        .width(56.dp)
-                        .height(80.dp),
-                    shape = RoundedCornerShape(10.dp),
+                        .width(MangaCardMetrics.listCoverWidth)
+                        .aspectRatio(MangaCardMetrics.CoverAspect),
+                    shape = RoundedCornerShape(MangaCardMetrics.innerCorner),
                 )
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {

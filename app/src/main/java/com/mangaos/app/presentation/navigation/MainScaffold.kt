@@ -305,6 +305,7 @@ private fun MainNavHost(
         }
         composable(DrawerDestination.STORAGE.route) {
             com.mangaos.app.presentation.storage.LocalStorageScreen(
+                viewMode = viewMode,
                 onOpenWork = { manga ->
                     navController.navigate(Routes.localDetail(manga.sourceId, manga.id)) {
                         launchSingleTop = true

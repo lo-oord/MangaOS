@@ -82,9 +82,8 @@ import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.ErrorState
 import com.mangaos.app.core.ui.components.MangaCardContext
-import com.mangaos.app.core.ui.components.MangaGrid
+import com.mangaos.app.core.ui.components.MangaCollection
 import com.mangaos.app.core.ui.components.MangaGridSkeleton
-import com.mangaos.app.core.ui.components.MangaList
 import com.mangaos.app.core.ui.components.MangaListSkeleton
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
@@ -212,23 +211,15 @@ fun LatestScreen(
                                     Spacer(Modifier.height(64.dp))
                                 }
                             }
-                            if (viewMode == MangaViewMode.GRID) {
-                                MangaGrid(
-                                    mangas = current.mangas,
-                                    onMangaClick = onMangaClick,
-                                    gridState = gridState,
-                                    context = MangaCardContext.LATEST,
-                                    footer = footer,
-                                )
-                            } else {
-                                MangaList(
-                                    mangas = current.mangas,
-                                    onMangaClick = onMangaClick,
-                                    listState = listState,
-                                    context = MangaCardContext.LATEST,
-                                    footer = footer,
-                                )
-                            }
+                            MangaCollection(
+                                mangas = current.mangas,
+                                viewMode = viewMode,
+                                onMangaClick = onMangaClick,
+                                context = MangaCardContext.LATEST,
+                                gridState = gridState,
+                                listState = listState,
+                                footer = footer,
+                            )
                         }
                     }
                 }
@@ -450,21 +441,14 @@ private fun SearchBody(
                         }
                     }
                 }
-                if (viewMode == MangaViewMode.GRID) {
-                    MangaGrid(
-                        mangas = searchState.mangas,
-                        onMangaClick = onMangaClick,
-                        gridState = gridState,
-                        footer = footer,
-                    )
-                } else {
-                    MangaList(
-                        mangas = searchState.mangas,
-                        onMangaClick = onMangaClick,
-                        listState = listState,
-                        footer = footer,
-                    )
-                }
+                MangaCollection(
+                    mangas = searchState.mangas,
+                    viewMode = viewMode,
+                    onMangaClick = onMangaClick,
+                    gridState = gridState,
+                    listState = listState,
+                    footer = footer,
+                )
             }
         }
     }
