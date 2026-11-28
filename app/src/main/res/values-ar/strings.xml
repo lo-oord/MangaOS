@@ -105,28 +105,28 @@
     <string name="state_error_retry">إعادة المحاولة</string>
 
     <!-- Phase 2: details, sources, profile -->
-    <string name="nav_sources">المصادر</string>
+    <string name="nav_sources">السيرفرات</string>
     <string name="cd_clear_search">مسح البحث</string>
     <string name="cd_grid_view">عرض شبكي</string>
     <string name="cd_list_view">عرض قائمة</string>
     <string name="status_unknown">غير معروف</string>
-    <string name="search_sources_failed">تعذر البحث في %1$d مصادر</string>
-    <string name="source_radial_hint">اسحب نحو مصدر</string>
+    <string name="search_sources_failed">تعذر البحث في %1$d من السيرفرات</string>
+    <string name="source_radial_hint">اسحب نحو سيرفر</string>
     <string name="detail_start_reading">ابدأ القراءة</string>
-    <string name="search_manga_placeholder">ابحث في جميع المصادر</string>
+    <string name="search_manga_placeholder">ابحث في جميع السيرفرات</string>
     <string name="search_library_placeholder">ابحث في مكتبتك</string>
-    <string name="search_sources_placeholder">ابحث في المصادر</string>
+    <string name="search_sources_placeholder">ابحث في السيرفرات</string>
     <string name="search_no_results">لا توجد نتائج</string>
-    <string name="state_no_source_title">لا توجد مصادر مفعّلة</string>
-    <string name="state_no_source_action">فتح المصادر</string>
-    <string name="state_source_unavailable">لا يمكن قراءة هذا المصدر بعد</string>
+    <string name="state_no_source_title">لا توجد سيرفرات مفعّلة</string>
+    <string name="state_no_source_action">فتح السيرفرات</string>
+    <string name="state_source_unavailable">لا يمكن قراءة هذا السيرفر بعد</string>
     <string name="source_pick_title">الأحدث من</string>
-    <string name="source_manage">إدارة المصادر</string>
+    <string name="source_manage">إدارة السيرفرات</string>
     <string name="detail_share">مشاركة</string>
     <string name="detail_more">خيارات إضافية</string>
     <string name="detail_refresh">تحديث التفاصيل</string>
     <string name="detail_story">القصة</string>
-    <string name="detail_story_empty">لم يوفّر المصدر وصفاً لهذا العمل.</string>
+    <string name="detail_story_empty">لم يوفّر السيرفر وصفاً لهذا العمل.</string>
     <string name="action_show_more">عرض المزيد</string>
     <string name="action_show_less">عرض أقل</string>
     <string name="detail_chapters_empty">لا توجد فصول متاحة لهذا العمل.</string>
@@ -139,7 +139,7 @@
     <string name="detail_read">مقروء</string>
     <string name="detail_last_read">آخر قراءة: الفصل %1$s</string>
     <string name="detail_source_unavailable">لا يمكن فتح هذا العمل بعد</string>
-    <string name="sources_none">لا توجد مصادر مضافة بعد</string>
+    <string name="sources_none">لا توجد سيرفرات مضافة بعد</string>
     <string name="tagline_welcome">عالمك من المانجا، في مكان واحد.</string>
     <string name="label_preferred_language">اللغة المفضلة</string>
     <string name="label_country">الدولة</string>
@@ -147,7 +147,7 @@
     <string name="value_not_set">غير محدد</string>
     <string name="country_search_hint">ابحث عن دولة</string>
     <string name="age_privacy_note">يُستخدم عمرك لقواعد المحتوى فقط ولا يظهر للعامة أبداً.</string>
-    <string name="sources_section_sources">المصادر</string>
+    <string name="sources_section_sources">السيرفرات</string>
     <string name="reader_chapters_title">الفصول</string>
     <string name="reader_current_chapter">الفصل الحالي</string>
     <string name="detail_in_progress">قيد القراءة</string>
@@ -324,14 +324,14 @@
     <string name="download_status_partial">بحاجة إلى إعادة محاولة</string>
     <string name="download_partial_message">فشل تنزيل بعض الفصول، وتم الاحتفاظ بالفصول المكتملة.</string>
     <string name="download_error_wifi">بانتظار اتصال Wi-Fi</string>
-    <string name="download_error_no_pages">لم يُرجع المصدر أي صور</string>
+    <string name="download_error_no_pages">لم يُرجع السيرفر أي صور</string>
     <string name="download_error_storage">لا توجد مساحة كافية لهذا الفصل</string>
     <string name="download_error_verify">فشل التحقق من الصور التي تم تنزيلها</string>
     <string name="download_error_record">تعذر حفظ الفصل في التخزين المحلي</string>
     <string name="download_error_storage_access">مجلد التنزيلات غير متاح. تحقق من أن التخزين موصول ثم أعد المحاولة.</string>
     <string name="download_error_write">تعذرت كتابة الصور إلى مساحة التخزين</string>
     <string name="download_error_network">انقطع الاتصال أثناء التنزيل. أعد المحاولة عند عودة الشبكة.</string>
-    <string name="download_error_http">رفض المصدر الطلب (%1$s)</string>
+    <string name="download_error_http">رفض السيرفر الطلب (%1$s)</string>
     <string name="download_error_generic">فشل التنزيل</string>
     <string name="notif_pages_progress">%1$d من %2$d صورة</string>
 

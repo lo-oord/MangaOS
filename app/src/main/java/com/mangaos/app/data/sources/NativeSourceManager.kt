@@ -62,7 +62,11 @@ class NativeSourceManager(
             runCatching { dataStore.data.first()[ENABLED_KEY] }.getOrNull()
         }
         if (stored != null) {
-            _enabledIds.value = stored.filter { id -> definitions.any { it.id == id } }.toSet()
+            val known = stored.filter { id -> definitions.any { it.id == id } }.toSet()
+            // A store written by an older build can only hold ids this build no longer ships.
+            // Falling back to the default policy keeps the app usable instead of starting with
+            // every server switched off and an empty Latest feed.
+            _enabledIds.value = known.ifEmpty { definitions.map { it.id }.toSet() }
             return
         }
         // Default policy for a first run (and for an upgrade from the old APK-based sources):

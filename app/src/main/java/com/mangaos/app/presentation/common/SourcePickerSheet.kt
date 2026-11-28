@@ -40,6 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.AppIcon
+import com.mangaos.app.core.designsystem.IconRole
+import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.domain.model.SourceInfo
@@ -143,9 +146,12 @@ private fun SourceBubble(
                         modifier = Modifier.size(20.dp),
                     )
                 } else {
-                    Text(
-                        text = name.trim().take(1).uppercase(),
-                        style = MaterialTheme.typography.labelLarge,
+                    // One neutral glyph for every server; no brand artwork is shown anywhere.
+                    AppIcon(
+                        icon = MangaOsIcons.sources,
+                        contentDescription = null,
+                        role = if (selected) IconRole.Primary else IconRole.Muted,
+                        size = 15.dp,
                     )
                 }
             }

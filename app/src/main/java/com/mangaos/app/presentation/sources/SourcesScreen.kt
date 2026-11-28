@@ -37,6 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.AppIcon
+import com.mangaos.app.core.designsystem.IconRole
+import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.EmptyState
 import com.mangaos.app.core.ui.components.MangaSearchField
@@ -155,7 +158,7 @@ private fun SourceRow(
         ) {
             val icon = source.iconRes
             if (icon != null) {
-                // The source's own icon keeps its square aspect ratio instead of being cropped.
+                // The server's own icon keeps its square aspect ratio instead of being cropped.
                 Image(
                     painter = painterResource(icon),
                     contentDescription = null,
@@ -163,11 +166,12 @@ private fun SourceRow(
                     modifier = Modifier.size(32.dp),
                 )
             } else {
-                Text(
-                    text = source.name.trim().take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (source.enabled) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                // Servers are presented neutrally: one shared glyph, never brand artwork.
+                AppIcon(
+                    icon = MangaOsIcons.sources,
+                    contentDescription = null,
+                    role = if (source.enabled) IconRole.Primary else IconRole.Muted,
+                    size = 20.dp,
                 )
             }
         }

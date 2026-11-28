@@ -24,7 +24,7 @@ import org.jsoup.nodes.Document
 class TeamXSource : MangaSource {
 
     override val id: String = "teamx"
-    override val name: String = "Team X Manga"
+    override val name: String = "السيرفر الاحتياطي"
     override val lang: String = "ar"
     override val baseUrl: String = "https://olympustaff.com"
     override val capabilities: Set<SourceCapability> = setOf(

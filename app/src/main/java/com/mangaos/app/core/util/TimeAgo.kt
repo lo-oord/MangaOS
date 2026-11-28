@@ -62,6 +62,22 @@ fun relativeTime(
     }
 }
 
+/**
+ * The same age as [relativeTime], but a long date is printed short (`24/11/26`) instead of in the
+ * device's medium format. A card has one narrow slot for this label, and the medium format used to
+ * be ellipsised mid-date; the short form always fits.
+ */
+fun relativeTimeCompact(
+    context: Context,
+    timestamp: Long,
+    now: Long = System.currentTimeMillis(),
+): String {
+    val value = timeAgoValue(timestamp, now)
+    if (value.bucket != TimeAgoBucket.DATE) return relativeTime(context, timestamp, now)
+    val locale = Locale.getDefault()
+    return java.text.SimpleDateFormat("d/M/yy", locale).format(Date(timestamp))
+}
+
 private fun calendarDaysBetween(from: Long, to: Long, zone: TimeZone): Int {
     val start = startOfDay(from, zone)
     val end = startOfDay(to, zone)

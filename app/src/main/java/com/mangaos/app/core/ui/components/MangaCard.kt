@@ -78,14 +78,13 @@ import coil.request.ImageRequest
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Dimens
 import com.mangaos.app.core.designsystem.MangaGlass
-import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.glassTokens
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.displayGenres
 import com.mangaos.app.core.util.ratingLabel
-import com.mangaos.app.core.util.relativeTime
+import com.mangaos.app.core.util.relativeTimeCompact
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.MangaViewMode
@@ -113,7 +112,7 @@ object MangaCardMetrics {
     val titleMetaGap = 5.dp
     val chipGap = 4.dp
     val chipHeight = 20.dp
-    val chipHorizontalPadding = 6.dp
+    val chipHorizontalPadding = 5.dp
     val factIconSize = 11.dp
     val listCoverWidth = 66.dp
     val listGap = Spacing.md
@@ -256,7 +255,7 @@ fun MangaListRow(
                                 color = scheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 88.dp),
+                                modifier = Modifier.widthIn(max = 96.dp),
                             )
                         }
                     }
@@ -298,7 +297,7 @@ private fun MangaCardCover(
         if (context == MangaCardContext.LATEST) {
             manga.latestChapter?.takeIf { it.isNotBlank() }?.let { chapter ->
                 ChapterBadge(
-                    text = appString(R.string.chapter_number, chapter),
+                    text = appString(R.string.chapter_number, compactChapter(chapter)),
                     modifier = Modifier
                         .align(badgeAlignment)
                         .padding(badgePadding),
@@ -381,7 +380,10 @@ private fun CardFactRow(facts: List<CardFact>) {
 @Composable
 private fun cardFacts(manga: Manga, context: MangaCardContext): List<CardFact> {
     val facts = mutableListOf<CardFact>()
-    latestDateLabel(manga, context)?.let { facts += CardFact.Updated(it) }
+    // In the Latest feed the date is the fact that surface exists for, and the newest chapter is
+    // already on the cover: the date therefore takes the whole fact line instead of competing
+    // with a rating chip for half of a narrow card.
+    latestDateLabel(manga, context)?.let { date -> return listOf(CardFact.Updated(date)) }
     ratingLabel(manga.rating)?.let { facts += CardFact.Rating(it) }
     if (manga.status != MangaStatus.UNKNOWN) facts += CardFact.Status(manga.status)
     displayGenres(manga.genres, 1).firstOrNull()?.let { facts += CardFact.Genre(it) }
@@ -399,7 +401,7 @@ private fun latestDateLabel(manga: Manga, context: MangaCardContext): String? {
     if (context != MangaCardContext.LATEST) return null
     val timestamp = manga.updatedAt ?: return null
     val context0 = LocalContext.current
-    return remember(timestamp, context0) { relativeTime(context0, timestamp) }
+    return remember(timestamp, context0) { relativeTimeCompact(context0, timestamp) }
 }
 
 private const val MaxCardFacts = 2
@@ -413,17 +415,27 @@ private sealed interface CardFact {
     data class Source(val label: String) : CardFact
 }
 
+/**
+ * The cover badge has one narrow line: a source that sends a release key or a long label (for
+ * example `12@2024-05-01`) is reduced to its chapter number, which is the fact the badge means.
+ */
+private fun compactChapter(raw: String): String =
+    Regex("""\d+(?:\.\d+)?""").find(raw)?.value ?: raw.take(8)
+
 /** One resolved look for a pill, so every fact is drawn with the same measurements. */
 private data class PillStyle(
     val container: Color,
     val content: Color,
-    val icon: ImageVector,
+    val icon: ImageVector?,
     val label: String,
 )
 
 @Composable
 private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
+    // A chip carries an icon only where it replaces a word the reader needs no explanation for
+    // (a star for a score, a calendar for a date). Status and genre are text-only: at card width
+    // the icon took the space the label needed and the word was ellipsised.
     val style = when (fact) {
         is CardFact.Rating -> PillStyle(
             container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
@@ -436,14 +448,14 @@ private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
             PillStyle(
                 container = color.copy(alpha = 0.16f),
                 content = color,
-                icon = statusIcon(fact.status),
+                icon = null,
                 label = appString(mangaStatusLabel(fact.status)),
             )
         }
         is CardFact.Genre -> PillStyle(
             container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
             content = scheme.onSurfaceVariant,
-            icon = Icons.Outlined.Category,
+            icon = null,
             label = fact.label,
         )
         is CardFact.Updated -> PillStyle(
@@ -455,7 +467,7 @@ private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
         is CardFact.Source -> PillStyle(
             container = scheme.surfaceContainerHighest.copy(alpha = 0.9f),
             content = scheme.onSurfaceVariant,
-            icon = Icons.Outlined.Public,
+            icon = null,
             label = fact.label,
         )
     }
@@ -471,13 +483,15 @@ private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
             ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = style.icon,
-                contentDescription = null,
-                tint = style.content,
-                modifier = Modifier.size(MangaCardMetrics.factIconSize),
-            )
-            Spacer(Modifier.width(3.dp))
+            style.icon?.let { icon ->
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = style.content,
+                    modifier = Modifier.size(MangaCardMetrics.factIconSize),
+                )
+                Spacer(Modifier.width(3.dp))
+            }
             Text(
                 text = style.label,
                 style = MaterialTheme.typography.labelSmall,
@@ -487,15 +501,6 @@ private fun CardPill(fact: CardFact, modifier: Modifier = Modifier) {
             )
         }
     }
-}
-
-/** The state of a work, drawn from the shared icon vocabulary rather than a generic glyph. */
-private fun statusIcon(status: MangaStatus): ImageVector = when (status) {
-    MangaStatus.ONGOING -> MangaOsIcons.stateOngoing
-    MangaStatus.COMPLETED -> MangaOsIcons.stateCompleted
-    MangaStatus.HIATUS -> MangaOsIcons.stateHiatus
-    MangaStatus.CANCELLED -> MangaOsIcons.stateCancelled
-    MangaStatus.UNKNOWN -> Icons.Outlined.Category
 }
 
 /** A tiny press scale is the whole acknowledgement: no neighbours move, the grid never reflows. */

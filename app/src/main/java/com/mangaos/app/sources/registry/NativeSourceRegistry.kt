@@ -1,23 +1,13 @@
 package com.mangaos.app.sources.registry
 
-import com.mangaos.app.R
 import com.mangaos.app.sources.core.MangaSource
 import com.mangaos.app.sources.core.SourceCapability
-import com.mangaos.app.sources.implementations.AzoraSource
-import com.mangaos.app.sources.implementations.DespairMangaSource
-import com.mangaos.app.sources.implementations.MangaArSource
-import com.mangaos.app.sources.implementations.MangaDarSource
-import com.mangaos.app.sources.implementations.MangaOriginSource
-import com.mangaos.app.sources.implementations.MangaSwatSource
 import com.mangaos.app.sources.implementations.MangaTekSource
-import com.mangaos.app.sources.implementations.MangaTikSource
-import com.mangaos.app.sources.implementations.MangaTimeSource
-import com.mangaos.app.sources.implementations.ProcomicSource
 import com.mangaos.app.sources.implementations.TeamXSource
 
 /**
- * A bundled source: identity, display metadata, its icon and a factory. The factory is what
- * makes a source lazy: no instance and no request exist until it is actually used.
+ * A bundled server: identity, display metadata, its icon (none by default) and a factory. The
+ * factory is what makes a server lazy: no instance and no request exist until it is used.
  */
 data class SourceDefinition(
     val id: String,
@@ -27,204 +17,65 @@ data class SourceDefinition(
     val description: String,
     val version: String,
     val capabilities: Set<SourceCapability>,
-    val iconRes: Int,
+    /** Brand artwork is deliberately absent: servers are presented neutrally in the app. */
+    val iconRes: Int? = null,
     val factory: () -> MangaSource,
 )
 
 /**
- * The single list of sources compiled into MangaOS: Arabic sources only.
+ * The single list of servers compiled into MangaOS: one primary and one backup.
  *
- * Every source here is a native implementation inside the APK: there is nothing to install,
- * download or update separately, and no extension APK or repository is loaded at runtime.
- * Adding a source means appending one [SourceDefinition] together with its [MangaSource]
- * implementation — the Sources screen, the enable/disable state, the picker and the repository
- * all read this list.
+ * Both implementations are native and live inside the APK, so there is nothing to install or
+ * update separately and no extension repository is loaded at runtime. The Sources screen, the
+ * enable/disable state, the picker and the repository all read this list.
  *
- * Identity is the stable [SourceDefinition.id], never the display name, so a renamed source
- * keeps its library, reading history and downloads.
+ * Identity is the stable [SourceDefinition.id], never the display name: a renamed server keeps
+ * every library entry, reading position and download that already belongs to it. The MangaTek
+ * implementation therefore keeps its id `mangatek` and Team X keeps `teamx`.
  */
 object NativeSourceRegistry {
 
     val definitions: List<SourceDefinition> = listOf(
         SourceDefinition(
             id = "mangatek",
-            name = "MangaTek",
+            name = "السيرفر الرئيسي",
+            description = "الخادم الأساسي للمانجا العربية",
             lang = "ar",
             baseUrl = "https://mangatek.com",
-            description = "مانجا عربية مع طبقات ترجمة مرسومة على الصفحات",
             version = "1.0.0",
             capabilities = setOf(
                 SourceCapability.LATEST,
                 SourceCapability.POPULAR,
                 SourceCapability.SEARCH,
             ),
-            iconRes = R.drawable.source_mangatek,
             factory = ::MangaTekSource,
         ),
         SourceDefinition(
-            id = "despairmanga",
-            name = "Despair Manga",
-            lang = "ar",
-            baseUrl = "https://despair-world.com",
-            description = "مانجا عربية عبر واجهة الموقع العامة",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_despairmanga,
-            factory = ::DespairMangaSource,
-        ),
-        SourceDefinition(
-            id = "procomic",
-            name = "ProComic",
-            lang = "ar",
-            baseUrl = "https://procomic.pro",
-            description = "مانجا ومانهوا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_procomic,
-            factory = ::ProcomicSource,
-        ),
-        SourceDefinition(
-            id = "mangaar",
-            name = "MangaAr",
-            lang = "ar",
-            baseUrl = "https://mangaar.com",
-            description = "مانغا عربي بترجمات محلية وفصول من مانجا ديكس",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangaar,
-            factory = ::MangaArSource,
-        ),
-        SourceDefinition(
             id = "teamx",
-            name = "Team X Manga",
+            name = "السيرفر الاحتياطي",
+            description = "خادم بديل يُستخدم عند تعذّر الخادم الرئيسي",
             lang = "ar",
             baseUrl = "https://olympustaff.com",
-            description = "مانجا عربية من فريق Team X",
             version = "1.0.0",
             capabilities = setOf(
                 SourceCapability.LATEST,
                 SourceCapability.POPULAR,
                 SourceCapability.SEARCH,
             ),
-            iconRes = R.drawable.source_teamx,
             factory = ::TeamXSource,
-        ),
-        SourceDefinition(
-            id = "azora",
-            name = "Azora",
-            lang = "ar",
-            baseUrl = "https://azorafly.com",
-            description = "مانجا ومانهوا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_azora,
-            factory = ::AzoraSource,
-        ),
-        SourceDefinition(
-            id = "mangadar",
-            name = "Manga Dar",
-            lang = "ar",
-            baseUrl = "https://mangadar.com",
-            description = "مانجا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangadar,
-            factory = ::MangaDarSource,
-        ),
-        SourceDefinition(
-            id = "mangaorigin",
-            name = "Manga Origin",
-            lang = "ar",
-            baseUrl = "https://teammangaorigin.blogspot.com",
-            description = "مانجا عربية على مدونة Blogger",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangaorigin,
-            factory = ::MangaOriginSource,
-        ),
-        SourceDefinition(
-            id = "mangaswat",
-            name = "Manga Swat",
-            lang = "ar",
-            baseUrl = "https://meshmanga.com",
-            description = "مانجا عربية عبر واجهة التطبيق",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangaswat,
-            factory = ::MangaSwatSource,
-        ),
-        SourceDefinition(
-            id = "mangatik",
-            name = "Manga Tik",
-            lang = "ar",
-            baseUrl = "https://mangatik.com",
-            description = "مانجا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangatik,
-            factory = ::MangaTikSource,
-        ),
-        SourceDefinition(
-            id = "mangatime",
-            name = "Manga Time",
-            lang = "ar",
-            baseUrl = "https://mangatime.org",
-            description = "مانجا عربية",
-            version = "1.0.0",
-            capabilities = setOf(
-                SourceCapability.LATEST,
-                SourceCapability.POPULAR,
-                SourceCapability.SEARCH,
-            ),
-            iconRes = R.drawable.source_mangatime,
-            factory = ::MangaTimeSource,
         ),
     )
 
     init {
         val duplicates = definitions.groupBy { it.id }.filterValues { it.size > 1 }
-        require(duplicates.isEmpty()) { "Duplicate source ids: ${duplicates.keys}" }
+        require(duplicates.isEmpty()) { "Duplicate server ids: ${duplicates.keys}" }
         val names = definitions.groupBy { it.name }.filterValues { it.size > 1 }
-        require(names.isEmpty()) { "Duplicate source names: ${names.keys}" }
+        require(names.isEmpty()) { "Duplicate server names: ${names.keys}" }
         require(definitions.all { it.id.isNotBlank() && it.name.isNotBlank() }) {
-            "Every source needs a stable id and a name"
-        }
-        require(definitions.all { it.lang == "ar" }) {
-            "MangaOS ships Arabic sources only"
+            "Every server needs a stable id and a name"
         }
         require(definitions.all { it.baseUrl.startsWith("https://") }) {
-            "Every source needs an https base url"
+            "Every server needs an https base url"
         }
     }
 

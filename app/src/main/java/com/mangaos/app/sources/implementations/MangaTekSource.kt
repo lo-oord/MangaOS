@@ -40,7 +40,7 @@ import org.jsoup.nodes.Document
 class MangaTekSource : MangaSource {
 
     override val id: String = "mangatek"
-    override val name: String = "MangaTek"
+    override val name: String = "السيرفر الرئيسي"
     override val lang: String = "ar"
     override val baseUrl: String = "https://mangatek.com"
     override val capabilities: Set<SourceCapability> = setOf(
