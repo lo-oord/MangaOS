@@ -18,11 +18,6 @@ object Routes {
     const val SPLASH = "splash"
     const val ONBOARDING = "onboarding"
     const val AUTH = "auth"
-    const val AUTH_CHOICE = "auth/choice"
-    const val AUTH_SIGN_UP = "auth/sign-up"
-    const val AUTH_PROFILE = "auth/profile"
-    const val AUTH_VERIFY = "auth/verify"
-    const val AUTH_SIGN_IN = "auth/sign-in"
     const val MAIN = "main"
 
     const val NOTIFICATIONS = "notifications"

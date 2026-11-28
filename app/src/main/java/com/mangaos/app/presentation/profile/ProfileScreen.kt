@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Sync
@@ -76,6 +77,7 @@ import com.mangaos.app.core.ui.components.ProfileSkeleton
 import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.domain.model.SessionType
 import com.mangaos.app.domain.model.UserProfile
+import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.presentation.common.AgePickerDialog
 import com.mangaos.app.presentation.common.CountryPickerDialog
 import com.mangaos.app.presentation.common.LanguagePickerSheet
@@ -99,6 +101,7 @@ fun ProfileScreen(
     var showCountryPicker by remember { mutableStateOf(false) }
     var showAgePicker by remember { mutableStateOf(false) }
     var showPasswordInfo by remember { mutableStateOf(false) }
+    var showSignOutConfirm by remember { mutableStateOf(false) }
     var avatarReloadKey by remember(profile?.avatarUri) { mutableStateOf(0) }
     var avatarFailed by remember(profile?.avatarUri) { mutableStateOf(false) }
 
@@ -245,6 +248,16 @@ fun ProfileScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        // Ending the session only returns to the authentication screen: the library, downloads,
+        // reading history and every preference stay exactly where they are on this device.
+        item {
+            SecondaryButton(
+                text = stringResource(R.string.action_sign_out),
+                icon = Icons.AutoMirrored.Outlined.Logout,
+                onClick = { showSignOutConfirm = true },
+            )
+        }
     }
 
     editTarget?.let { target ->
@@ -364,6 +377,19 @@ fun ProfileScreen(
                 }
             },
             onDismiss = { showAgePicker = false },
+        )
+    }
+
+    if (showSignOutConfirm) {
+        AppDialog(
+            title = stringResource(R.string.sign_out_title),
+            message = stringResource(R.string.sign_out_message),
+            confirmLabel = stringResource(R.string.action_sign_out),
+            onConfirm = {
+                showSignOutConfirm = false
+                ServiceLocator.user.signOut()
+            },
+            onDismiss = { showSignOutConfirm = false },
         )
     }
 

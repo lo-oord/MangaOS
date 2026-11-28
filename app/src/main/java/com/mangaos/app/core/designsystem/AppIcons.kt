@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LibraryBooks
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -48,9 +50,11 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.QuestionMark
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Rocket
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.Settings
@@ -94,13 +98,13 @@ object MangaOsIcons {
     val genreComedy = Icons.Outlined.SentimentSatisfied
     val genreDrama = Icons.Outlined.Theaters
     val genrePsychological = Icons.Outlined.Psychology
-    val genreThriller = Icons.Outlined.Notifications
+    val genreThriller = Icons.Outlined.Bolt
     val genreSports = Icons.Outlined.EmojiEvents
     val genreSchool = Icons.Outlined.School
     val genreHistorical = Icons.Outlined.AccountBalance
     val genreSciFi = Icons.Outlined.Rocket
-    val genreMystery = Icons.Outlined.Search
-    val genreSliceOfLife = Icons.Outlined.Category
+    val genreMystery = Icons.Outlined.QuestionMark
+    val genreSliceOfLife = Icons.Outlined.LocalCafe
 
     // Work information
     val rating = Icons.Outlined.Star
@@ -155,7 +159,7 @@ object MangaOsIcons {
     val unlock = Icons.Outlined.LockOpen
     val help = Icons.Outlined.HelpOutline
     val home = Icons.Outlined.Home
-    val storage = Icons.Outlined.CloudDownload
+    val storage = Icons.Outlined.SdStorage
 
     val theme: ImageVector = Icons.Outlined.Palette
 }

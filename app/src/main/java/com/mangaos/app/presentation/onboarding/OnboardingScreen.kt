@@ -14,6 +14,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -87,6 +89,7 @@ import com.mangaos.app.domain.model.StorageChoice
 fun OnboardingScreen(onFinished: () -> Unit) {
     val viewModel: OnboardingViewModel = viewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val direction by viewModel.direction.collectAsStateWithLifecycle()
     val ready by viewModel.ready.collectAsStateWithLifecycle()
     val storageError by viewModel.storageError.collectAsStateWithLifecycle()
     val reduceMotion = LocalReduceMotion.current
@@ -190,12 +193,20 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                 AnimatedContent(
                     targetState = step,
                     transitionSpec = {
-                        val spec = tween<Float>(if (reduceMotion) 0 else 220)
-                        (fadeIn(tween(if (reduceMotion) 0 else 220)) +
-                            scaleIn(
-                                initialScale = 0.985f,
-                                animationSpec = tween(if (reduceMotion) 0 else 220),
-                            )).togetherWith(fadeOut(spec))
+                        // Forward and back move in opposite directions, so the wizard's motion
+                        // matches the arrow the reader just pressed; the shift is a tenth of the
+                        // width, a nudge rather than a page flip.
+                        val duration = if (reduceMotion) 0 else 240
+                        val forward = direction >= 0
+                        val enter = fadeIn(tween(duration)) +
+                            slideInHorizontally(tween(duration)) { width ->
+                                if (forward) width / 10 else -width / 10
+                            }
+                        val exit = fadeOut(tween(if (reduceMotion) 0 else 160)) +
+                            slideOutHorizontally(tween(duration)) { width ->
+                                if (forward) -width / 10 else width / 10
+                            }
+                        enter togetherWith exit
                     },
                     label = "onboardingStep",
                 ) { current ->
@@ -247,7 +258,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                         )
                     }
                 }
-                if (step == OnboardingViewModel.STEP_GENRES) {
+                if (step == OnboardingViewModel.STEP_GENRES || step == OnboardingViewModel.STEP_TYPES) {
                     TextButton(onClick = viewModel::next) {
                         Text(
                             text = stringResource(R.string.onboarding_skip),

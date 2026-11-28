@@ -8,42 +8,19 @@
     <string name="cd_notifications">Notifications</string>
     <string name="cd_back">Back</string>
     <string name="cd_cover">Cover of %1$s</string>
-    <string name="cd_avatar">Profile picture</string>
     <string name="cd_change_photo">Change profile picture</string>
-    <string name="cd_external_link">Open</string>
 
     <!-- Splash -->
-    <string name="splash_welcome">Welcome to MangaOS</string>
-    <string name="splash_tagline">Read. Enjoy. Follow.</string>
 
     <!-- Account -->
-    <string name="auth_create_account">Create account</string>
-    <string name="auth_existing_user">I already have an account</string>
-    <string name="auth_guest">Continue as guest</string>
-    <string name="signup_title">Create account</string>
-    <string name="signin_title">Sign in</string>
-    <string name="signup_with_google">Sign up with Google</string>
-    <string name="label_email">Email</string>
-    <string name="label_password">Password</string>
-    <string name="label_confirm_password">Confirm password</string>
-    <string name="action_next">Next</string>
-    <string name="google_unavailable">Google sign-in is unavailable because no authentication service is connected in this version.</string>
     <string name="error_email_invalid">Invalid email address</string>
     <string name="error_password_short">Use at least 8 characters</string>
     <string name="error_password_mismatch">Passwords do not match</string>
     <string name="error_required">This field is required</string>
-    <string name="profile_title">Account details</string>
     <string name="label_display_name">Display name</string>
     <string name="label_username">Username</string>
     <string name="error_username_length">Between 3 and 20 characters</string>
     <string name="error_username_chars">Letters, numbers and _ only</string>
-    <string name="action_change_photo">Change photo</string>
-    <string name="action_add_photo">Add photo</string>
-    <string name="verify_title">Confirm your email</string>
-    <string name="verify_code_label">Confirmation code</string>
-    <string name="verify_note">No real code is sent in this phase.</string>
-    <string name="action_edit_email">Edit email</string>
-    <string name="error_code_incomplete">Enter the 6-digit code</string>
     <string name="guest_display_name">Guest</string>
     <string name="guest_username">guest</string>
 
@@ -62,9 +39,6 @@
     <string name="status_completed">Completed</string>
     <string name="status_hiatus">On hold</string>
     <string name="status_cancelled">Cancelled</string>
-    <string name="type_manga">Manga</string>
-    <string name="type_manhwa">Manhwa</string>
-    <string name="chapter_short">Ch. %1$s</string>
     <string name="chapter_number">Chapter %1$s</string>
 
     <!-- Relative time -->
@@ -76,7 +50,6 @@
     <string name="time_days_ago">%1$d days ago</string>
     <string name="time_week_ago">a week ago</string>
     <string name="time_weeks_ago">%1$d weeks ago</string>
-    <string name="time_months_ago">%1$d months ago</string>
 
     <!-- Library -->
     <string name="library_empty_title">Your library is empty</string>
@@ -93,14 +66,12 @@
     <string name="download_status_paused">Paused</string>
     <string name="download_status_failed">Download failed</string>
     <string name="download_status_completed">Completed</string>
-    <string name="download_status_cancelling">Cancelling</string>
     <string name="download_status_cancelled">Cancelled</string>
     <string name="action_pause">Pause</string>
     <string name="action_resume">Resume</string>
     <string name="action_retry">Retry</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
-    <string name="action_select">Select</string>
     <string name="action_done">Done</string>
     <string name="selected_count">%1$d selected</string>
 
@@ -108,7 +79,6 @@
     <string name="storage_empty_title">Nothing saved yet</string>
     <string name="storage_chapter_count">%1$d chapters</string>
     <string name="delete_chapter_title">Delete chapter?</string>
-    <string name="delete_chapters_title">Delete selected chapters?</string>
     <string name="delete_work_title">Delete work?</string>
     <string name="delete_chapter_message">%1$s will be removed from local storage.</string>
     <string name="delete_work_message">All chapters of %1$s will be removed from local storage.</string>
@@ -119,17 +89,8 @@
     <string name="action_mark_all_read">Mark all as read</string>
     <string name="action_delete_all">Delete all</string>
     <string name="delete_all_notifications_title">Delete all notifications?</string>
-    <string name="notif_completed_title">Download complete</string>
-    <string name="notif_completed_message">%1$s — chapter %2$s is ready in local storage</string>
-    <string name="notif_failed_title">Download failed</string>
-    <string name="notif_failed_message">Could not download %1$s — chapter %2$s</string>
-    <string name="notif_started_title">Download started</string>
-    <string name="notif_started_message">%1$s — chapter %2$s</string>
-    <string name="notif_system_title">MangaOS</string>
-    <string name="notif_system_message">This is a sample notification.</string>
 
     <!-- Settings -->
-    <string name="settings_appearance">Theme and appearance</string>
     <string name="settings_language">Language</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_dark_mode">Display mode</string>
@@ -144,11 +105,6 @@
     <string name="theme_sky">Sky</string>
     <string name="theme_coffee">Coffee</string>
     <string name="theme_forest">Forest</string>
-    <string name="settings_reader">Reader</string>
-    <string name="settings_notifications">Notifications</string>
-    <string name="settings_reader_soon">Reader settings</string>
-    <string name="settings_notifications_soon">Notification settings</string>
-    <string name="badge_soon">Soon</string>
 
     <!-- About -->
     <string name="about_privacy">Privacy and security</string>
@@ -168,13 +124,9 @@
     <string name="cd_grid_view">Grid view</string>
     <string name="cd_list_view">List view</string>
     <string name="status_unknown">Unknown</string>
-    <string name="search_latest_placeholder">Search every source</string>
     <string name="search_sources_failed">%1$d sources could not be searched</string>
-    <string name="feed_end">You reached the end</string>
     <string name="source_radial_hint">Slide to a source</string>
     <string name="detail_start_reading">Start reading</string>
-    <string name="detail_continue_reading">Continue reading</string>
-    <string name="detail_chapter_count">%1$d chapters</string>
     <string name="search_manga_placeholder">Search every source</string>
     <string name="search_library_placeholder">Search your library</string>
     <string name="search_sources_placeholder">Search sources</string>
@@ -182,69 +134,38 @@
     <string name="state_no_source_title">No sources enabled</string>
     <string name="state_no_source_action">Open sources</string>
     <string name="state_source_unavailable">This source cannot be read yet</string>
-    <string name="source_choose">Choose source</string>
     <string name="source_pick_title">Latest from</string>
     <string name="source_manage">Manage sources</string>
     <string name="detail_share">Share</string>
     <string name="detail_more">More options</string>
     <string name="detail_refresh">Refresh details</string>
-    <string name="detail_open_source_page">Open source page</string>
     <string name="detail_story">Story</string>
     <string name="detail_story_empty">No description was provided by the source.</string>
     <string name="action_show_more">Show more</string>
     <string name="action_show_less">Show less</string>
-    <string name="detail_chapters">Chapters (%1$d)</string>
     <string name="detail_chapters_empty">No chapters are available for this work.</string>
     <string name="detail_chapters_error">The chapter list could not be loaded.</string>
     <string name="detail_sort">Sort chapters</string>
-    <string name="detail_sort_newest">Newest first</string>
-    <string name="detail_sort_oldest">Oldest first</string>
-    <string name="action_select_all">Select all</string>
     <string name="action_download_selected">Download</string>
     <string name="action_delete_selected">Delete</string>
     <string name="detail_download_queued">Download requested</string>
-    <string name="detail_marked_read">Chapter %1$s is now your last read</string>
     <string name="detail_downloaded">Downloaded</string>
     <string name="detail_read">Read</string>
     <string name="detail_last_read">Last read: chapter %1$s</string>
-    <string name="detail_rating">Rating %1$.1f</string>
-    <string name="detail_author">Author</string>
-    <string name="detail_artist">Artist</string>
-    <string name="detail_year">Year</string>
-    <string name="detail_language">Language</string>
-    <string name="detail_source">Source</string>
     <string name="detail_source_unavailable">This work cannot be opened yet</string>
-    <string name="library_saved">In your library</string>
-    <string name="library_not_saved">Not in your library</string>
-    <string name="sources_filter_all">All</string>
     <string name="sources_none">No sources have been added yet</string>
-    <string name="sources_empty">No sources match this filter</string>
-    <string name="sources_multi_language">Multi-language</string>
     <string name="tagline_welcome">Your manga world, in one place.</string>
-    <string name="tagline_signup">Create your account and start your journey.</string>
-    <string name="tagline_signin">Welcome back.</string>
-    <string name="tagline_profile">Let us set up your profile.</string>
-    <string name="tagline_verify">One last step to finish your account.</string>
     <string name="label_preferred_language">Preferred language</string>
     <string name="label_country">Country</string>
     <string name="label_age">Age</string>
     <string name="value_not_set">Not set</string>
     <string name="country_search_hint">Search countries</string>
     <string name="age_privacy_note">Your age is used for content rules only and is never shown publicly.</string>
-    <string name="profile_privacy_note">Country, age and preferred language stay private. You can change or remove them later from privacy settings.</string>
-    <string name="error_age_min">You must be at least 13 years old</string>
-    <string name="action_continue">Continue</string>
-    <string name="action_sign_in">Sign in</string>
     <string name="sources_section_sources">Sources</string>
     <string name="reader_chapter_error">Chapter pages could not be loaded</string>
     <string name="reader_chapters_title">Chapters</string>
     <string name="reader_current_chapter">Current chapter</string>
     <string name="detail_in_progress">In progress</string>
-    <string name="info_webview_required">Android System WebView is required to open this source. Install or enable it, then retry.</string>
-    <string name="info_cloudflare_bypass_failure">The source could not get past Cloudflare protection. Try again later.</string>
-    <string name="settings_group_look">Look and reading</string>
-    <string name="settings_group_content">Content and storage</string>
-    <string name="settings_group_app">App and behavior</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_appearance_desc">Language, theme and dark mode</string>
     <string name="settings_section_reader">Reader</string>
@@ -267,15 +188,10 @@
     <string name="settings_mode_amoled">AMOLED black</string>
     <string name="settings_mode_amoled_desc">Recommended for AMOLED screens.</string>
     <string name="settings_notifications_enabled">Enable notifications</string>
-    <string name="settings_notifications_new_chapters">New chapters</string>
     <string name="settings_notifications_downloads">Download complete</string>
-    <string name="settings_notifications_sound">Sound</string>
-    <string name="settings_notifications_vibration">Vibration</string>
     <string name="settings_downloads_wifi_only">Wi-Fi only</string>
-    <string name="settings_downloads_auto">Download new chapters automatically</string>
     <string name="settings_downloads_location">Storage location</string>
     <string name="settings_downloads_manage">Manage downloads</string>
-    <string name="settings_downloads_concurrent">Concurrent downloads</string>
     <string name="settings_library_view">Library view</string>
     <string name="settings_library_grid">Grid</string>
     <string name="settings_library_list">List</string>
@@ -297,14 +213,9 @@
     <string name="settings_performance_freed">Freed %1$s</string>
     <string name="settings_interaction_reduce_motion">Reduce motion</string>
     <string name="settings_interaction_haptics">Haptic feedback</string>
-    <string name="settings_interaction_touch">Touch effects</string>
     <string name="settings_behavior_restore_last">Restore last screen</string>
     <string name="settings_behavior_confirm_exit">Confirm before exit</string>
     <string name="settings_behavior_refresh_on_open">Refresh on open</string>
-    <string name="settings_behavior_external_links">Open links in their apps</string>
-    <string name="settings_behavior_navigation">Navigation</string>
-    <string name="settings_behavior_tabs_hint">Tabs keep their state while the app is open</string>
-    <string name="settings_behavior_library_hint">Scroll positions are restored with the screen</string>
     <string name="exit_confirm_title">Exit MangaOS?</string>
     <string name="exit_confirm_message">Your reading progress is saved.</string>
     <string name="action_exit">Exit</string>
@@ -362,35 +273,22 @@
     <string name="reader_settings">Reader settings</string>
     <string name="reader_previous_chapter">Previous chapter</string>
     <string name="reader_next_chapter">Next chapter</string>
-    <string name="reader_next_failed">Next chapter failed · Retry</string>
-    <string name="reader_previous_failed">Previous chapter failed · Retry</string>
     <string name="reader_loading_previous">Loading previous chapter</string>
-    <string name="notif_wifi_required_title">Wi-Fi required</string>
-    <string name="notif_wifi_required_message">Downloads are paused because Wi-Fi only is enabled. %1$s · Chapter %2$s</string>
 
     <!-- Polished auth and profile -->
     <string name="cd_show_password">Show password</string>
     <string name="cd_hide_password">Hide password</string>
-    <string name="auth_or">or</string>
-    <string name="auth_have_account">Already have an account? Sign in</string>
-    <string name="auth_no_account">New to MangaOS? Create an account</string>
-    <string name="forgot_password">Forgot password?</string>
-    <string name="forgot_password_title">Password recovery</string>
-    <string name="forgot_password_unavailable">Password recovery is not available in this version because MangaOS has no authentication or email service connected yet. No email will be sent.</string>
-    <string name="action_google_sign_in">Sign in with Google</string>
     <string name="profile_screen_title">Profile</string>
     <string name="profile_account_info">Account information</string>
     <string name="profile_email">Email</string>
     <string name="profile_password">Password</string>
     <string name="profile_change_password">Change password</string>
-    <string name="profile_password_unavailable">Password management is unavailable because this version does not store or verify passwords on a server.</string>
     <string name="profile_auth_sync">Authentication and sync</string>
     <string name="profile_auto_sync">Automatic sync</string>
     <string name="profile_auto_sync_desc">Library, app settings and reader settings</string>
     <string name="profile_sync_unavailable">No sync service is connected in this version, so nothing is uploaded.</string>
     <string name="profile_edit_display_name">Edit display name</string>
     <string name="profile_edit_username">Edit username</string>
-    <string name="profile_edit_username_hint">Letters, numbers, dots and underscores</string>
     <string name="profile_save">Save</string>
     <string name="profile_saving">Saving…</string>
     <string name="profile_saved">Profile updated</string>
@@ -399,10 +297,8 @@
     <string name="profile_photo_upload_note">The picture is saved on this device. Cloud upload is not connected.</string>
     <string name="profile_photo_saved">Profile picture updated</string>
     <string name="profile_photo_save_failed">Could not save the picture</string>
-    <string name="profile_choose_photo">Choose picture</string>
     <string name="profile_image_retry">Reload picture</string>
     <string name="profile_username_rule">3–20 characters. Letters, numbers, dots and underscores only.</string>
-    <string name="profile_value_private">Private</string>
     <string name="error_display_name_length">Display name must be 40 characters or fewer</string>
 
     <!-- Download tasks (Android notifications) -->
@@ -428,12 +324,6 @@
     <string name="notif_new_chapter_group_text">New chapters in your library</string>
 
     <!-- Downloads tab -->
-    <string name="downloads_filter_all">All</string>
-    <string name="downloads_filter_active">Active</string>
-    <string name="downloads_filter_queued">Waiting</string>
-    <string name="downloads_filter_completed">Completed</string>
-    <string name="downloads_filter_failed">Failed</string>
-    <string name="downloads_no_matching">No downloads in this filter</string>
     <string name="downloads_task_chapters">Downloading %1$d chapters</string>
     <string name="downloads_task_chapter">Chapter %1$s</string>
     <string name="downloads_chapter_progress">%1$d / %2$d chapters</string>
@@ -445,14 +335,12 @@
     <string name="downloads_remove_message">Downloaded chapters stay in your local library. Only the task is removed.</string>
     <string name="downloads_delete_files_title">Delete downloaded files?</string>
     <string name="downloads_delete_files_message">The chapter files for %1$s will be removed from this device, together with their local library entries.</string>
-    <string name="downloads_completed_hint">Available in local storage</string>
     <string name="downloads_delete_chapter_title">Delete this chapter’s files?</string>
     <string name="download_status_partial">Needs retry</string>
     <string name="download_partial_message">Some chapters could not be downloaded. Completed ones are kept.</string>
     <string name="download_error_wifi">Waiting for a Wi-Fi connection</string>
     <string name="download_error_no_pages">The source returned no pages</string>
     <string name="download_error_storage">Not enough free storage for this chapter</string>
-    <string name="download_error_folder">Could not create the chapter folder</string>
     <string name="download_error_verify">The downloaded pages failed verification</string>
     <string name="download_error_record">Could not save the chapter in the local library</string>
     <string name="download_error_storage_access">The download folder is not available. Check that the storage is mounted, then try again.</string>
@@ -460,21 +348,13 @@
     <string name="download_error_network">The connection was lost while downloading. Try again when the network is back.</string>
     <string name="download_error_http">The source refused the request (%1$s)</string>
     <string name="download_error_generic">The download failed</string>
-    <string name="download_storage_title">Download storage</string>
-    <string name="download_storage_location">Location: %1$s</string>
-    <string name="download_storage_free">%1$s free</string>
-    <string name="download_storage_check">Check storage</string>
-    <string name="download_storage_ok">Storage is ready for downloads</string>
-    <string name="download_storage_problem">Storage is not ready: %1$s</string>
     <string name="notif_pages_progress">%1$d / %2$d images</string>
 
     <!-- Local library and offline reading -->
     <string name="storage_summary">%1$d works · %2$s</string>
-    <string name="storage_badge_offline">Offline</string>
     <string name="storage_delete_blocked">This work is open in the reader. Close it before deleting.</string>
     <string name="local_detail_chapters">Downloaded chapters (%1$d)</string>
     <string name="local_detail_missing_info">Not available offline</string>
-    <string name="local_detail_source">Source: %1$s</string>
     <string name="local_detail_not_found">This work is no longer in local storage</string>
     <string name="local_detail_size">%1$s on this device</string>
     <string name="local_detail_empty_chapters">No complete chapters are stored for this work</string>
@@ -494,28 +374,19 @@
     <string name="reader_image_failed">Image failed to load</string>
     <string name="reader_direction">Reading direction</string>
     <string name="reader_direction_hint">Applies to horizontal page modes</string>
-    <string name="detail_chapters_stats">%1$d read · %2$d downloaded</string>
-    <string name="detail_filter_all">All</string>
-    <string name="detail_filter_unread">Unread</string>
-    <string name="detail_filter_downloaded">Downloaded</string>
     <string name="action_mark_selected_read">Mark read</string>
     <string name="action_mark_selected_unread">Mark unread</string>
     <string name="action_retry_selected">Retry failed</string>
     <string name="action_cancel_selected">Cancel downloads</string>
     <string name="action_clear_selection">Clear</string>
-    <string name="detail_chapter_search">Search chapters</string>
-    <string name="detail_jump_resume">Jump to last read</string>
     <string name="action_close">Close</string>
     <string name="action_more">More options</string>
-    <string name="detail_last_read_marker">Last read</string>
     <string name="sources_native_summary">%1$d enabled of %2$d</string>
     <string name="sources_last_error">Last error: %1$s</string>
     <string name="language_switching_to">Switching to %1$s</string>
     <string name="detail_publication_date">Publication date</string>
     <string name="detail_last_update">Last update</string>
-    <string name="detail_sort_by">Sort by</string>
     <string name="detail_story_chapters">Chapters</string>
-    <string name="sources_all_label">All sources</string>
     <string name="search_latest_in">Search in %1$s</string>
     <string name="downloads_completed_tap">Downloaded · tap to open</string>
     <string name="detail_continue_from">Continue from chapter %1$s</string>
@@ -590,4 +461,9 @@
     <string name="auth_error_wrong_password">Wrong password.</string>
     <string name="auth_error_email_taken">This email already has an account.</string>
     <string name="auth_error_generic">Something went wrong. Try again.</string>
+    <string name="action_sign_out">Sign out</string>
+    <string name="sign_out_title">Sign out?</string>
+    <string name="sign_out_message">Your library, downloads and settings stay on this device.</string>
+    <string name="profile_password_unavailable">Passwords are stored and verified on this device only.</string>
+    <string name="profile_privacy_note">Country, age and language stay private. You can change or remove them here.</string>
 </resources>

@@ -41,8 +41,6 @@ class OnboardingViewModel : ViewModel() {
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready.asStateFlow()
 
-    val stepCount: Int = STEP_COUNT
-
     init {
         viewModelScope.launch {
             _state.value = settings.onboardingState.first()
@@ -135,24 +133,20 @@ class OnboardingViewModel : ViewModel() {
     fun next() {
         val current = _state.value
         if (current.step >= STEP_COUNT - 1) return
+        val target = current.step + 1
         _direction.value = 1
-        _state.update { it.copy(step = current.step + 1) }
-        persistStep(current.step + 1)
-        // The first step is where a fresh install always starts; a later launch that was
-        // interrupted resumes directly on the saved step instead.
-        viewModelScope.launch {
-            settings.updateOnboarding { it.copy(step = current.step + 1) }
-        }
+        _state.update { it.copy(step = target) }
+        // One write per step: a later launch that was interrupted resumes on the saved step.
+        viewModelScope.launch { settings.updateOnboarding { it.copy(step = target) } }
     }
 
     fun back(): Boolean {
         val current = _state.value
         if (current.step == 0) return false
+        val target = current.step - 1
         _direction.value = -1
-        _state.update { it.copy(step = current.step - 1) }
-        viewModelScope.launch {
-            settings.updateOnboarding { it.copy(step = current.step - 1) }
-        }
+        _state.update { it.copy(step = target) }
+        viewModelScope.launch { settings.updateOnboarding { it.copy(step = target) } }
         return true
     }
 
@@ -178,10 +172,6 @@ class OnboardingViewModel : ViewModel() {
                 )
             }
         }
-    }
-
-    private fun persistStep(step: Int) {
-        viewModelScope.launch { settings.updateOnboarding { it.copy(step = step) } }
     }
 
     private fun folderName(uri: Uri): String {

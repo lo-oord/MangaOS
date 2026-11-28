@@ -19,13 +19,17 @@ class SplashViewModel : ViewModel() {
 
     fun resolveDestination(onResolved: (SplashDestination) -> Unit) {
         viewModelScope.launch {
-            // Both values come from the same DataStore read, so the hand-off is one decision.
+            // Both reads are awaited, not sampled: the session is still loading when the launch
+            // screen starts, and a `.value` check would send a signed-in reader to sign in again.
             val onboardingCompleted = ServiceLocator.settings.onboardingCompleted.first()
-            when {
-                !onboardingCompleted -> onResolved(SplashDestination.ONBOARDING)
-                ServiceLocator.user.profile.value == null -> onResolved(SplashDestination.AUTH)
-                else -> onResolved(SplashDestination.MAIN)
-            }
+            val profile = ServiceLocator.user.profile.first()
+            onResolved(
+                when {
+                    !onboardingCompleted -> SplashDestination.ONBOARDING
+                    profile == null -> SplashDestination.AUTH
+                    else -> SplashDestination.MAIN
+                },
+            )
         }
     }
 }

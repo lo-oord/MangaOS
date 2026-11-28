@@ -4,7 +4,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -29,6 +33,23 @@ fun RootNavHost(modifier: Modifier = Modifier) {
     val unreadNotifications by ServiceLocator.notifications.unreadCount.collectAsStateWithLifecycle()
     val reduceMotion = LocalReduceMotion.current
     val transitionMillis = if (reduceMotion) 0 else 220
+
+    // Signing out ends the session only: the wizard stays completed and every preference stays
+    // on the device, so the reader lands on authentication rather than on the setup again.
+    // The flag also keeps the first, still-loading profile from redirecting at launch.
+    var hadSession by remember { mutableStateOf(false) }
+    LaunchedEffect(profile) {
+        if (profile != null) {
+            hadSession = true
+            return@LaunchedEffect
+        }
+        if (hadSession) {
+            navController.navigate(Routes.AUTH) {
+                popUpTo(Routes.MAIN) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
