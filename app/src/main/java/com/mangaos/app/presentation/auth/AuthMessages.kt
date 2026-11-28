@@ -20,6 +20,7 @@ fun AuthReason.messageRes(): Int = when (this) {
     AuthReason.PASSWORD_MISSING -> R.string.auth_error_password_missing
     AuthReason.USER_DISABLED -> R.string.auth_error_disabled
     AuthReason.USER_NOT_FOUND -> R.string.auth_error_no_account
+    AuthReason.EMAIL_NOT_VERIFIED -> R.string.auth_error_email_not_verified
     AuthReason.NOT_CONFIGURED, AuthReason.GENERIC -> R.string.auth_error_generic
     AuthReason.CANCELLED -> R.string.auth_error_cancelled
 }

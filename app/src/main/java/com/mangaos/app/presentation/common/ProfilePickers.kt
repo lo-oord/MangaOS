@@ -37,6 +37,7 @@ import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.components.AppBottomSheet
 import com.mangaos.app.core.ui.components.SettingsOptionRow
+import com.mangaos.app.core.util.ArabCountries
 import com.mangaos.app.core.util.LocaleManager
 import java.util.Locale
 
@@ -120,8 +121,9 @@ fun CountryPickerDialog(
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    // Only the Arab states are offered, sorted by their name in the active language.
     val countries = remember {
-        Locale.getISOCountries()
+        ArabCountries.codes
             .map { code -> code to countryDisplayName(code) }
             .sortedBy { it.second.lowercase() }
     }
@@ -258,6 +260,6 @@ fun languageDisplayName(code: String): String = stringResource(
 )
 
 fun countryDisplayName(code: String): String =
-    runCatching { Locale("", code).getDisplayCountry(Locale.getDefault()) }
+    runCatching { Locale("", code.uppercase()).getDisplayCountry(Locale.getDefault()) }
         .getOrDefault(code)
         .ifBlank { code }

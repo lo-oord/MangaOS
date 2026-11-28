@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,13 +38,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.AppIcon
 import com.mangaos.app.core.designsystem.GlassSurface
@@ -63,7 +65,7 @@ import com.mangaos.app.core.util.appString
  * the reader never leaves the page they started on.
  */
 @Composable
-fun AuthScreen(onSignedIn: () -> Unit) {
+fun AuthScreen(onSignedIn: () -> Unit = {}) {
     val viewModel: AuthViewModel = rememberAuthViewModel()
     val reduceMotion = LocalReduceMotion.current
     val stage = viewModel.stage
@@ -153,7 +155,6 @@ fun AuthScreen(onSignedIn: () -> Unit) {
                                     )
                                     AuthStage.EMAIL -> EmailStep(viewModel)
                                     AuthStage.PASSWORD -> PasswordStep(viewModel)
-                                    AuthStage.VERIFY -> VerifyStep(viewModel, onSignedIn)
                                     AuthStage.RESET -> ResetStep(viewModel)
                                     AuthStage.LINK -> LinkStep(viewModel)
                                 }
@@ -218,20 +219,6 @@ private fun StepActions(
             loading = viewModel.isSubmitting,
             icon = if (mode == AuthMode.SIGN_UP) MangaOsIcons.add else MangaOsIcons.login,
         )
-        AuthStage.VERIFY -> {
-            PrimaryButton(
-                text = stringResource(R.string.auth_verify_check),
-                onClick = { viewModel.checkVerification(onSignedIn) },
-                loading = viewModel.isSubmitting,
-                icon = MangaOsIcons.success,
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            SecondaryGooglelessAction(
-                text = stringResource(R.string.auth_verify_resend),
-                enabled = viewModel.canResendVerification,
-                onClick = { viewModel.sendVerification() },
-            )
-        }
         AuthStage.RESET -> PrimaryButton(
             text = stringResource(R.string.auth_flow_reset),
             onClick = viewModel::resetPassword,
@@ -297,37 +284,45 @@ private fun WelcomeStep(
     GoogleButton(onClick = onGoogle, enabled = !submitting)
 }
 
-/** The Google action is a real button with the brand monogram, never a decorative mark. */
+/**
+ * The Google action follows the brand: a white surface with the four-colour G, whatever the app
+ * theme is. The uppercase "G" letter that used to stand in for the logo is gone.
+ */
 @Composable
 private fun GoogleButton(onClick: () -> Unit, enabled: Boolean) {
-    OutlinedButton(
+    val contentColor = GoogleContentColor
+    Surface(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(MangaGlass.corner),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = Color.White,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, Color(0xFFDADCE0)),
         modifier = Modifier.fillMaxWidth().height(52.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .background(MaterialTheme.colorScheme.surface, CircleShape),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
+            Image(
+                painter = painterResource(R.drawable.ic_google_g),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm))
             Text(
-                text = "G",
+                text = stringResource(R.string.auth_continue_google),
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
             )
         }
-        Spacer(Modifier.width(Spacing.sm))
-        Text(
-            text = stringResource(R.string.auth_continue_google),
-            style = MaterialTheme.typography.labelLarge,
-        )
     }
 }
+
+/** Google's own dark grey, used on the white brand button in both themes. */
+private val GoogleContentColor = Color(0xFF1F1F1F)
 
 @Composable
 private fun EmailStep(viewModel: AuthViewModel) {
@@ -403,43 +398,6 @@ private fun PasswordStep(viewModel: AuthViewModel) {
                 style = MaterialTheme.typography.labelMedium,
             )
         }
-    }
-}
-
-@Composable
-private fun VerifyStep(viewModel: AuthViewModel, onSignedIn: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        AppIcon(
-            icon = MangaOsIcons.mail,
-            contentDescription = null,
-            role = IconRole.Primary,
-            size = 22.dp,
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Text(
-            text = stringResource(R.string.auth_verify_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-    Spacer(Modifier.height(Spacing.sm))
-    Text(
-        text = stringResource(R.string.auth_verify_hint, viewModel.email),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    AnimatedVisibility(visible = viewModel.verificationSent) {
-        Text(
-            text = stringResource(R.string.auth_verify_sent),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = Spacing.sm),
-        )
-    }
-    Spacer(Modifier.height(Spacing.sm))
-    TextButton(onClick = { viewModel.checkVerification(onSignedIn) }) {
-        Text(text = stringResource(R.string.auth_verify_check), style = MaterialTheme.typography.labelMedium)
     }
 }
 

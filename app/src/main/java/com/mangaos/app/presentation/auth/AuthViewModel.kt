@@ -11,12 +11,10 @@ import com.mangaos.app.data.firebase.AuthFailure
 import com.mangaos.app.data.firebase.AuthReason
 import com.mangaos.app.data.firebase.FirebaseAuthManager
 import com.mangaos.app.di.ServiceLocator
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** The screens of one shell. The shell is fixed; only its content changes. */
-enum class AuthStage { WELCOME, EMAIL, PASSWORD, VERIFY, RESET, LINK }
+enum class AuthStage { WELCOME, EMAIL, PASSWORD, RESET, LINK }
 
 enum class AuthMode { SIGN_IN, SIGN_UP }
 
@@ -47,13 +45,31 @@ class AuthViewModel : ViewModel() {
         private set
     var isSubmitting by mutableStateOf(false)
         private set
-    var canResendVerification by mutableStateOf(true)
-        private set
-    var verificationSent by mutableStateOf(false)
-        private set
 
     private var pendingGoogleToken: String? = null
-    private var resendJob: Job? = null
+
+    init {
+        // The shell is shared by the whole Activity, so it outlives a session. Clearing the form
+        // when the session ends is what stops the previous account's address and password from
+        // being offered again to the next reader on this device.
+        viewModelScope.launch {
+            FirebaseAuthManager.authState().collect { user ->
+                if (user == null) clearForm()
+            }
+        }
+    }
+
+    private fun clearForm() {
+        stage = AuthStage.WELCOME
+        email = ""
+        password = ""
+        confirmPassword = ""
+        emailError = null
+        passwordError = null
+        confirmError = null
+        failure = null
+        pendingGoogleToken = null
+    }
 
     fun open(next: AuthStage, nextMode: AuthMode = mode) {
         if (isSubmitting) return
@@ -72,7 +88,6 @@ class AuthViewModel : ViewModel() {
             AuthStage.WELCOME -> AuthStage.WELCOME
             AuthStage.EMAIL -> AuthStage.WELCOME
             AuthStage.PASSWORD -> AuthStage.EMAIL
-            AuthStage.VERIFY -> AuthStage.VERIFY
             AuthStage.RESET -> AuthStage.EMAIL
             AuthStage.LINK -> AuthStage.EMAIL
         }
@@ -145,12 +160,11 @@ class AuthViewModel : ViewModel() {
                     AuthMode.SIGN_IN -> FirebaseAuthManager.signIn(email, password)
                     AuthMode.SIGN_UP -> FirebaseAuthManager.register(email, password, "")
                 }
-                if (!user.isEmailVerified) {
-                    sendVerification(quiet = true)
-                    stage = AuthStage.VERIFY
-                } else {
-                    onSignedIn()
-                }
+                // A confirmed address is the session's own business: the root gate opens the app
+                // when it is verified, and asks for verification when it is not, so this shell
+                // never decides on its own that a sign-in is complete.
+                if (user.uid.isBlank()) throw AuthFailure(AuthReason.GENERIC)
+                onSignedIn()
             } catch (error: AuthFailure) {
                 failure = error.reason
             } finally {
@@ -214,39 +228,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /** Sends the verification mail; a repeated tap is refused for a short while. */
-    fun sendVerification(quiet: Boolean = false) {
-        if (!canResendVerification) return
-        canResendVerification = false
-        verificationSent = true
-        if (quiet) failure = null
-        viewModelScope.launch {
-            runCatching { FirebaseAuthManager.sendVerificationEmail() }
-                .onFailure { error -> if (error is AuthFailure) failure = error.reason }
-        }
-        resendJob?.cancel()
-        resendJob = viewModelScope.launch {
-            delay(RESEND_COOLDOWN_MILLIS)
-            canResendVerification = true
-        }
-    }
-
-    /** Re-reads the account; advancing is the proof, not the tap. */
-    fun checkVerification(onVerified: () -> Unit) {
-        if (isSubmitting) return
-        isSubmitting = true
-        viewModelScope.launch {
-            try {
-                val user = FirebaseAuthManager.reload()
-                if (user?.isEmailVerified == true) onVerified() else failure = null
-            } catch (error: AuthFailure) {
-                failure = error.reason
-            } finally {
-                isSubmitting = false
-            }
-        }
-    }
-
     fun resetPassword() {
         if (isSubmitting) return
         emailError = when {
@@ -259,7 +240,6 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 FirebaseAuthManager.sendPasswordReset(email)
-                verificationSent = true
                 failure = null
             } catch (error: AuthFailure) {
                 failure = error.reason
@@ -284,9 +264,5 @@ class AuthViewModel : ViewModel() {
 
     fun signOutSilently() {
         viewModelScope.launch { FirebaseAuthManager.signOut() }
-    }
-
-    private companion object {
-        const val RESEND_COOLDOWN_MILLIS = 30_000L
     }
 }

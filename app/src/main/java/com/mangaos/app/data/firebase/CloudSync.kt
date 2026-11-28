@@ -105,6 +105,10 @@ class CloudSync(
         uploader = null
         uid = null
         baseline = emptyMap()
+        // Per-account state must not survive the account: a stamp left over from the previous
+        // reader would make this account's first snapshot look already applied.
+        stamps.clear()
+        applyingRemote = false
         remoteReady = false
         if (_status.value != Status.IDLE) _status.value = Status.IDLE
     }

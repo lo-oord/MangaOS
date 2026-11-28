@@ -388,6 +388,7 @@
     <string name="detail_last_update">Last update</string>
     <string name="detail_story_chapters">Chapters</string>
     <string name="search_latest_in">Search in %1$s</string>
+    <string name="search_latest">Search the latest</string>
     <string name="downloads_completed_tap">Downloaded · tap to open</string>
     <string name="detail_continue_from">Continue from chapter %1$s</string>
     <string name="detail_chapter_word">Chapter</string>
@@ -482,6 +483,11 @@
     <string name="auth_verify_check">I have verified</string>
     <string name="auth_verify_resend">Resend</string>
     <string name="auth_verify_sent">Verification email sent.</string>
+    <string name="auth_verify_gate_note">Verify your email to unlock your account. Everything stays saved until you do.</string>
+    <string name="auth_verify_not_yet">Not verified yet. Open the link in the email, then try again.</string>
+    <string name="auth_verify_other">Wrong address?</string>
+    <string name="auth_verify_sign_out">Sign out</string>
+    <string name="session_loading">Loading your account…</string>
     <string name="auth_reset_hint">Enter your email and we will send a reset link.</string>
     <string name="auth_error_email_invalid">That email is not valid.</string>
     <string name="auth_error_password_weak">Password is too short (8 characters minimum).</string>
@@ -493,6 +499,7 @@
     <string name="auth_error_recent_login">Sign in again to continue.</string>
     <string name="auth_error_password_missing">This account has no password yet.</string>
     <string name="auth_error_disabled">This account is disabled.</string>
+    <string name="auth_error_email_not_verified">Confirm your email address first.</string>
     <string name="auth_error_cancelled">Cancelled.</string>
     <string name="auth_error_password_mismatch">The passwords do not match.</string>
     <string name="action_back">Back</string>

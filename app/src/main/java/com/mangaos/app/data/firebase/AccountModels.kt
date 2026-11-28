@@ -15,6 +15,12 @@ data class AccountDoc(
     /** Small compressed JPEG, base64 encoded, because the free plan has no file storage. */
     val photo: String? = null,
     val setupCompleted: Boolean = false,
+    /**
+     * Mirror of `badges/{uid}`, written only while it agrees with that document (the rules
+     * enforce it). It exists so the flag is visible on `users/{uid}`; the badge document stays
+     * the only place a grant can come from.
+     */
+    val isVerified: Boolean = false,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
 ) {
@@ -31,6 +37,7 @@ data class AccountDoc(
             age = (data["age"] as? Number)?.toInt(),
             photo = data["photo"] as? String,
             setupCompleted = data["setupCompleted"] as? Boolean ?: false,
+            isVerified = data["isVerified"] as? Boolean ?: false,
             createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L,
             updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
         )
@@ -59,4 +66,17 @@ data class AccountState(
             ?: ""
     val username: String get() = account?.username.orEmpty()
     val needsSetup: Boolean get() = signedIn && (account == null || !account.setupCompleted || !account.hasUsername)
+
+    /**
+     * The single decision the root host reads. [guestSession] comes from the local profile, which
+     * survives a restart and is never confused with an account session.
+     */
+    fun stage(guestSession: Boolean): SessionStage = SessionGate.resolve(
+        loading = loading,
+        signedIn = signedIn,
+        emailVerified = emailVerified,
+        setupCompleted = account?.setupCompleted == true,
+        hasUsername = account?.hasUsername == true,
+        guestSession = guestSession,
+    )
 }

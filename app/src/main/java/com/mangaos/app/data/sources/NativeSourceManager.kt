@@ -47,8 +47,18 @@ class NativeSourceManager(
         }
         .stateIn(scope, SharingStarted.Eagerly, definitions.map { it.toInfo(true) })
 
+    /**
+     * The primary server is the default source. Ordering the enabled list with it first makes
+     * "the first enabled source" mean the primary one everywhere, instead of whatever name
+     * happened to sort first alphabetically.
+     */
+    override val defaultSourceId: String? = definitions.firstOrNull()?.id
+
     override val enabledSources: StateFlow<List<SourceInfo>> = sources
-        .map { list -> list.filter { it.enabled }.sortedBy { it.name.lowercase() } }
+        .map { list ->
+            list.filter { it.enabled }
+                .sortedWith(compareBy({ it.id != defaultSourceId }, { it.name.lowercase() }))
+        }
         .stateIn(scope, SharingStarted.Eagerly, sources.value.filter { it.enabled })
 
     override val failures: StateFlow<Map<String, String>> = _failures.asStateFlow()

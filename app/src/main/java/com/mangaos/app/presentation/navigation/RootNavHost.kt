@@ -1,126 +1,118 @@
 package com.mangaos.app.presentation.navigation
 
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.mangaos.app.core.ui.LocalReduceMotion
+import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.ui.components.AppLogo
+import com.mangaos.app.data.firebase.SessionStage
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.SessionType
 import com.mangaos.app.presentation.auth.AccountSetupScreen
 import com.mangaos.app.presentation.auth.AuthScreen
+import com.mangaos.app.presentation.auth.VerifyEmailScreen
 import com.mangaos.app.presentation.onboarding.OnboardingScreen
-import com.mangaos.app.presentation.splash.SplashDestination
 import com.mangaos.app.presentation.splash.SplashScreen
 
 /**
- * The launch order is fixed: splash, then the first-launch wizard exactly once, then
- * authentication when there is no session, then the home screens. Each hand-off replaces its
- * predecessor, so back never walks into a wizard that was already completed.
+ * The root of the app, written as one gate instead of a set of routes.
+ *
+ * Only four things can ever be composed here: the launch screen, the first-run wizard, the
+ * account screens, and the app itself. Which one is decided by [SessionStage], computed from the
+ * Firebase session, the account document and the local guest flag. There is no navigation route
+ * to a protected screen, so a deep link, an intent, a restored back stack, an old activity state
+ * or a stale local session has nothing to navigate to: the protected UI simply does not exist
+ * until the gate opens.
  */
 @Composable
 fun RootNavHost(modifier: Modifier = Modifier) {
-    val navController = rememberNavController()
     val profile by ServiceLocator.user.profile.collectAsStateWithLifecycle()
     val account by ServiceLocator.account.state.collectAsStateWithLifecycle()
     val unreadNotifications by ServiceLocator.notifications.unreadCount.collectAsStateWithLifecycle()
-    val reduceMotion = LocalReduceMotion.current
-    val transitionMillis = if (reduceMotion) 0 else 220
+    val onboardingCompleted by ServiceLocator.settings.onboardingCompleted
+        .collectAsStateWithLifecycle(initialValue = true)
 
-    // Signing out ends the session only: the wizard stays completed and every preference stays
-    // on the device, so the reader lands on authentication rather than on the setup again.
-    // The flag also keeps the first, still-loading profile from redirecting at launch.
-    var hadSession by remember { mutableStateOf(false) }
-    LaunchedEffect(profile) {
-        if (profile != null) {
-            hadSession = true
-            return@LaunchedEffect
-        }
-        if (hadSession) {
-            navController.navigate(Routes.AUTH) {
-                popUpTo(Routes.MAIN) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
+    var splashDone by rememberSaveable { mutableStateOf(false) }
+    var onboardingDone by rememberSaveable { mutableStateOf(false) }
+    var onboardingShown by rememberSaveable { mutableStateOf(false) }
+
+    val guestSession = profile?.sessionType == SessionType.GUEST
+    val stage = account.stage(guestSession)
+
+    // The wizard is answered once and never asked again; signing out restarts neither.
+    val needsOnboarding = !onboardingCompleted && !onboardingDone
+
+    if (!splashDone) {
+        // The launch screen reads the session and the wizard state while it plays, so the first
+        // real screen is chosen with resolved values rather than with defaults.
+        SplashScreen(onFinished = { splashDone = true })
+        return
     }
 
-    // A new account is not finished until it has a username and a name: the setup screen is a
-    // real destination, and the flag survives a restart because it lives in the account document.
-    LaunchedEffect(account.needsSetup, account.uid) {
-        if (!account.needsSetup) return@LaunchedEffect
-        navController.navigate(Routes.ACCOUNT_SETUP) {
-            launchSingleTop = true
-        }
+    if (needsOnboarding) {
+        LaunchedEffect(Unit) { onboardingShown = true }
+        OnboardingScreen(onFinished = { onboardingDone = true })
+        return
+    }
+    // A wizard answered a moment ago writes its flag asynchronously; these keep the screen from
+    // flickering back to the wizard while that write lands.
+    if (onboardingShown && !onboardingCompleted) {
+        SessionLoading()
+        return
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = Routes.SPLASH,
-        modifier = modifier,
-        enterTransition = { fadeIn(tween(transitionMillis)) },
-        exitTransition = { fadeOut(tween(if (reduceMotion) 0 else 180)) },
-        popEnterTransition = { fadeIn(tween(transitionMillis)) },
-        popExitTransition = { fadeOut(tween(if (reduceMotion) 0 else 180)) },
-    ) {
-        composable(Routes.SPLASH) {
-            SplashScreen(
-                onFinished = { destination ->
-                    val target = when (destination) {
-                        SplashDestination.ONBOARDING -> Routes.ONBOARDING
-                        SplashDestination.AUTH -> Routes.AUTH
-                        SplashDestination.MAIN -> Routes.MAIN
-                    }
-                    navController.navigate(target) {
-                        popUpTo(Routes.SPLASH) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(Routes.ONBOARDING) {
-            OnboardingScreen(
-                onFinished = {
-                    navController.navigate(Routes.AUTH) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(Routes.AUTH) {
-            AuthScreen(
-                onSignedIn = {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.AUTH) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(Routes.ACCOUNT_SETUP) {
-            AccountSetupScreen(
-                onFinished = {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.ACCOUNT_SETUP) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(Routes.MAIN) {
-            MainScaffold(
+    Box(modifier = modifier.fillMaxSize()) {
+        when (stage) {
+            SessionStage.LOADING -> SessionLoading()
+            SessionStage.SIGNED_OUT -> AuthScreen()
+            SessionStage.EMAIL_VERIFICATION -> VerifyEmailScreen()
+            SessionStage.ACCOUNT_SETUP -> AccountSetupScreen()
+            SessionStage.GUEST, SessionStage.READY -> MainScaffold(
                 profile = profile,
                 unreadNotifications = unreadNotifications,
             )
+        }
+    }
+}
+
+/**
+ * Shown while the session is still unresolved. It is deliberately not the launch animation: a
+ * second splash after signing in would look like the app restarting.
+ */
+@Composable
+private fun SessionLoading() {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                AppLogo(size = 64.dp)
+                Spacer(Modifier.height(Spacing.md))
+                CircularProgressIndicator(strokeWidth = 2.dp)
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.session_loading),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

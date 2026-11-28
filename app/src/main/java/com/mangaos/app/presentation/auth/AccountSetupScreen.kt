@@ -11,8 +11,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,11 +70,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Completes an account that Firebase created but the app could not finish: a Google sign-up
- * arrives with an address and nothing else. Each step writes as it completes, so a closed app
- * reopens on the same step instead of starting over.
+ * arrives with an address and nothing else.
+ *
+ * The name, the username and the photo are on the first step — the three fields the account
+ * cannot work without are visible immediately — and the optional preferences follow. Values are
+ * seeded once per account and are never written back over what the reader typed.
  */
 @Composable
-fun AccountSetupScreen(onFinished: () -> Unit) {
+fun AccountSetupScreen(onFinished: () -> Unit = {}) {
     val viewModel: AccountSetupViewModel = viewModel()
     val state by ServiceLocator.account.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -88,7 +92,12 @@ fun AccountSetupScreen(onFinished: () -> Unit) {
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) pendingPhoto = uri }
 
-    viewModel.seed(state?.displayName.orEmpty())
+    val uid = state?.uid
+    val suggestion = state?.displayName.orEmpty()
+    val existingUsername = state?.username.orEmpty()
+    LaunchedEffect(uid) {
+        if (uid != null) viewModel.seed(uid, suggestion, existingUsername)
+    }
 
     val stepIndex = viewModel.step.ordinal + 1
     val stepCount = SetupStep.entries.size
@@ -128,23 +137,30 @@ fun AccountSetupScreen(onFinished: () -> Unit) {
             GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(MangaGlass.dialogCorner),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
+                contentPadding = PaddingValues(Spacing.lg),
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     AnimatedContent(
                         targetState = viewModel.step,
-                        transitionSpec = {
-                            fadeIn(tween(180)) togetherWith fadeOut(tween(120))
-                        },
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
                         label = "setupStep",
                     ) { step ->
                         Column(modifier = Modifier.fillMaxWidth()) {
                             when (step) {
-                                SetupStep.USERNAME -> {
+                                SetupStep.PROFILE -> {
                                     StepHeading(
-                                        title = stringResource(R.string.setup_username_title),
-                                        hint = stringResource(R.string.setup_username_hint),
+                                        title = stringResource(R.string.setup_profile_title),
+                                        hint = stringResource(R.string.setup_profile_hint),
                                     )
+                                    AppTextField(
+                                        value = viewModel.displayName,
+                                        onValueChange = viewModel::onDisplayNameChange,
+                                        label = stringResource(R.string.setup_display_label),
+                                        leadingIcon = MangaOsIcons.author,
+                                        imeAction = ImeAction.Next,
+                                        enabled = !viewModel.isSaving,
+                                    )
+                                    Spacer(Modifier.height(Spacing.sm))
                                     AppTextField(
                                         value = viewModel.username,
                                         onValueChange = viewModel::onUsernameChange,
@@ -156,20 +172,6 @@ fun AccountSetupScreen(onFinished: () -> Unit) {
                                         enabled = !viewModel.isSaving,
                                     )
                                     UsernameStatus(viewModel.usernameState)
-                                }
-                                SetupStep.PROFILE -> {
-                                    StepHeading(
-                                        title = stringResource(R.string.setup_profile_title),
-                                        hint = stringResource(R.string.setup_profile_hint),
-                                    )
-                                    AppTextField(
-                                        value = viewModel.displayName,
-                                        onValueChange = viewModel::onDisplayNameChange,
-                                        label = stringResource(R.string.setup_display_label),
-                                        leadingIcon = MangaOsIcons.author,
-                                        imeAction = ImeAction.Done,
-                                        enabled = !viewModel.isSaving,
-                                    )
                                     Spacer(Modifier.height(Spacing.md))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         ProfileAvatar(
@@ -275,7 +277,7 @@ fun AccountSetupScreen(onFinished: () -> Unit) {
                             enabled = !viewModel.isSaving,
                         )
                     }
-                    if (viewModel.step != SetupStep.USERNAME) {
+                    if (viewModel.step != SetupStep.PROFILE) {
                         Spacer(Modifier.height(Spacing.xs))
                         SecondaryButton(
                             text = stringResource(R.string.action_back),

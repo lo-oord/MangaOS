@@ -84,9 +84,16 @@ class LatestViewModel : ViewModel() {
     val sources: StateFlow<List<SourceInfo>> = sourcesRepository.enabledSources
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Null means every enabled source, which is the default feed. */
-    val selectedSourceId: StateFlow<String?> = settings.latestSourceId
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /**
+     * The source the feed reads from. A stored choice wins, the primary server is the fallback,
+     * and only if neither is enabled does the first enabled source stand in. This is resolved, not
+     * written: nothing is persisted just because the app opened.
+     */
+    val selectedSourceId: StateFlow<String?> = combine(
+        settings.latestSourceId,
+        sourcesRepository.enabledSources,
+    ) { chosen, enabled -> resolveSource(chosen, enabled) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, sourcesRepository.defaultSourceId)
 
     private val _state = MutableStateFlow<LatestUiState>(LatestUiState.Loading)
     val state: StateFlow<LatestUiState> = _state.asStateFlow()
@@ -105,12 +112,20 @@ class LatestViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            combine(settings.latestSourceId, sourcesRepository.enabledSources) { id, enabled ->
-                id to enabled
+            combine(settings.latestSourceId, sourcesRepository.enabledSources) { chosen, enabled ->
+                resolveSource(chosen, enabled) to enabled
             }.collectLatest { (id, enabled) ->
                 if (query.isBlank()) load(id, enabled)
             }
         }
+    }
+
+    private fun resolveSource(chosen: String?, enabled: List<SourceInfo>): String? {
+        if (enabled.isEmpty()) return null
+        if (chosen != null && enabled.any { it.id == chosen }) return chosen
+        val primary = sourcesRepository.defaultSourceId
+        if (primary != null && enabled.any { it.id == primary }) return primary
+        return enabled.first().id
     }
 
     fun onQueryChange(value: String) {
@@ -208,7 +223,8 @@ class LatestViewModel : ViewModel() {
             _state.value = LatestUiState.NoSources
             return
         }
-        // One source is always chosen: the first enabled one until the reader picks another.
+        // One source is always active: the chosen one, or the primary server by default. A
+        // failure changes the error state, never the choice.
         val scope = preferred?.let { id -> sources.filter { it.id == id } }
             ?.takeIf { it.isNotEmpty() }
             ?: sources.take(1)
@@ -410,7 +426,7 @@ class LatestViewModel : ViewModel() {
     private suspend fun search(text: String) {
         // A chosen source scopes the search; otherwise every enabled source is asked.
         val allowed = sourcesRepository.enabledSources.value
-        val chosen = selectedSourceId.value ?: allowed.firstOrNull()?.id
+        val chosen = selectedSourceId.value ?: sourcesRepository.defaultSourceId
         val allSources = chosen?.let { id -> allowed.filter { it.id == id } }.orEmpty()
         if (allSources.isEmpty()) {
             _searchState.value = LatestSearchState.Error(SourceFailure.NO_SOURCES)

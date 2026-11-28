@@ -71,21 +71,34 @@ class AccountSession(
         cloudSync.start(user.uid)
         registerDevice(user.uid)
         scheduleWork(user.uid)
+        // The identity is known before the document is: publishing it right away keeps the root
+        // host from showing an unresolved session while the account document is being read.
+        _state.value = AccountState(
+            loading = true,
+            uid = user.uid,
+            email = user.email,
+            emailVerified = user.isEmailVerified,
+            hasPassword = FirebaseAuthManager.hasPassword,
+            hasGoogle = FirebaseAuthManager.hasGoogle,
+        )
         bindJob = scope.launch {
-            accounts.ensureAccount(user.uid, user.email, user.displayName)
-            _state.value = _state.value.copy(
-                loading = false,
-                uid = user.uid,
-                email = user.email,
-                emailVerified = user.isEmailVerified,
-                hasPassword = FirebaseAuthManager.hasPassword,
-                hasGoogle = FirebaseAuthManager.hasGoogle,
-            )
+            var createAttempts = 0
             combine(
                 accounts.account(user.uid),
                 accounts.badge(user.uid),
             ) { account, verified -> account to verified }
                 .collect { (account, verified) ->
+                    // The snapshot listener is the read the app needs anyway; the account is
+                    // only created when that read says it is genuinely missing, which removes a
+                    // second read on every sign-in. A transient failure is retried by the next
+                    // emission instead of being reported as a completed account.
+                    if (account == null && createAttempts < MAX_CREATE_ATTEMPTS) {
+                        createAttempts++
+                        runCatching {
+                            accounts.ensureAccount(user.uid, user.email, user.displayName)
+                        }
+                        return@collect
+                    }
                     _state.value = _state.value.copy(
                         loading = false,
                         uid = user.uid,
@@ -96,9 +109,21 @@ class AccountSession(
                         account = account,
                         verified = verified,
                     )
+                    mirrorVerification(user.uid, account, verified)
                     adoptProfile(user, account, verified)
                 }
         }
+    }
+
+    /**
+     * Writes the badge state into `users/{uid}.isVerified` when — and only when — it disagrees.
+     * The badge document remains the source of truth and the rules refuse any other value, so
+     * this can never grant verification; it only keeps the visible field in step.
+     */
+    private suspend fun mirrorVerification(uid: String, account: AccountDoc?, verified: Boolean) {
+        if (account == null) return
+        if (account.isVerified == verified) return
+        runCatching { accounts.updateAccount(uid, mapOf(FIELD_VERIFIED to verified)) }
     }
 
     /** Keeps the drawer, cards and profile writing from one local profile row. */
@@ -129,10 +154,17 @@ class AccountSession(
     suspend fun refresh() {
         runCatching { FirebaseAuthManager.reload() }
         val user = FirebaseAuthManager.user ?: return
+        // A confirmed address is what opens the setup and the app, so the reloaded value is
+        // published immediately instead of waiting for the next auth event.
         _state.value = _state.value.copy(
             emailVerified = user.isEmailVerified,
             hasPassword = FirebaseAuthManager.hasPassword,
             hasGoogle = FirebaseAuthManager.hasGoogle,
         )
+    }
+
+    private companion object {
+        const val MAX_CREATE_ATTEMPTS = 3
+        const val FIELD_VERIFIED = "isVerified"
     }
 }

@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -61,7 +60,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -77,8 +75,6 @@ import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Dimens
-import com.mangaos.app.core.designsystem.MangaGlass
-import com.mangaos.app.core.designsystem.glassTokens
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.util.appString
@@ -106,6 +102,12 @@ object MangaCardMetrics {
 
     /** Title lines reserved in every card, so a short name never produces a shorter card. */
     const val TitleLines = 2
+
+    /** A list row sits beside a smaller cover, so it reserves a single title line. */
+    const val ListTitleLines = 1
+
+    /** The one border width the cards use. */
+    val hairline = 1.dp
 
     val corner = 16.dp
     val innerCorner = 12.dp
@@ -147,10 +149,10 @@ fun MangaCard(
     onLongClick: (() -> Unit)? = null,
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
-    // The card uses the app-wide glass tokens, so its translucency and border are the same as a
-    // dialog's or the top bar's in every theme.
+    // A card is opaque on purpose. No blur, no translucent panel over the artwork and no
+    // gradient sheen: the cover is the picture and the text under it has to stay legible in
+    // every theme. The app's glass surfaces remain for dialogs and the top bar.
     val scheme = MaterialTheme.colorScheme
-    val glass = glassTokens()
     val interaction = remember { MutableInteractionSource() }
     val pressScale by cardPressScale(interaction)
 
@@ -164,9 +166,10 @@ fun MangaCard(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick, interaction)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = glass.background,
-        border = BorderStroke(MangaGlass.borderWidth, glass.border),
-        shadowElevation = glass.shadow,
+        color = scheme.surfaceContainerLow,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(MangaCardMetrics.hairline, scheme.outlineVariant.copy(alpha = 0.55f)),
+        shadowElevation = 0.dp,
     ) {
         Column {
             MangaCardCover(
@@ -176,13 +179,11 @@ fun MangaCard(
                     .fillMaxWidth()
                     .aspectRatio(MangaCardMetrics.CoverAspect),
             )
-            CardInfoSurface(sheen = glass.highlight) {
-                MangaCardInfo(
-                    title = manga.title,
-                    facts = cardFacts(manga, context),
-                    scheme = scheme,
-                )
-            }
+            MangaCardInfo(
+                title = manga.title,
+                facts = cardFacts(manga, context),
+                scheme = scheme,
+            )
         }
     }
 }
@@ -198,7 +199,6 @@ fun MangaListRow(
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val glass = glassTokens()
 
     Surface(
         modifier = modifier
@@ -206,11 +206,17 @@ fun MangaListRow(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = glass.background,
-        border = BorderStroke(MangaGlass.borderWidth, glass.border),
-        shadowElevation = glass.shadow,
+        color = scheme.surfaceContainerLow,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(MangaCardMetrics.hairline, scheme.outlineVariant.copy(alpha = 0.55f)),
+        shadowElevation = 0.dp,
     ) {
-        Row(modifier = Modifier.padding(MangaCardMetrics.contentPadding)) {
+        // The row is as tall as its cover, and the text sits against it vertically so a short
+        // title does not leave a gap at the top or the bottom.
+        Row(
+            modifier = Modifier.padding(MangaCardMetrics.contentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             MangaCardCover(
                 manga = manga,
                 context = context,
@@ -223,26 +229,23 @@ fun MangaListRow(
 
             Spacer(Modifier.width(MangaCardMetrics.listGap))
 
-            CardInfoSurface(sheen = glass.highlight, modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
                 // In a list there is room to set the publication date beside the name, which is
                 // exactly where the Latest feed needs it; every other surface never computes it.
-                Row(verticalAlignment = Alignment.Top) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = manga.title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = scheme.onSurface,
-                        minLines = MangaCardMetrics.TitleLines,
+                        minLines = MangaCardMetrics.ListTitleLines,
                         maxLines = MangaCardMetrics.TitleLines,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
                     latestDateLabel(manga, context)?.let { date ->
                         Spacer(Modifier.width(Spacing.xs))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 1.dp),
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Outlined.CalendarMonth,
                                 contentDescription = null,
@@ -256,12 +259,15 @@ fun MangaListRow(
                                 color = scheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 96.dp),
                             )
                         }
                     }
                 }
-                CardFactRow(facts = cardFacts(manga, context))
+                val facts = cardFacts(manga, context)
+                if (facts.isNotEmpty()) {
+                    Spacer(Modifier.height(MangaCardMetrics.titleMetaGap))
+                    CardFactRow(facts = facts)
+                }
             }
         }
     }
@@ -308,31 +314,6 @@ private fun MangaCardCover(
     }
 }
 
-/** The glass information panel under the cover, with a single subtle sheen. */
-@Composable
-private fun CardInfoSurface(
-    sheen: Color,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = modifier
-            .background(
-                Brush.verticalGradient(
-                    listOf(sheen.copy(alpha = 0.35f), Color.Transparent),
-                ),
-            )
-            .padding(
-                start = MangaCardMetrics.contentPadding,
-                end = MangaCardMetrics.contentPadding,
-                top = MangaCardMetrics.contentPadding,
-                bottom = MangaCardMetrics.contentPadding,
-            ),
-    ) {
-        content()
-    }
-}
-
 /** Title on top, one fact row below it; the gap between them is a single shared token. */
 @Composable
 private fun MangaCardInfo(
@@ -340,18 +321,27 @@ private fun MangaCardInfo(
     facts: List<CardFact>,
     scheme: androidx.compose.material3.ColorScheme,
 ) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = scheme.onSurface,
-        minLines = MangaCardMetrics.TitleLines,
-        maxLines = MangaCardMetrics.TitleLines,
-        overflow = TextOverflow.Ellipsis,
-    )
-    if (facts.isNotEmpty()) {
-        Spacer(Modifier.height(MangaCardMetrics.titleMetaGap))
-        CardFactRow(facts = facts)
+    Column(
+        modifier = Modifier.padding(
+            start = MangaCardMetrics.contentPadding,
+            end = MangaCardMetrics.contentPadding,
+            top = MangaCardMetrics.contentPadding,
+            bottom = MangaCardMetrics.contentPadding,
+        ),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = scheme.onSurface,
+            minLines = MangaCardMetrics.TitleLines,
+            maxLines = MangaCardMetrics.TitleLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (facts.isNotEmpty()) {
+            Spacer(Modifier.height(MangaCardMetrics.titleMetaGap))
+            CardFactRow(facts = facts)
+        }
     }
 }
 
@@ -624,12 +614,13 @@ fun CoverImage(
 @Composable
 fun ChapterBadge(text: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
+    // Opaque, not translucent: a chapter number over artwork has to be readable on every cover.
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = scheme.surface.copy(alpha = 0.82f),
+        color = scheme.surface,
         contentColor = scheme.primary,
-        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.28f)),
     ) {
         Text(
             text = text,

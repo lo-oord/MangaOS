@@ -55,8 +55,14 @@ interface SourceRepository {
     /** Every bundled source, with its current enabled flag. */
     val sources: StateFlow<List<SourceInfo>>
 
-    /** Sources usable for new requests, ordered for the picker. */
+    /** Sources usable for new requests, ordered for the picker (the primary server first). */
     val enabledSources: StateFlow<List<SourceInfo>>
+
+    /**
+     * The server the app uses until the reader chooses another one. It is a default, not a
+     * stored choice: nothing is written to the account or to Firebase because of it.
+     */
+    val defaultSourceId: String?
 
     /** Source id -> last runtime failure, shown next to the source and cleared on success. */
     val failures: StateFlow<Map<String, String>>

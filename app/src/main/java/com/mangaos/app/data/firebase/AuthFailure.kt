@@ -17,6 +17,7 @@ enum class AuthReason {
     PASSWORD_MISSING,
     USER_DISABLED,
     USER_NOT_FOUND,
+    EMAIL_NOT_VERIFIED,
     NOT_CONFIGURED,
     CANCELLED,
     GENERIC,
@@ -45,6 +46,7 @@ fun FirebaseAuthException.toAuthReason(): AuthReason = when (errorCode) {
     "ERROR_NO_SUCH_PROVIDER" -> AuthReason.PASSWORD_MISSING
     "ERROR_USER_DISABLED" -> AuthReason.USER_DISABLED
     "ERROR_USER_NOT_FOUND" -> AuthReason.USER_NOT_FOUND
+    "ERROR_EMAIL_NOT_VERIFIED" -> AuthReason.EMAIL_NOT_VERIFIED
     "ERROR_OPERATION_NOT_ALLOWED" -> AuthReason.NOT_CONFIGURED
     "ERROR_INVALID_CREDENTIAL" -> AuthReason.WRONG_PASSWORD
     else -> AuthReason.GENERIC

@@ -144,14 +144,34 @@ tools/setup-signing.sh owner/repo # أو حدّد المستودع صراحةً
 - **المزامنة**: `CloudSync` يعكس كل تفضيلات الجهاز إلى `users/{uid}/state/prefs` بمفتاح مستقل
   وختم زمني لكل مفتاح، ويستمع للتغييرات ويعيد تطبيقها؛ فجهازان يعدّلان تفضيلين مختلفين يحتفظ كل
   منهما بتعديله، وتعديل المفتاح نفسه يُحلّ بالأحدث، ولا يرتد التعديل إلى صاحبه.
-- **الشارة الذهبية**: تُقرأ من `badges/{uid}` فقط، وقواعد Firestore تمنع أي كتابة من العميل عليها.
+- **بوابة واحدة للحالة**: `SessionGate` يحوّل (الجلسة، تأكيد البريد، اكتمال المستند، جلسة الزائر)
+  إلى حالة واحدة: `LOADING / SIGNED_OUT / GUEST / EMAIL_VERIFICATION / ACCOUNT_SETUP / READY`،
+  و`RootNavHost` لا يرسم إلا الشاشة التي تخصها. الشاشات المحمية ليست مسارات تنقل أصلًا، فلا
+  ديبلينك ولا Intent ولا Back Stack ولا جلسة محلية قديمة تستطيع الوصول إليها.
+- **تأكيد البريد إلزامي**: حساب مسجّل وبريده غير مؤكد يرى `VerifyEmailScreen` فقط؛ لا إعداد حساب
+  ولا واجهة رئيسية قبل التأكيد، ويعيد المحاولة بعد `reload()` لا بعد ضغطة زر.
+- **إعداد الحساب خطوتان**: الاسم الظاهر واسم المستخدم والصورة في الخطوة الأولى، ثم التفضيلات.
+  يُملأ النموذج مرة واحدة لكل حساب فقط، فلا يعود اسم حُذف إلى الظهور. حساب Google موجود مسبقًا
+  لا يُطلب منه الإعداد مرة أخرى.
+- **الشارة الذهبية**: مصدرها `badges/{uid}` فقط، وقواعد Firestore تمنع أي كتابة من العميل عليها.
+  الحقل `isVerified` موجود على `users/{uid}` كمرآة للشارة، ولا تُقبل كتابته إلا إذا طابقت الشارة
+  الفعلية (`isVerified == exists(badges/uid)`)، فلا يمكن منح التوثيق من التطبيق.
 - **حذف الحساب**: اسم المستخدم + كلمة المرور + `reauthenticate`، ثم تفريغ المجموعات الفرعية
   وحذف المستند وحجز الاسم ثم حساب Firebase. لا تُعرض رسالة نجاح قبل نجاح هذه الخطوات.
 - **الإشعارات**: `MangaMessagingService` يسجّل رمز FCM في `users/{uid}/devices/{token}` ويزيله
   عند تسجيل الخروج؛ والفحص الدوري للفصول يعمل بمهمة فريدة لكل حساب.
 
-قبل النشر: انشر القواعد بـ `firebase deploy --only firestore:rules` ومنح التوثيق يدويًا بمستند
-في `badges/{uid}` بالقيمة `verified: true` من وحدة تحكم Firebase (أو Admin SDK).
+### القواعد والأمان
+
+`firestore.rules` تتحقق من الشكل لا من الملكية وحدها: مفاتيح مسموحة فقط، أنواع وأطوال محدودة،
+اسم مستخدم بنمط `^[a-z0-9_]{3,20}$`، دولة من الدول العربية، عمر بين 13 و99، صورة بحجم محدود،
+ومنع كامل لحقول الإدارة (`verified`, `role`, `admin`, `banned`, `suspended`). المجموعات الفرعية
+(المكتبة، التقدم، الفصول المقروءة، الأجهزة، الحالة، الإشعارات) مقيّدة بعدد حقول وبمعرّف الجهاز،
+وبقية المسارات مرفوضة.
+
+قبل النشر: انشر القواعد بـ `firebase deploy --only firestore:rules`، ثم امنح التوثيق يدويًا
+بمستند `badges/{uid}` بالقيمة `verified: true` من وحدة تحكم Firebase (أو Admin SDK). بعد أول
+قراءة يكتب التطبيق `users/{uid}.isVerified = true` مطابقةً للشارة، فيظهر الحقل في وحدة التحكم.
 
 ## ما لا يزال ناقصاً
 
@@ -167,3 +187,9 @@ loaded at runtime. `NativeSourceRegistry` lists them, `NativeSourceManager` stor
 enable/disable choice, and `NativeMangaRepository` runs each call isolated so one broken site
 cannot affect the others. `tools/verify_native_sources.py` checks the live sites with the same
 parsing rules as the app.
+
+The primary server is the default source. `SourceRepository.defaultSourceId` is the first entry
+of the registry, the enabled list is ordered with it first, and the Latest feed resolves
+«saved choice → primary → first enabled» without writing anything. A failure keeps the choice and
+shows a retry state instead of switching servers silently. The Latest screen has no source
+switcher of its own; choosing a server belongs to the Sources screen.

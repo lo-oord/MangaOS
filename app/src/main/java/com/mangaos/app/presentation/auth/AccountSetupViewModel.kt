@@ -16,20 +16,27 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class SetupStep { USERNAME, PROFILE, PREFERENCES }
+/**
+ * The two things a new account still needs: how it is called, and its optional preferences.
+ * The photo lives with the name, so the first step the reader sees already carries every field
+ * the account will keep.
+ */
+enum class SetupStep { PROFILE, PREFERENCES }
 
 enum class UsernameState { UNKNOWN, CHECKING, AVAILABLE, TAKEN, INVALID }
 
 /**
  * The half of onboarding a new account still needs. Google accounts arrive without a username,
- * so this is a first-class step rather than an edit afterwards. Progress is written to the
- * account document as each step completes, which is what makes closing the app harmless.
+ * so this is a first-class step rather than an edit afterwards.
+ *
+ * Seeding happens once per account and only into empty fields: a value the reader deleted must
+ * stay deleted, which is exactly what a seed on every recomposition used to break.
  */
 class AccountSetupViewModel : ViewModel() {
 
     private val accounts: AccountRepository get() = ServiceLocator.accounts
 
-    var step by mutableStateOf(SetupStep.USERNAME)
+    var step by mutableStateOf(SetupStep.PROFILE)
         private set
 
     var username by mutableStateOf("")
@@ -53,14 +60,33 @@ class AccountSetupViewModel : ViewModel() {
         private set
 
     private var checkJob: Job? = null
+    private var seededUid: String? = null
 
-    fun seed(displayNameSuggestion: String) {
-        if (displayName.isBlank()) displayName = displayNameSuggestion
-        if (username.isBlank()) {
-            username = displayNameSuggestion
+    /**
+     * Fills the form once for [uid]. An account that already owns a username resumes with it
+     * instead of being asked for a new one, and nothing is ever re-filled after a deletion.
+     */
+    fun seed(uid: String, displayNameSuggestion: String, existingUsername: String) {
+        if (seededUid == uid) return
+        seededUid = uid
+        val suggestion = displayNameSuggestion.trim()
+        if (displayName.isBlank()) displayName = suggestion.take(MAX_DISPLAY_NAME)
+        val existing = existingUsername.trim().lowercase()
+        if (existing.isNotBlank()) {
+            if (username.isBlank()) username = existing
+            if (username == existing) {
+                usernameState = UsernameState.AVAILABLE
+                usernameMessage = null
+            }
+            return
+        }
+        if (username.isBlank() && suggestion.isNotBlank()) {
+            username = suggestion
                 .filter { it.isLetterOrDigit() || it == '_' }
                 .lowercase()
                 .take(Validators.MAX_USERNAME_LENGTH)
+                .takeIf { Validators.usernameError(it) == null }
+                .orEmpty()
         }
     }
 
@@ -76,6 +102,7 @@ class AccountSetupViewModel : ViewModel() {
                 Validators.UsernameError.LENGTH -> R.string.error_username_length
                 Validators.UsernameError.CHARACTERS -> R.string.error_username_chars
             }
+            checkJob?.cancel()
             return
         }
         usernameState = UsernameState.CHECKING
@@ -84,14 +111,16 @@ class AccountSetupViewModel : ViewModel() {
             // Debounce: a keystroke burst costs one request, not one request per letter.
             delay(USERNAME_DEBOUNCE_MILLIS)
             val uid = FirebaseAuthManager.uid ?: return@launch
-            val available = runCatching { accounts.isUsernameAvailable(username, uid) }.getOrDefault(false)
+            val available = runCatching { accounts.isUsernameAvailable(username, uid) }
+                .getOrDefault(false)
             usernameState = if (available) UsernameState.AVAILABLE else UsernameState.TAKEN
         }
     }
 
     fun onDisplayNameChange(value: String) {
-        displayName = value.take(40)
+        displayName = value.take(MAX_DISPLAY_NAME)
         failure = null
+        usernameMessage = null
     }
 
     fun onLanguageChange(code: String) {
@@ -109,16 +138,13 @@ class AccountSetupViewModel : ViewModel() {
     fun next() {
         failure = null
         when (step) {
-            SetupStep.USERNAME -> {
-                if (usernameState != UsernameState.AVAILABLE) {
-                    usernameMessage = R.string.setup_username_unavailable
-                    return
-                }
-                step = SetupStep.PROFILE
-            }
             SetupStep.PROFILE -> {
                 if (displayName.isBlank()) {
                     usernameMessage = R.string.error_required
+                    return
+                }
+                if (usernameState != UsernameState.AVAILABLE) {
+                    usernameMessage = R.string.setup_username_unavailable
                     return
                 }
                 step = SetupStep.PREFERENCES
@@ -130,8 +156,7 @@ class AccountSetupViewModel : ViewModel() {
     fun back() {
         failure = null
         step = when (step) {
-            SetupStep.USERNAME -> SetupStep.USERNAME
-            SetupStep.PROFILE -> SetupStep.USERNAME
+            SetupStep.PROFILE -> SetupStep.PROFILE
             SetupStep.PREFERENCES -> SetupStep.PROFILE
         }
     }
@@ -140,20 +165,29 @@ class AccountSetupViewModel : ViewModel() {
     fun finish(avatarBase64: String?, onDone: () -> Unit) {
         if (isSaving) return
         val uid = FirebaseAuthManager.uid ?: return
+        // The root gate already refuses this screen to an unconfirmed address; the check stays
+        // here as well so no future caller can complete an account without it.
+        if (!FirebaseAuthManager.isEmailVerified) {
+            failure = AuthReason.EMAIL_NOT_VERIFIED
+            return
+        }
         if (displayName.isBlank()) {
             usernameMessage = R.string.error_required
+            step = SetupStep.PROFILE
             return
         }
         isSaving = true
         viewModelScope.launch {
             try {
                 val previous = ServiceLocator.account?.state?.value?.account?.username
-                val claimed = accounts.claimUsername(uid, username, previous)
-                if (!claimed) {
-                    usernameState = UsernameState.TAKEN
-                    usernameMessage = R.string.setup_username_unavailable
-                    step = SetupStep.USERNAME
-                    return@launch
+                if (previous?.lowercase() != username) {
+                    val claimed = accounts.claimUsername(uid, username, previous)
+                    if (!claimed) {
+                        usernameState = UsernameState.TAKEN
+                        usernameMessage = R.string.setup_username_unavailable
+                        step = SetupStep.PROFILE
+                        return@launch
+                    }
                 }
                 val fields = mutableMapOf<String, Any?>(
                     "username" to username,
@@ -179,5 +213,6 @@ class AccountSetupViewModel : ViewModel() {
 
     private companion object {
         const val USERNAME_DEBOUNCE_MILLIS = 450L
+        const val MAX_DISPLAY_NAME = 40
     }
 }

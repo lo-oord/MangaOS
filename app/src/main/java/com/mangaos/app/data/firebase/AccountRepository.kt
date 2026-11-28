@@ -56,6 +56,9 @@ class AccountRepository(
                 "displayName" to (displayName ?: ""),
                 "username" to "",
                 "setupCompleted" to false,
+                // Present from the first write so the flag is visible on the document. It can
+                // only ever become true through the badge document.
+                "isVerified" to false,
                 "createdAt" to now,
                 "updatedAt" to now,
             ),
