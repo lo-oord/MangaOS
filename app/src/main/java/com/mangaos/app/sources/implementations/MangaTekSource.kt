@@ -82,6 +82,9 @@ class MangaTekSource : MangaSource {
                 url = "$baseUrl/manga/$slug",
                 genres = cardGenres(element),
                 status = cardStatus(element),
+                // The listing prints the newest chapter on the card. It is read so the Latest
+                // feed can order works whose card carries no date, instead of inventing one.
+                latestChapter = cardChapterNumber(element.text()),
             )
         }.distinctBy { it.id }
     }
@@ -100,6 +103,10 @@ class MangaTekSource : MangaSource {
         val label = listOf("مستمر", "مكتمل", "متوقف", "ملغي").firstOrNull { text.contains(it) }
         return statusOf(label.orEmpty())
     }
+
+    /** "الفصل 12.5" / "Chapter 12" as the card prints it; nothing is returned when absent. */
+    private fun cardChapterNumber(text: String): String? =
+        CHAPTER_PATTERN.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun statusOf(value: String): MangaStatus = when (value.trim().lowercase()) {
         "مستمر", "ongoing" -> MangaStatus.ONGOING
@@ -172,9 +179,16 @@ class MangaTekSource : MangaSource {
             .map { resolveUrl(it.url) }
             .filter { it.isNotBlank() }
             .distinct()
-        // Some chapters publish no props at all and render their pages straight into the
-        // reader markup. Those images are the chapter too, so they are read instead of failing.
-        if (imageUrls.isEmpty()) imageUrls = domPages(document)
+        // The reader markup is the authority on how many pages the chapter has: some chapters
+        // publish no props at all, and others publish a props list that stops before pages the
+        // markup still renders (lazily loaded images). When the markup holds more distinct pages
+        // than the props and contains all of them, its order is used so no page is dropped.
+        val fromMarkup = domPages(document)
+        if (imageUrls.isEmpty()) {
+            imageUrls = fromMarkup
+        } else if (fromMarkup.size > imageUrls.size && imageUrls.all { it in fromMarkup }) {
+            imageUrls = fromMarkup
+        }
         if (imageUrls.isEmpty()) throw SourceException(SourceFailure.EMPTY, "This chapter has no pages")
 
         // A chapter whose translated text lives in a separate layer that only the site's own
@@ -211,15 +225,32 @@ class MangaTekSource : MangaSource {
         return emptyList()
     }
 
-    /** Pages rendered into the reader markup, used when the props carry no page list. */
+    /**
+     * Pages rendered into the reader markup. A page image may be deferred: the real address then
+     * lives in `data-src`, `data-original`, `data-lazy-src` or the first `srcset` candidate, while
+     * `src` is a placeholder. Reading only `src` used to collect a chapter with missing pages.
+     */
     private fun domPages(document: Document): List<String> =
-        document.select("main img, [data-reader] img, .reader img, img[src]")
+        document.select("main img, [data-reader] img, .reader img, img[src], img[data-src]")
             .mapNotNull { image ->
-                val url = image.absUrl("src").ifBlank { image.attr("src") }
-                val resolved = resolveUrl(url)
-                resolved.takeIf {
-                    it.startsWith("http") && !DOM_LOGO.containsMatchIn(it)
-                }
+                val candidates = listOf(
+                    image.absUrl("src"),
+                    image.attr("src"),
+                    image.absUrl("data-src"),
+                    image.attr("data-src"),
+                    image.absUrl("data-original"),
+                    image.attr("data-original"),
+                    image.absUrl("data-lazy-src"),
+                    image.attr("data-lazy-src"),
+                    image.attr("srcset").substringBefore(',').substringBefore(' ').trim(),
+                )
+                candidates.asSequence()
+                    .map { resolveUrl(it) }
+                    .firstOrNull { url ->
+                        url.startsWith("http") &&
+                            !DOM_LOGO.containsMatchIn(url) &&
+                            !PLACEHOLDER_IMAGE.containsMatchIn(url)
+                    }
             }
             .distinct()
 
@@ -298,5 +329,15 @@ class MangaTekSource : MangaSource {
 
     private companion object {
         val DOM_LOGO = Regex("""(logo|favicon|avatar|icon|banner|sponsor)""", RegexOption.IGNORE_CASE)
+
+        /** Spinner and skeleton resources that are never a chapter page. */
+        val PLACEHOLDER_IMAGE = Regex(
+            """(placeholder|spinner|loading|blank|1x1|transparent)""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        val CHAPTER_PATTERN = Regex(
+            """(?:الفصل|فصل|Chapter|chapter|CH\.?|ch\.?)\s*#?\s*(\d+(?:\.\d+)?)""",
+        )
     }
 }

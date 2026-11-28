@@ -77,7 +77,9 @@ import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.Dimens
+import com.mangaos.app.core.designsystem.MangaGlass
 import com.mangaos.app.core.designsystem.MangaOsIcons
+import com.mangaos.app.core.designsystem.glassTokens
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.core.util.appString
@@ -135,28 +137,6 @@ enum class MangaCardContext {
     CATALOG,
 }
 
-/** The translucent surface every card in the app shares, resolved from the active theme. */
-data class MangaCardGlass(
-    val container: Color,
-    val border: Color,
-    val sheen: Color,
-)
-
-@Composable
-fun mangaCardGlass(): MangaCardGlass {
-    val scheme = MaterialTheme.colorScheme
-    // A soft tint of the theme surface, a hairline accent border and a light sheen: a glass edge
-    // without a blur pass, which keeps long lists scrolling smoothly and stays legible in both
-    // the light and the dark palette.
-    return remember(scheme) {
-        MangaCardGlass(
-            container = scheme.surfaceContainerLow.copy(alpha = 0.82f),
-            border = scheme.primary.copy(alpha = 0.16f),
-            sheen = scheme.surface.copy(alpha = 0.28f),
-        )
-    }
-}
-
 /** The single grid card used by every catalogue screen. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -167,8 +147,10 @@ fun MangaCard(
     onLongClick: (() -> Unit)? = null,
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
+    // The card uses the app-wide glass tokens, so its translucency and border are the same as a
+    // dialog's or the top bar's in every theme.
     val scheme = MaterialTheme.colorScheme
-    val glass = mangaCardGlass()
+    val glass = glassTokens()
     val interaction = remember { MutableInteractionSource() }
     val pressScale by cardPressScale(interaction)
 
@@ -182,9 +164,9 @@ fun MangaCard(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick, interaction)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = glass.container,
-        border = BorderStroke(1.dp, glass.border),
-        shadowElevation = 0.dp,
+        color = glass.background,
+        border = BorderStroke(MangaGlass.borderWidth, glass.border),
+        shadowElevation = glass.shadow,
     ) {
         Column {
             MangaCardCover(
@@ -194,7 +176,7 @@ fun MangaCard(
                     .fillMaxWidth()
                     .aspectRatio(MangaCardMetrics.CoverAspect),
             )
-            CardInfoSurface(sheen = glass.sheen) {
+            CardInfoSurface(sheen = glass.highlight) {
                 MangaCardInfo(
                     title = manga.title,
                     facts = cardFacts(manga, context),
@@ -216,7 +198,7 @@ fun MangaListRow(
     context: MangaCardContext = MangaCardContext.CATALOG,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val glass = mangaCardGlass()
+    val glass = glassTokens()
 
     Surface(
         modifier = modifier
@@ -224,9 +206,9 @@ fun MangaListRow(
             .clip(RoundedCornerShape(MangaCardMetrics.corner))
             .then(clickModifier(onClick, onLongClick)),
         shape = RoundedCornerShape(MangaCardMetrics.corner),
-        color = glass.container,
-        border = BorderStroke(1.dp, glass.border),
-        shadowElevation = 0.dp,
+        color = glass.background,
+        border = BorderStroke(MangaGlass.borderWidth, glass.border),
+        shadowElevation = glass.shadow,
     ) {
         Row(modifier = Modifier.padding(MangaCardMetrics.contentPadding)) {
             MangaCardCover(
@@ -241,7 +223,7 @@ fun MangaListRow(
 
             Spacer(Modifier.width(MangaCardMetrics.listGap))
 
-            CardInfoSurface(sheen = glass.sheen, modifier = Modifier.weight(1f)) {
+            CardInfoSurface(sheen = glass.highlight, modifier = Modifier.weight(1f)) {
                 // In a list there is room to set the publication date beside the name, which is
                 // exactly where the Latest feed needs it; every other surface never computes it.
                 Row(verticalAlignment = Alignment.Top) {

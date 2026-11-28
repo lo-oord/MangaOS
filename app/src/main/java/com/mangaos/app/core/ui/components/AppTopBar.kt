@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mangaos.app.core.designsystem.Dimens
+import com.mangaos.app.core.designsystem.glassBar
 import com.mangaos.app.core.designsystem.Spacing
 
 /**
@@ -37,6 +38,7 @@ fun AppTopBar(
         modifier = modifier
             .fillMaxWidth()
             .height(Dimens.topBarHeight)
+            .glassBar()
             .padding(start = Spacing.sm, end = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

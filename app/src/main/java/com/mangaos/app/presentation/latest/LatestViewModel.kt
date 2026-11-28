@@ -179,18 +179,24 @@ class LatestViewModel : ViewModel() {
             }
             val incoming = pages.flatten().filterNot { it.key in merged }
             val ready = withTimeoutOrNull(RESOLVE_TOTAL_MS) { resolveCards(incoming) } ?: incoming
-            val added = ready.count { merged.put(it.key, it) == null }
+            // A page is ordered before it is appended, so a source that answers out of order
+            // cannot place an older work above a newer one. The cards already on screen keep
+            // their positions: the feed only re-sorts when the page is newer than its tail.
+            val ordered = ready.sortedNewestFirst()
+            val added = ordered.count { merged.put(it.key, it) == null }
             if (added == 0) {
                 _state.value = content.copy(loadingMore = false, endReached = true)
                 return@launch
             }
             nextPage = page + 1
-            // The source's own order is kept: nothing re-sorts under the reader's finger.
+            val feed = merged.values.toList().let { items ->
+                if (isNewerThanFeed(ordered, content.mangas)) items.sortedNewestFirst() else items
+            }
             _state.value = content.copy(
-                mangas = merged.values.toList(),
+                mangas = feed,
                 loadingMore = false,
             )
-            enrichNewest(merged.values.toList())
+            enrichNewest(feed)
         }
     }
 
@@ -267,13 +273,21 @@ class LatestViewModel : ViewModel() {
         }
     }
 
+    /** True when an arriving page holds a work newer than anything already on screen. */
+    private fun isNewerThanFeed(incoming: List<Manga>, shown: List<Manga>): Boolean {
+        val newestShown = shown.firstNotNullOfOrNull { it.updatedAt } ?: return false
+        return incoming.any { (it.updatedAt ?: Long.MIN_VALUE) > newestShown }
+    }
+
     private fun publish(
         merged: Map<String, Manga>,
         failures: List<String>,
         endReached: Boolean = false,
     ) {
         _state.value = LatestUiState.Content(
-            mangas = merged.values.toList(),
+            // The feed is newest first on its very first paint, not only after an enrichment
+            // pass: undated works are never treated as the newest (they keep their source order).
+            mangas = merged.values.sortedNewestFirst(),
             loadingMore = false,
             endReached = endReached,
             failedSources = failures.toList(),
@@ -475,10 +489,13 @@ class LatestViewModel : ViewModel() {
     }
 }
 
-/** Newest first, using the real publication time; works without a timestamp go last. */
+/**
+ * Newest first, using the real publication time of the newest chapter. A work without a date is
+ * never treated as the newest: it sorts after every dated work and keeps the source's own order,
+ * because [sortedWith] is a stable sort — so equal (or missing) dates never reshuffle a feed.
+ */
 internal fun Collection<Manga>.sortedNewestFirst(): List<Manga> =
     sortedWith(
         compareByDescending<Manga> { it.updatedAt ?: Long.MIN_VALUE }
-            .thenByDescending { it.latestChapter?.toDoubleOrNull() ?: -1.0 }
-            .thenBy { it.title },
+            .thenByDescending { it.latestChapter?.toDoubleOrNull() ?: -1.0 },
     )

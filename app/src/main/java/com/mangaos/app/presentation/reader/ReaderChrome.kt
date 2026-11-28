@@ -61,8 +61,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.MangaGlass
 import com.mangaos.app.core.designsystem.MangaTheme
 import com.mangaos.app.core.designsystem.Spacing
+import com.mangaos.app.core.designsystem.glassTokens
 import com.mangaos.app.core.ui.components.CoverImage
 import com.mangaos.app.domain.model.ReaderSettings
 
@@ -82,6 +84,9 @@ fun ReaderTopBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val tokens = MangaTheme.tokens
+    // The reader's bar is the same glass as the rest of the app, fading out so the artwork is
+    // never cut off by a hard panel.
+    val glass = glassTokens()
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 22.dp, bottomStart = 22.dp),
@@ -93,9 +98,9 @@ fun ReaderTopBar(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            scheme.surface.copy(alpha = 0.92f),
-                            scheme.surface.copy(alpha = 0.72f),
-                            scheme.surface.copy(alpha = 0.34f),
+                            glass.background,
+                            glass.background.copy(alpha = 0.72f),
+                            glass.background.copy(alpha = 0.28f),
                         ),
                     ),
                 )
@@ -181,6 +186,7 @@ fun ReaderBottomBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val tokens = MangaTheme.tokens
+    val glass = glassTokens()
     var brightnessOpen by remember { mutableStateOf(false) }
 
     Surface(
@@ -188,9 +194,9 @@ fun ReaderBottomBar(
             .fillMaxWidth()
             .pointerInput(Unit) { detectTapGestures { } },
         shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 0.dp, bottomStart = 0.dp),
-        color = scheme.surface.copy(alpha = 0.90f),
-        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.16f)),
-        shadowElevation = 16.dp,
+        color = glass.background,
+        border = BorderStroke(MangaGlass.borderWidth, glass.border),
+        shadowElevation = glass.shadow,
     ) {
         Column(
             modifier = Modifier
