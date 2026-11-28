@@ -349,6 +349,7 @@ private fun LanguageStep(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ThemeStep(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
     val dark = isSystemInDarkTheme()
