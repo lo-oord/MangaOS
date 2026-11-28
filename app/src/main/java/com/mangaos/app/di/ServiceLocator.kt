@@ -3,6 +3,7 @@ package com.mangaos.app.di
 import android.content.Context
 import com.mangaos.app.data.download.LocalDownloadRepository
 import com.mangaos.app.data.local.CoverStore
+import com.mangaos.app.data.local.LocalAuthStore
 import com.mangaos.app.data.local.ReaderSettingsRepositoryImpl
 import com.mangaos.app.data.local.SettingsRepositoryImpl
 import com.mangaos.app.data.local.mangaOsDataStore
@@ -72,12 +73,17 @@ object ServiceLocator {
     lateinit var chapterWatch: ChapterWatchStore
         private set
 
+    /** Local credential store used by the authentication flow until a backend is connected. */
+    lateinit var localAuth: LocalAuthStore
+        private set
+
     fun init(context: Context) {
         if (initialized) return
         appContext = context.applicationContext
         val dataStore = appContext.mangaOsDataStore
 
         settings = SettingsRepositoryImpl(appContext, dataStore)
+        localAuth = LocalAuthStore(appContext)
         readerSettings = ReaderSettingsRepositoryImpl(dataStore)
         user = DataStoreUserRepository(dataStore, appScope)
         library = DataStoreLibraryRepository(dataStore, appScope)

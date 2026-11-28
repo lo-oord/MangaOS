@@ -76,23 +76,8 @@ fun MangaOsApp() {
     val context = LocalContext.current
     val settings = ServiceLocator.settings
 
-    // Download progress and new chapters are Android notifications, so ask once on Android 13+
-    // instead of silently posting notifications the system will drop.
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { }
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-    }
-
+    // Notification permission is requested in the setup wizard (and only when the reader asks
+    // for notifications) or when a feature first needs it — never on every cold start.
     val language by settings.language.collectAsStateWithLifecycle(
         initialValue = LocaleManager.readLanguage(context),
     )

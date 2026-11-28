@@ -6,21 +6,26 @@ import com.mangaos.app.di.ServiceLocator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-enum class SplashDestination { WELCOME, MAIN }
+/**
+ * Where the launch screen hands over to.
+ *
+ * Onboarding and the session are independent: a completed wizard with no session goes to the
+ * authentication screen, and only a completed wizard with a live session goes straight home. The
+ * wizard's flag is never reset by signing out or by an app update.
+ */
+enum class SplashDestination { ONBOARDING, AUTH, MAIN }
 
 class SplashViewModel : ViewModel() {
 
     fun resolveDestination(onResolved: (SplashDestination) -> Unit) {
         viewModelScope.launch {
-            val completed = ServiceLocator.settings.onboardingCompleted.first()
-            if (!completed) {
-                onResolved(SplashDestination.WELCOME)
-                return@launch
+            // Both values come from the same DataStore read, so the hand-off is one decision.
+            val onboardingCompleted = ServiceLocator.settings.onboardingCompleted.first()
+            when {
+                !onboardingCompleted -> onResolved(SplashDestination.ONBOARDING)
+                ServiceLocator.user.profile.value == null -> onResolved(SplashDestination.AUTH)
+                else -> onResolved(SplashDestination.MAIN)
             }
-            if (ServiceLocator.user.profile.value == null) {
-                ServiceLocator.user.startGuestSession()
-            }
-            onResolved(SplashDestination.MAIN)
         }
     }
 }

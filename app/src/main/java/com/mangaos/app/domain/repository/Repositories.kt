@@ -9,6 +9,7 @@ import com.mangaos.app.domain.model.Download
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
 import com.mangaos.app.domain.model.NotificationType
+import com.mangaos.app.domain.model.OnboardingState
 import com.mangaos.app.domain.model.ReadingProgress
 import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.SourceInfo
@@ -192,6 +193,9 @@ interface SettingsRepository {
     /** System / light / dark / AMOLED, independent of the colour theme. */
     val themeMode: Flow<ThemeMode>
     val onboardingCompleted: Flow<Boolean>
+
+    /** The wizard's saved answers and the step it was left on. */
+    val onboardingState: Flow<OnboardingState>
     val viewMode: Flow<MangaViewMode>
     /** Source id shown in the Latest tab, or null for the first usable source. */
     val latestSourceId: Flow<String?>
@@ -206,6 +210,7 @@ interface SettingsRepository {
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setOnboardingCompleted(completed: Boolean)
+    suspend fun updateOnboarding(transform: (OnboardingState) -> OnboardingState)
     suspend fun setViewMode(viewMode: MangaViewMode)
     suspend fun setLatestSourceId(sourceId: String?)
     suspend fun updateAppSettings(transform: (AppSettings) -> AppSettings)

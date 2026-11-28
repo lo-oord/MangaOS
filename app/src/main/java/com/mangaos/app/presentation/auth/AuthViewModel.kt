@@ -10,14 +10,37 @@ import com.mangaos.app.R
 import com.mangaos.app.core.util.LocaleManager
 import com.mangaos.app.core.util.Validators
 import com.mangaos.app.data.local.AvatarStore
+import com.mangaos.app.data.local.LocalAuthStore
 import com.mangaos.app.di.ServiceLocator
 import kotlinx.coroutines.launch
 
+/** The three states of the authentication shell; the shell itself never changes. */
+enum class AuthStage { SIGN_IN, SIGN_UP, RESET }
+
 /**
- * Owns the account flow draft and all local validation. No authentication happens here:
- * the future auth layer will replace [completeAccount] and [signIn] only.
+ * Owns the account flow draft, its validation and the local credential check. The screen keeps
+ * one shell and animates between [AuthStage]s; this ViewModel is the single source of truth for
+ * the fields, the error and the busy state, so switching stage never loses what was typed.
  */
 class AuthViewModel : ViewModel() {
+
+    var stage by mutableStateOf(AuthStage.SIGN_IN)
+        private set
+
+    /** One short message for the whole form (credentials, existing account, wrong password). */
+    var formError by mutableStateOf<Int?>(null)
+        private set
+
+    /** Sets after a successful operation, so the shell can show its confirmation state. */
+    var succeeded by mutableStateOf(false)
+        private set
+
+    fun openStage(next: AuthStage) {
+        if (isSubmitting) return
+        stage = next
+        formError = null
+        succeeded = false
+    }
 
     var email by mutableStateOf("")
     var password by mutableStateOf("")
@@ -201,11 +224,105 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 ServiceLocator.user.startGuestSession()
-                ServiceLocator.settings.setOnboardingCompleted(true)
                 onDone()
             } finally {
                 isSubmitting = false
             }
         }
+    }
+
+    /** Sign-in against the stored credentials; a wrong password is reported, never accepted. */
+    fun signInAccount(onDone: () -> Unit) {
+        if (isSubmitting) return
+        formError = null
+        if (!validateSignIn()) return
+        isSubmitting = true
+        viewModelScope.launch {
+            try {
+                when (ServiceLocator.localAuth.signIn(email, password)) {
+                    is LocalAuthStore.Result.Success -> openSession(onDone)
+                    LocalAuthStore.Result.UnknownEmail -> formError = R.string.auth_error_no_account
+                    LocalAuthStore.Result.WrongPassword -> formError = R.string.auth_error_wrong_password
+                    else -> formError = R.string.auth_error_generic
+                }
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
+
+    /** Creates the account and its session; an address that already exists is refused. */
+    fun signUpAccount(onDone: () -> Unit) {
+        if (isSubmitting) return
+        formError = null
+        nameError = if (displayName.isBlank()) R.string.error_required else null
+        if (!validateCredentials() || nameError != null) return
+        isSubmitting = true
+        viewModelScope.launch {
+            try {
+                val result = ServiceLocator.localAuth.register(
+                    email = email,
+                    password = password,
+                    displayName = displayName,
+                    username = username,
+                )
+                when (result) {
+                    is LocalAuthStore.Result.Success -> openSession(onDone)
+                    LocalAuthStore.Result.EmailTaken -> {
+                        emailError = R.string.auth_error_email_taken
+                        formError = R.string.auth_error_email_taken
+                    }
+                    else -> formError = R.string.auth_error_generic
+                }
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
+
+    /** Replaces the password of an existing account, then confirms inside the same shell. */
+    fun resetPassword(onDone: () -> Unit) {
+        if (isSubmitting) return
+        formError = null
+        val emailValid = validateSignIn()
+        confirmError = when {
+            confirmPassword.isEmpty() -> R.string.error_required
+            !Validators.passwordsMatch(password, confirmPassword) -> R.string.error_password_mismatch
+            else -> null
+        }
+        if (!emailValid || confirmError != null) return
+        isSubmitting = true
+        viewModelScope.launch {
+            try {
+                when (ServiceLocator.localAuth.resetPassword(email, password)) {
+                    is LocalAuthStore.Result.Success -> succeeded = true
+                    LocalAuthStore.Result.UnknownEmail -> {
+                        emailError = R.string.auth_error_no_account
+                        formError = R.string.auth_error_no_account
+                    }
+                    else -> formError = R.string.auth_error_generic
+                }
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
+
+    private fun openSession(onDone: () -> Unit) {
+        val fallbackName = displayName.trim().ifBlank { email.substringBefore('@') }
+        val handle = username.trim().ifBlank {
+            fallbackName.filter { it.isLetterOrDigit() || it == '_' || it == '.' }.take(20)
+        }
+        ServiceLocator.user.createAccount(
+            displayName = fallbackName.ifBlank { "reader" },
+            username = handle.ifBlank { "reader" },
+            avatarUri = null,
+            email = email.trim().ifBlank { null },
+            countryCode = countryCode,
+            age = age,
+            preferredLanguage = preferredLanguage,
+        )
+        succeeded = true
+        onDone()
     }
 }

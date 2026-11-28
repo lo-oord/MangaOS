@@ -14,6 +14,8 @@ import com.mangaos.app.domain.model.AppSettings
 import com.mangaos.app.domain.model.LibraryFilter
 import com.mangaos.app.domain.model.LibrarySort
 import com.mangaos.app.domain.model.MangaViewMode
+import com.mangaos.app.domain.model.OnboardingState
+import com.mangaos.app.domain.model.StorageChoice
 import com.mangaos.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -23,12 +25,23 @@ class SettingsRepositoryImpl(
     private val dataStore: DataStore<Preferences>,
 ) : SettingsRepository {
 
+    private companion object {
+        const val GENRE_SEPARATOR = "|"
+    }
+
     private object Keys {
         val language = stringPreferencesKey("language")
         val theme = stringPreferencesKey("theme")
         // Same key as the old light/dark flag so an upgrade keeps the previous choice.
         val themeMode = stringPreferencesKey("dark_mode")
         val onboarding = booleanPreferencesKey("onboarding_completed")
+        val onboardingStep = intPreferencesKey("onboarding_step")
+        val onboardingStorage = stringPreferencesKey("onboarding_storage")
+        val onboardingFolderUri = stringPreferencesKey("onboarding_folder_uri")
+        val onboardingFolderName = stringPreferencesKey("onboarding_folder_name")
+        val onboardingGenres = stringPreferencesKey("onboarding_genres")
+        val onboardingTypes = stringPreferencesKey("onboarding_types")
+        val onboardingNotifications = booleanPreferencesKey("onboarding_notifications")
         val viewMode = stringPreferencesKey("manga_view_mode")
         val latestSource = stringPreferencesKey("latest_source_id")
         val lastDestination = stringPreferencesKey("last_destination")
@@ -75,6 +88,33 @@ class SettingsRepositoryImpl(
         preferences[Keys.onboarding] ?: false
     }
 
+    override val onboardingState: Flow<OnboardingState> = dataStore.data.map { preferences ->
+        OnboardingState(
+            step = (preferences[Keys.onboardingStep] ?: 0).coerceAtLeast(0),
+            language = if (LocaleManager.isSupported(preferences[Keys.language])) {
+                preferences[Keys.language]!!
+            } else {
+                LocaleManager.DEFAULT_LANGUAGE
+            },
+            theme = AppTheme.fromStorage(preferences[Keys.theme]),
+            storageChoice = StorageChoice.fromStorage(preferences[Keys.onboardingStorage]),
+            folderUri = preferences[Keys.onboardingFolderUri]?.takeIf { it.isNotBlank() },
+            folderName = preferences[Keys.onboardingFolderName]?.takeIf { it.isNotBlank() },
+            genres = preferences[Keys.onboardingGenres]
+                ?.split(GENRE_SEPARATOR)
+                ?.filter { it.isNotBlank() }
+                ?.toSet()
+                .orEmpty(),
+            contentTypes = preferences[Keys.onboardingTypes]
+                ?.split(GENRE_SEPARATOR)
+                ?.filter { it.isNotBlank() }
+                ?.toSet()
+                ?.takeIf { it.isNotEmpty() }
+                ?: OnboardingState.DEFAULT_CONTENT_TYPES,
+            notificationsEnabled = preferences[Keys.onboardingNotifications] ?: true,
+        )
+    }
+
     override val viewMode: Flow<MangaViewMode> = dataStore.data.map { preferences ->
         MangaViewMode.fromStorage(preferences[Keys.viewMode])
     }
@@ -104,6 +144,43 @@ class SettingsRepositoryImpl(
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { it[Keys.onboarding] = completed }
+    }
+
+    override suspend fun updateOnboarding(transform: (OnboardingState) -> OnboardingState) {
+        dataStore.edit { preferences ->
+            val current = OnboardingState(
+                step = (preferences[Keys.onboardingStep] ?: 0).coerceAtLeast(0),
+                language = preferences[Keys.language] ?: LocaleManager.DEFAULT_LANGUAGE,
+                theme = AppTheme.fromStorage(preferences[Keys.theme]),
+                storageChoice = StorageChoice.fromStorage(preferences[Keys.onboardingStorage]),
+                folderUri = preferences[Keys.onboardingFolderUri],
+                folderName = preferences[Keys.onboardingFolderName],
+                genres = preferences[Keys.onboardingGenres]
+                    ?.split(GENRE_SEPARATOR)
+                    ?.filter { it.isNotBlank() }
+                    ?.toSet()
+                    .orEmpty(),
+                contentTypes = preferences[Keys.onboardingTypes]
+                    ?.split(GENRE_SEPARATOR)
+                    ?.filter { it.isNotBlank() }
+                    ?.toSet()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: OnboardingState.DEFAULT_CONTENT_TYPES,
+                notificationsEnabled = preferences[Keys.onboardingNotifications] ?: true,
+            )
+            val next = transform(current)
+            preferences[Keys.onboardingStep] = next.step.coerceAtLeast(0)
+            preferences[Keys.onboardingStorage] = next.storageChoice.storageKey
+            next.folderUri?.takeIf { it.isNotBlank() }?.let {
+                preferences[Keys.onboardingFolderUri] = it
+            } ?: preferences.remove(Keys.onboardingFolderUri)
+            next.folderName?.takeIf { it.isNotBlank() }?.let {
+                preferences[Keys.onboardingFolderName] = it
+            } ?: preferences.remove(Keys.onboardingFolderName)
+            preferences[Keys.onboardingGenres] = next.genres.joinToString(GENRE_SEPARATOR)
+            preferences[Keys.onboardingTypes] = next.contentTypes.joinToString(GENRE_SEPARATOR)
+            preferences[Keys.onboardingNotifications] = next.notificationsEnabled
+        }
     }
 
     override suspend fun setViewMode(viewMode: MangaViewMode) {

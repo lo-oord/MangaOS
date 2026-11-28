@@ -12,15 +12,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mangaos.app.core.ui.LocalReduceMotion
 import com.mangaos.app.di.ServiceLocator
-import com.mangaos.app.presentation.auth.AccountChoiceScreen
-import com.mangaos.app.presentation.auth.ProfileSetupScreen
-import com.mangaos.app.presentation.auth.SignInScreen
-import com.mangaos.app.presentation.auth.SignUpScreen
-import com.mangaos.app.presentation.auth.VerifyEmailScreen
-import com.mangaos.app.presentation.auth.rememberAuthViewModel
+import com.mangaos.app.presentation.auth.AuthScreen
+import com.mangaos.app.presentation.onboarding.OnboardingScreen
 import com.mangaos.app.presentation.splash.SplashDestination
 import com.mangaos.app.presentation.splash.SplashScreen
 
+/**
+ * The launch order is fixed: splash, then the first-launch wizard exactly once, then
+ * authentication when there is no session, then the home screens. Each hand-off replaces its
+ * predecessor, so back never walks into a wizard that was already completed.
+ */
 @Composable
 fun RootNavHost(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -41,7 +42,11 @@ fun RootNavHost(modifier: Modifier = Modifier) {
         composable(Routes.SPLASH) {
             SplashScreen(
                 onFinished = { destination ->
-                    val target = if (destination == SplashDestination.MAIN) Routes.MAIN else Routes.AUTH_CHOICE
+                    val target = when (destination) {
+                        SplashDestination.ONBOARDING -> Routes.ONBOARDING
+                        SplashDestination.AUTH -> Routes.AUTH
+                        SplashDestination.MAIN -> Routes.MAIN
+                    }
                     navController.navigate(target) {
                         popUpTo(Routes.SPLASH) { inclusive = true }
                     }
@@ -49,67 +54,22 @@ fun RootNavHost(modifier: Modifier = Modifier) {
             )
         }
 
-        composable(Routes.AUTH_CHOICE) {
-            val authViewModel = rememberAuthViewModel()
-            AccountChoiceScreen(
-                onCreateAccount = { navController.navigate(Routes.AUTH_SIGN_UP) },
-                onSignIn = { navController.navigate(Routes.AUTH_SIGN_IN) },
-                onGuest = {
-                    authViewModel.continueAsGuest {
-                        navController.navigate(Routes.MAIN) {
-                            popUpTo(Routes.AUTH_CHOICE) { inclusive = true }
-                        }
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(
+                onFinished = {
+                    navController.navigate(Routes.AUTH) {
+                        popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
             )
         }
 
-        composable(Routes.AUTH_SIGN_UP) {
-            val authViewModel = rememberAuthViewModel()
-            SignUpScreen(
-                viewModel = authViewModel,
-                onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(Routes.AUTH_PROFILE) },
-                onSignIn = {
-                    navController.navigate(Routes.AUTH_SIGN_IN) { launchSingleTop = true }
-                },
-            )
-        }
-
-        composable(Routes.AUTH_PROFILE) {
-            val authViewModel = rememberAuthViewModel()
-            ProfileSetupScreen(
-                viewModel = authViewModel,
-                onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(Routes.AUTH_VERIFY) },
-            )
-        }
-
-        composable(Routes.AUTH_VERIFY) {
-            val authViewModel = rememberAuthViewModel()
-            VerifyEmailScreen(
-                viewModel = authViewModel,
-                onBack = { navController.popBackStack() },
-                onComplete = {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.AUTH_CHOICE) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(Routes.AUTH_SIGN_IN) {
-            val authViewModel = rememberAuthViewModel()
-            SignInScreen(
-                viewModel = authViewModel,
-                onBack = { navController.popBackStack() },
+        composable(Routes.AUTH) {
+            AuthScreen(
                 onSignedIn = {
                     navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.AUTH_CHOICE) { inclusive = true }
+                        popUpTo(Routes.AUTH) { inclusive = true }
                     }
-                },
-                onCreateAccount = {
-                    navController.navigate(Routes.AUTH_SIGN_UP) { launchSingleTop = true }
                 },
             )
         }

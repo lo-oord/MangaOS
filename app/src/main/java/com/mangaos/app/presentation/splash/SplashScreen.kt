@@ -5,7 +5,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +27,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mangaos.app.R
@@ -36,6 +35,11 @@ import com.mangaos.app.core.ui.LocalReduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * The launch screen: the mark, nothing else. Settings, language, theme, the wizard state and the
+ * session are all read in the background while it plays; as soon as both the entrance animation
+ * and that read are done it leaves, without a second of dead time or an intermediate screen.
+ */
 @Composable
 fun SplashScreen(onFinished: (SplashDestination) -> Unit) {
     val viewModel: SplashViewModel = viewModel()
@@ -43,75 +47,66 @@ fun SplashScreen(onFinished: (SplashDestination) -> Unit) {
     val reduceMotion = LocalReduceMotion.current
 
     LaunchedEffect(Unit) {
-        viewModel.resolveDestination { destination = it }
+        viewModel.resolveDestination { resolved -> destination = resolved }
     }
 
     val logoAlpha = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    val logoScale = remember { Animatable(if (reduceMotion) 1f else 0.88f) }
-    val textAlpha = remember { Animatable(if (reduceMotion) 1f else 0f) }
+    val logoScale = remember { Animatable(if (reduceMotion) 1f else 0.9f) }
+    val wordmarkAlpha = remember { Animatable(if (reduceMotion) 1f else 0f) }
 
     LaunchedEffect(Unit) {
         if (!reduceMotion) {
-            launch { logoAlpha.animateTo(1f, tween(220)) }
-            logoScale.animateTo(1f, tween(340, easing = FastOutSlowInEasing))
-            textAlpha.animateTo(1f, tween(240))
-            delay(180)
+            launch { logoAlpha.animateTo(1f, tween(200)) }
+            logoScale.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+            delay(120)
+            wordmarkAlpha.animateTo(1f, tween(240))
+            delay(120)
         } else {
-            delay(200)
+            delay(160)
         }
-        while (destination == null) delay(30)
+        while (destination == null) delay(20)
         destination?.let(onFinished)
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center,
     ) {
-        val logoSize = (maxWidth * 0.32f).coerceIn(96.dp, 132.dp)
-        val glow = Brush.radialGradient(
-            colors = listOf(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                MaterialTheme.colorScheme.background.copy(alpha = 0f),
-            ),
-        )
-        androidx.compose.foundation.layout.Box(
+        // A single, very soft accent behind the mark; no text, no copy to read.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(glow),
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                        ),
+                    ),
+                ),
         )
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
                 painter = painterResource(id = R.drawable.logo_mangaos),
                 contentDescription = stringResource(id = R.string.cd_logo),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(logoSize)
+                    .size(112.dp)
                     .graphicsLayer {
                         alpha = logoAlpha.value
                         scaleX = logoScale.value
                         scaleY = logoScale.value
                     },
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.sm))
             Text(
-                text = stringResource(id = R.string.splash_welcome),
-                style = MaterialTheme.typography.titleLarge,
+                text = stringResource(id = R.string.app_name),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.graphicsLayer { alpha = textAlpha.value },
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = stringResource(id = R.string.splash_tagline),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.graphicsLayer { alpha = textAlpha.value },
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
+                modifier = Modifier.graphicsLayer { alpha = wordmarkAlpha.value },
             )
         }
     }
