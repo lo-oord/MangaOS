@@ -57,8 +57,13 @@ class AuthViewModel : ViewModel() {
         // when the session ends is what stops the previous account's address and password from
         // being offered again to the next reader on this device.
         viewModelScope.launch {
+            // Only a session that actually ended clears the form. The flow starts with the
+            // current value, which is null for a guest arriving from the guest prompt, and that
+            // first emission must not wipe the step the prompt asked for.
+            var hadUser = false
             FirebaseAuthManager.authState().collect { user ->
-                if (user == null) clearForm()
+                if (user == null && hadUser) clearForm()
+                hadUser = user != null
             }
         }
     }

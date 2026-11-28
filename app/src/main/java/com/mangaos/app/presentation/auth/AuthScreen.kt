@@ -35,6 +35,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangaos.app.R
 import com.mangaos.app.core.designsystem.AppIcon
 import com.mangaos.app.core.designsystem.GlassSurface
@@ -68,6 +71,15 @@ fun AuthScreen(onSignedIn: () -> Unit = {}) {
     val viewModel: AuthViewModel = rememberAuthViewModel()
     val reduceMotion = LocalReduceMotion.current
     val stage = viewModel.stage
+
+    // A guest who chose "sign in" or "create account" arrives with that intent already made, so
+    // the shell opens on the address step instead of asking the same question again.
+    val requestedMode by AuthRequests.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedMode) {
+        val mode = requestedMode ?: return@LaunchedEffect
+        AuthRequests.consume()
+        if (viewModel.stage == AuthStage.WELCOME) viewModel.open(AuthStage.EMAIL, mode)
+    }
 
     val launchGoogle = rememberGoogleSignIn { result ->
         result

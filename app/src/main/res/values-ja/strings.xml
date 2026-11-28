@@ -19,6 +19,17 @@
     <string name="error_username_chars">半角英数字と _ のみ使用できます</string>
     <string name="guest_display_name">ゲスト</string>
     <string name="guest_username">guest</string>
+    <string name="guest_mode">ゲストモード</string>
+    <string name="guest_profile_note">ライブラリ・ダウンロード・進捗はこの端末に保存されます。同期するにはアカウントを作成してください。</string>
+    <string name="guest_register_title">今すぐ登録</string>
+    <string name="guest_register_message">アカウントを作成するか、お持ちのアカウントにサインインすると、ライブラリと進捗を端末間で同期できます。</string>
+    <string name="guest_library_title">ライブラリにはアカウントが必要です</string>
+    <string name="guest_library_message">追加した作品はアカウントに保存されるため、サインインまたはアカウント作成後にライブラリが開きます。</string>
+    <string name="guest_sync_title">この手順にはアカウントが必要です</string>
+    <string name="guest_sync_message">この操作はアカウントと同期します。続行するにはアカウントを作成するかサインインしてください。</string>
+    <string name="guest_leave">ゲストモードを終了</string>
+    <string name="guest_leave_title">ゲストモードを終了しますか？</string>
+    <string name="guest_leave_message">サインイン画面に戻ります。ダウンロードと設定は端末に残ります。</string>
 
     <string name="nav_latest">最新</string>
     <string name="nav_manga">マンガ</string>

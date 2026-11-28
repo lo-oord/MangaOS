@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,8 +30,14 @@ import com.mangaos.app.data.firebase.SessionStage
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.SessionType
 import com.mangaos.app.presentation.auth.AccountSetupScreen
+import com.mangaos.app.presentation.auth.AuthMode
+import com.mangaos.app.presentation.auth.AuthRequests
 import com.mangaos.app.presentation.auth.AuthScreen
 import com.mangaos.app.presentation.auth.VerifyEmailScreen
+import com.mangaos.app.presentation.common.GuestAccountDialog
+import com.mangaos.app.presentation.common.GuestGate
+import com.mangaos.app.presentation.common.GuestNeed
+import com.mangaos.app.presentation.common.LocalGuestGate
 import com.mangaos.app.presentation.onboarding.OnboardingScreen
 import com.mangaos.app.presentation.splash.SplashScreen
 
@@ -55,8 +62,24 @@ fun RootNavHost(modifier: Modifier = Modifier) {
     var splashDone by rememberSaveable { mutableStateOf(false) }
     var onboardingDone by rememberSaveable { mutableStateOf(false) }
     var onboardingShown by rememberSaveable { mutableStateOf(false) }
+    var guestPrompt by remember { mutableStateOf<GuestNeed?>(null) }
 
     val guestSession = profile?.sessionType == SessionType.GUEST
+
+    // The gate a guest meets: features that only exist on an account ask here, and the two
+    // buttons leave the guest session exactly the way signing out does, so the root gate opens
+    // the account shell with the mode the reader picked.
+    val guestGate = remember(guestSession) {
+        GuestGate(
+            isGuest = guestSession,
+            showPrompt = { need -> guestPrompt = need },
+            openAuth = { mode ->
+                guestPrompt = null
+                AuthRequests.request(mode)
+                ServiceLocator.user.signOut()
+            },
+        )
+    }
     val stage = account.stage(guestSession)
 
     // The wizard is answered once and never asked again; signing out restarts neither.
@@ -81,15 +104,26 @@ fun RootNavHost(modifier: Modifier = Modifier) {
         return
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        when (stage) {
-            SessionStage.LOADING -> SessionLoading()
-            SessionStage.SIGNED_OUT -> AuthScreen()
-            SessionStage.EMAIL_VERIFICATION -> VerifyEmailScreen()
-            SessionStage.ACCOUNT_SETUP -> AccountSetupScreen()
-            SessionStage.GUEST, SessionStage.READY -> MainScaffold(
-                profile = profile,
-                unreadNotifications = unreadNotifications,
+    CompositionLocalProvider(LocalGuestGate provides guestGate) {
+        Box(modifier = modifier.fillMaxSize()) {
+            when (stage) {
+                SessionStage.LOADING -> SessionLoading()
+                SessionStage.SIGNED_OUT -> AuthScreen()
+                SessionStage.EMAIL_VERIFICATION -> VerifyEmailScreen()
+                SessionStage.ACCOUNT_SETUP -> AccountSetupScreen()
+                SessionStage.GUEST, SessionStage.READY -> MainScaffold(
+                    profile = profile,
+                    unreadNotifications = unreadNotifications,
+                )
+            }
+        }
+
+        guestPrompt?.let { need ->
+            GuestAccountDialog(
+                need = need,
+                onSignIn = { guestGate.start(AuthMode.SIGN_IN) },
+                onSignUp = { guestGate.start(AuthMode.SIGN_UP) },
+                onDismiss = { guestPrompt = null },
             )
         }
     }

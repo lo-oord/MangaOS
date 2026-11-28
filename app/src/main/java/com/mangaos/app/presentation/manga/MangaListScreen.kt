@@ -35,7 +35,9 @@ import com.mangaos.app.core.util.SearchText
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
+import com.mangaos.app.presentation.common.GuestNeed
 import com.mangaos.app.presentation.common.LibraryToggleSheet
+import com.mangaos.app.presentation.common.LocalGuestGate
 import kotlinx.coroutines.launch
 
 @Composable
@@ -56,6 +58,7 @@ fun MangaListScreen(
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val guestGate = LocalGuestGate.current
 
     Column(modifier = modifier.fillMaxSize()) {
         MangaSearchField(
@@ -111,13 +114,18 @@ fun MangaListScreen(
             manga = manga,
             isInLibrary = manga.key in libraryIds,
             onToggle = {
-                val added = manga.key !in libraryIds
-                ServiceLocator.library.toggle(manga)
                 sheetManga = null
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        context.getString(if (added) R.string.library_added else R.string.library_removed),
-                    )
+                if (guestGate.isGuest) {
+                    // Saved works live on the account, so a guest is asked for one first.
+                    guestGate.require(GuestNeed.LIBRARY)
+                } else {
+                    val added = manga.key !in libraryIds
+                    ServiceLocator.library.toggle(manga)
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            context.getString(if (added) R.string.library_added else R.string.library_removed),
+                        )
+                    }
                 }
             },
             onDismiss = { sheetManga = null },

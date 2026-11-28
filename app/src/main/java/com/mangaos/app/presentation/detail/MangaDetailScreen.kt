@@ -141,6 +141,8 @@ import com.mangaos.app.domain.model.DownloadChapterState
 import com.mangaos.app.domain.model.findChapter
 import com.mangaos.app.domain.model.SourceFailure
 import com.mangaos.app.domain.model.Manga
+import com.mangaos.app.presentation.common.GuestNeed
+import com.mangaos.app.presentation.common.LocalGuestGate
 import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.ReadingProgress
 import com.mangaos.app.domain.repository.readChapterKey
@@ -206,6 +208,7 @@ private fun DetailContent(
     val context = LocalContext.current
     val snackbar = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
+    val guestGate = LocalGuestGate.current
 
     var menuOpen by remember { mutableStateOf(false) }
     var descriptionExpanded by remember { mutableStateOf(false) }
@@ -401,7 +404,12 @@ private fun DetailContent(
             progress = progress,
             isSaved = isSaved,
             onRead = { readingChapter?.let(onOpenChapter) },
-            onLibrary = { viewModel.toggleLibrary() },
+            // The saved flag lives on the account, so a guest is offered the account instead of a
+            // button that would quietly do nothing.
+            onLibrary = {
+                if (guestGate.isGuest) guestGate.require(GuestNeed.LIBRARY)
+                else viewModel.toggleLibrary()
+            },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
 

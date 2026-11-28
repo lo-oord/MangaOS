@@ -60,6 +60,7 @@ import com.mangaos.app.core.ui.components.AppDialog
 import com.mangaos.app.core.ui.components.AppTextField
 import com.mangaos.app.core.ui.components.PrimaryButton
 import com.mangaos.app.core.ui.components.ProfileAvatar
+import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.core.ui.components.ProfileSkeleton
 import com.mangaos.app.core.ui.components.SettingsRow
 import com.mangaos.app.core.ui.components.VerifiedBadge
@@ -67,11 +68,14 @@ import com.mangaos.app.core.ui.components.VerifiedName
 import com.mangaos.app.data.firebase.AccountState
 import com.mangaos.app.data.firebase.CloudSync
 import com.mangaos.app.di.ServiceLocator
+import com.mangaos.app.domain.model.SessionType
+import com.mangaos.app.presentation.auth.AuthMode
 import com.mangaos.app.presentation.auth.messageRes
 import com.mangaos.app.presentation.auth.rememberGoogleSignIn
 import com.mangaos.app.presentation.common.AgePickerDialog
 import com.mangaos.app.presentation.common.CountryPickerDialog
 import com.mangaos.app.presentation.common.LanguagePickerSheet
+import com.mangaos.app.presentation.common.LocalGuestGate
 import com.mangaos.app.presentation.common.countryDisplayName
 import com.mangaos.app.presentation.common.languageDisplayName
 import kotlinx.coroutines.launch
@@ -102,6 +106,7 @@ fun ProfileScreen(
     var showSignOut by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showUnlink by remember { mutableStateOf(false) }
+    var showLeaveGuest by remember { mutableStateOf(false) }
 
     fun message(res: Int) {
         scope.launch { snackbar.showSnackbar(context.getString(res)) }
@@ -127,6 +132,35 @@ fun ProfileScreen(
     }
 
     val account = state.account
+    val isGuest = localProfile?.sessionType == SessionType.GUEST
+    val guestGate = LocalGuestGate.current
+
+    // A guest page lists only what a guest has: no account rows, no linked providers and no
+    // security card, because none of them can be read or written without a session. The way
+    // forward is the one card at the top.
+    if (isGuest) {
+        GuestProfile(
+            avatarUri = localProfile?.avatarUri,
+            onCreate = { guestGate.start(AuthMode.SIGN_UP) },
+            onSignIn = { guestGate.start(AuthMode.SIGN_IN) },
+            onLeave = { showLeaveGuest = true },
+        )
+        if (showLeaveGuest) {
+            AppDialog(
+                title = stringResource(R.string.guest_leave_title),
+                message = stringResource(R.string.guest_leave_message),
+                confirmLabel = stringResource(R.string.guest_leave),
+                dismissLabel = stringResource(R.string.action_cancel),
+                onConfirm = {
+                    showLeaveGuest = false
+                    ServiceLocator.user.signOut()
+                },
+                onDismiss = { showLeaveGuest = false },
+                icon = MangaOsIcons.logout,
+            )
+        }
+        return
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().imePadding(),
@@ -658,6 +692,118 @@ private fun ProfileHeader(
                 Text(
                     text = stringResource(R.string.profile_edit_name),
                     style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The guest page: who they are browsing as, the one action that turns the session into an
+ * account, and the way back to the sign-in shell. Nothing here pretends to be stored remotely.
+ */
+@Composable
+private fun GuestProfile(
+    avatarUri: String?,
+    onCreate: () -> Unit,
+    onSignIn: () -> Unit,
+    onLeave: () -> Unit,
+) {
+    val name = stringResource(R.string.guest_display_name)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = PaddingValues(
+            start = Spacing.screen,
+            end = Spacing.screen,
+            top = Spacing.md,
+            bottom = Spacing.xxl,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        item {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(MangaGlass.dialogCorner),
+                contentPadding = PaddingValues(Spacing.lg),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProfileAvatar(name = name, avatarUri = avatarUri, size = 72.dp)
+                    Spacer(Modifier.width(Spacing.md))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(Spacing.xxs))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.guest_mode),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(
+                                    horizontal = Spacing.xs,
+                                    vertical = 2.dp,
+                                ),
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            text = stringResource(R.string.guest_profile_note),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(MangaGlass.corner),
+                contentPadding = PaddingValues(Spacing.lg),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.guest_register_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(Spacing.xxs))
+                    Text(
+                        text = stringResource(R.string.guest_register_message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    PrimaryButton(
+                        text = stringResource(R.string.auth_flow_create),
+                        onClick = onCreate,
+                        icon = MangaOsIcons.account,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    SecondaryButton(
+                        text = stringResource(R.string.auth_flow_sign_in),
+                        onClick = onSignIn,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+
+        item {
+            ProfileCard {
+                SettingsRow(
+                    icon = MangaOsIcons.logout,
+                    title = stringResource(R.string.guest_leave),
+                    onClick = onLeave,
                 )
             }
         }

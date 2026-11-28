@@ -23,6 +23,17 @@
     <string name="error_username_chars">Letters, numbers and _ only</string>
     <string name="guest_display_name">Guest</string>
     <string name="guest_username">guest</string>
+    <string name="guest_mode">Guest mode</string>
+    <string name="guest_profile_note">Your library, downloads and progress stay on this device. Create an account to sync them.</string>
+    <string name="guest_register_title">Sign up now</string>
+    <string name="guest_register_message">Create an account, or sign in to the one you already have, to keep your library and sync your progress across devices.</string>
+    <string name="guest_library_title">Your library needs an account</string>
+    <string name="guest_library_message">Every work you add is saved to your account, so the library opens after you sign in or create one.</string>
+    <string name="guest_sync_title">This step needs an account</string>
+    <string name="guest_sync_message">This action syncs with your account. Create one, or sign in, to continue.</string>
+    <string name="guest_leave">Leave guest mode</string>
+    <string name="guest_leave_title">Leave guest mode?</string>
+    <string name="guest_leave_message">You will return to the sign-in screen. Downloads and settings stay on this device.</string>
 
     <!-- Navigation -->
     <string name="nav_latest">Latest</string>

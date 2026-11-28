@@ -19,6 +19,17 @@
     <string name="error_username_chars">أحرف إنجليزية وأرقام و _ فقط</string>
     <string name="guest_display_name">ضيف</string>
     <string name="guest_username">guest</string>
+    <string name="guest_mode">وضع الضيف</string>
+    <string name="guest_profile_note">مكتبتك وتحميلاتك وتقدّمك محفوظة على هذا الجهاز. أنشئ حسابًا لمزامنتها.</string>
+    <string name="guest_register_title">سجّل الآن</string>
+    <string name="guest_register_message">أنشئ حسابًا جديدًا أو سجّل الدخول إلى حسابك لحفظ مكتبتك ومزامنة تقدّمك بين أجهزتك.</string>
+    <string name="guest_library_title">مكتبتك تحتاج حسابًا</string>
+    <string name="guest_library_message">كل عمل تضيفه يُحفظ في حسابك، لذا تُفتح المكتبة بعد تسجيل الدخول أو إنشاء حساب.</string>
+    <string name="guest_sync_title">هذه الخطوة تحتاج حسابًا</string>
+    <string name="guest_sync_message">هذه العملية تُزامَن مع حسابك؛ أنشئ حسابًا أو سجّل الدخول للمتابعة.</string>
+    <string name="guest_leave">الخروج من وضع الضيف</string>
+    <string name="guest_leave_title">الخروج من وضع الضيف؟</string>
+    <string name="guest_leave_message">ستعود إلى شاشة المصادقة. التنزيلات والإعدادات تبقى على هذا الجهاز.</string>
 
     <string name="nav_latest">الأحدث</string>
     <string name="nav_manga">المانجا</string>

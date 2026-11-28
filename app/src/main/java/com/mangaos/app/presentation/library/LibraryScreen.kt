@@ -1,13 +1,20 @@
 package com.mangaos.app.presentation.library
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,19 +23,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.text.font.FontWeight
 import com.mangaos.app.R
+import com.mangaos.app.core.designsystem.AppIcon
+import com.mangaos.app.core.designsystem.GlassSurface
+import com.mangaos.app.core.designsystem.IconRole
+import com.mangaos.app.core.designsystem.MangaGlass
+import com.mangaos.app.core.designsystem.MangaOsIcons
 import com.mangaos.app.core.designsystem.Spacing
 import com.mangaos.app.core.ui.LocalSnackbarHostState
 import com.mangaos.app.core.ui.components.EmptyState
+import com.mangaos.app.core.ui.components.PrimaryButton
+import com.mangaos.app.core.ui.components.SecondaryButton
 import com.mangaos.app.core.ui.components.MangaCollection
 import com.mangaos.app.core.ui.components.MangaSearchField
 import com.mangaos.app.di.ServiceLocator
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaViewMode
+import com.mangaos.app.presentation.auth.AuthMode
 import com.mangaos.app.presentation.common.LibraryToggleSheet
+import com.mangaos.app.presentation.common.LocalGuestGate
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,6 +68,18 @@ fun LibraryScreen(
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val guestGate = LocalGuestGate.current
+
+    // A guest has nothing to list here, and the screen says why instead of showing an empty
+    // library that looks like a bug.
+    if (guestGate.isGuest) {
+        GuestLibraryPanel(
+            onCreate = { guestGate.start(AuthMode.SIGN_UP) },
+            onSignIn = { guestGate.start(AuthMode.SIGN_IN) },
+            modifier = modifier,
+        )
+        return
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         MangaSearchField(
@@ -99,5 +129,64 @@ fun LibraryScreen(
             },
             onDismiss = { sheetManga = null },
         )
+    }
+}
+
+/**
+ * The guest library: one glass card that explains the account requirement and offers the two
+ * ways to satisfy it, in the same order as every other account prompt in the app.
+ */
+@Composable
+private fun GuestLibraryPanel(
+    onCreate: () -> Unit,
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.screen),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        GlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(MangaGlass.dialogCorner),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AppIcon(
+                    icon = MangaOsIcons.library,
+                    contentDescription = null,
+                    role = IconRole.Primary,
+                    size = 26.dp,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.guest_library_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(Spacing.xxs))
+                Text(
+                    text = stringResource(R.string.guest_library_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.md))
+                PrimaryButton(
+                    text = stringResource(R.string.auth_flow_create),
+                    onClick = onCreate,
+                    icon = MangaOsIcons.account,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                SecondaryButton(
+                    text = stringResource(R.string.auth_flow_sign_in),
+                    onClick = onSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
