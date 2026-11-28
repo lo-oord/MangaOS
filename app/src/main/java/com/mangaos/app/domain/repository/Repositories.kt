@@ -50,6 +50,9 @@ class SourceUnavailableException(
 /**
  * The bundled sources and the user's enable/disable choice. There is no installation step:
  * every source is part of the APK and only its enabled flag changes.
+ *
+ * Only one source is active at a time: enabling one disables the others, so a request is never
+ * split between the primary server and the backup.
  */
 interface SourceRepository {
     /** Every bundled source, with its current enabled flag. */
@@ -67,6 +70,7 @@ interface SourceRepository {
     /** Source id -> last runtime failure, shown next to the source and cleared on success. */
     val failures: StateFlow<Map<String, String>>
 
+    /** Turns [sourceId] on, replacing the active source, or turns it off. */
     fun setEnabled(sourceId: String, enabled: Boolean)
     fun isEnabled(sourceId: String): Boolean
 

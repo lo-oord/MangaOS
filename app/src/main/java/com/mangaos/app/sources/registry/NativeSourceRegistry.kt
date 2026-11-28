@@ -35,11 +35,17 @@ data class SourceDefinition(
  */
 object NativeSourceRegistry {
 
+    /**
+     * The server the app opens on: the primary one, enabled on a fresh install while the backup
+     * stays off until the reader chooses it.
+     */
+    const val DEFAULT_ID = "mangatek"
+
     val definitions: List<SourceDefinition> = listOf(
         SourceDefinition(
             id = "mangatek",
             name = "السيرفر الرئيسي",
-            description = "الخادم الأساسي للمانجا العربية",
+            description = "الخادم الافتراضي الذي يبدأ عليه التطبيق",
             lang = "ar",
             baseUrl = "https://mangatek.com",
             version = "1.0.0",
@@ -53,7 +59,7 @@ object NativeSourceRegistry {
         SourceDefinition(
             id = "teamx",
             name = "السيرفر الاحتياطي",
-            description = "خادم بديل يُستخدم عند تعذّر الخادم الرئيسي",
+            description = "خادم بديل يمكن تفعيله بدلًا من الخادم الرئيسي",
             lang = "ar",
             baseUrl = "https://olympustaff.com",
             version = "1.0.0",
@@ -77,6 +83,7 @@ object NativeSourceRegistry {
         require(definitions.all { it.baseUrl.startsWith("https://") }) {
             "Every server needs an https base url"
         }
+        require(definition(DEFAULT_ID) != null) { "The default server must be bundled" }
     }
 
     fun definition(id: String): SourceDefinition? = definitions.firstOrNull { it.id == id }

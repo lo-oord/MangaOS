@@ -160,6 +160,7 @@
     <string name="age_privacy_note">年齢はコンテンツのルールにのみ使用され、公開されることはありません。</string>
     <string name="profile_privacy_note">国・年齢・希望言語は非公開です。後からプライバシー設定で変更または削除できます。</string>
     <string name="sources_section_sources">サーバー</string>
+    <string name="sources_exclusive_hint">使用するサーバーは同時に 1 つだけです。片方をオンにすると、もう片方はオフになります。</string>
     <string name="reader_chapters_title">章一覧</string>
     <string name="reader_current_chapter">現在の章</string>
     <string name="detail_in_progress">読書中</string>

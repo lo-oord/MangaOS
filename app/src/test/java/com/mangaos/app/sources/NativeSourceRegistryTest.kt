@@ -41,6 +41,13 @@ class NativeSourceRegistryTest {
     }
 
     @Test
+    fun `the primary server is the default and the backup follows it`() {
+        assertEquals("mangatek", NativeSourceRegistry.DEFAULT_ID)
+        assertEquals(NativeSourceRegistry.DEFAULT_ID, NativeSourceRegistry.definitions.first().id)
+        assertEquals("teamx", NativeSourceRegistry.definitions.last().id)
+    }
+
+    @Test
     fun `registry can resolve an id and rejects unknown ones`() {
         NativeSourceRegistry.definitions.forEach { definition ->
             assertEquals(definition, NativeSourceRegistry.definition(definition.id))

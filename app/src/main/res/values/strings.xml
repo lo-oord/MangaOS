@@ -394,6 +394,7 @@
     <string name="action_more">More options</string>
     <string name="sources_native_summary">%1$d enabled of %2$d</string>
     <string name="sources_last_error">Last error: %1$s</string>
+    <string name="sources_exclusive_hint">One server runs at a time. Turning a server on turns the other off.</string>
     <string name="language_switching_to">Switching to %1$s</string>
     <string name="detail_publication_date">Publication date</string>
     <string name="detail_last_update">Last update</string>

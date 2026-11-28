@@ -92,6 +92,17 @@ fun SourcesScreen(
             }
         }
 
+        Text(
+            text = stringResource(R.string.sources_exclusive_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                start = Spacing.screen,
+                end = Spacing.screen,
+                bottom = Spacing.sm,
+            ),
+        )
+
         MangaSearchField(
             value = viewModel.query,
             onValueChange = viewModel::onQueryChange,

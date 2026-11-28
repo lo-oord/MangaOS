@@ -29,7 +29,11 @@ import kotlinx.coroutines.withContext
  *
  * Enabled state is persisted in DataStore and survives restarts. Disabling a source never
  * deletes the user's library, reading history or downloads; it only stops new requests.
+ *
+ * Exactly one server is active at a time: the primary server is the default, the backup starts
+ * off, and turning either one on turns the other off, so requests never split between the two.
  */
+
 class NativeSourceManager(
     private val dataStore: DataStore<Preferences>,
     private val scope: CoroutineScope,
@@ -38,21 +42,29 @@ class NativeSourceManager(
     private val definitions = NativeSourceRegistry.definitions
     private val instances = ConcurrentHashMap<String, MangaSource>()
 
-    private val _enabledIds = MutableStateFlow(definitions.map { it.id }.toSet())
+    /** The server the app opens on and the one a disabled pair falls back to. */
+    private val defaultId = NativeSourceRegistry.DEFAULT_ID
+    private val defaultEnabledIds = setOf(defaultId)
+
+    private val _enabledIds = MutableStateFlow(defaultEnabledIds)
     private val _failures = MutableStateFlow<Map<String, String>>(emptyMap())
 
     override val sources: StateFlow<List<SourceInfo>> = _enabledIds
         .map { enabled ->
             definitions.map { definition -> definition.toInfo(enabled.contains(definition.id)) }
         }
-        .stateIn(scope, SharingStarted.Eagerly, definitions.map { it.toInfo(true) })
+        .stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            definitions.map { it.toInfo(it.id in defaultEnabledIds) },
+        )
 
     /**
      * The primary server is the default source. Ordering the enabled list with it first makes
      * "the first enabled source" mean the primary one everywhere, instead of whatever name
      * happened to sort first alphabetically.
      */
-    override val defaultSourceId: String? = definitions.firstOrNull()?.id
+    override val defaultSourceId: String? = defaultId
 
     override val enabledSources: StateFlow<List<SourceInfo>> = sources
         .map { list ->
@@ -71,29 +83,36 @@ class NativeSourceManager(
         val stored = withContext(Dispatchers.IO) {
             runCatching { dataStore.data.first()[ENABLED_KEY] }.getOrNull()
         }
-        if (stored != null) {
-            val known = stored.filter { id -> definitions.any { it.id == id } }.toSet()
-            // A store written by an older build can only hold ids this build no longer ships.
-            // Falling back to the default policy keeps the app usable instead of starting with
-            // every server switched off and an empty Latest feed.
-            _enabledIds.value = known.ifEmpty { definitions.map { it.id }.toSet() }
-            return
+        val enabled = if (stored == null) defaultEnabledIds else normalize(stored)
+        _enabledIds.value = enabled
+        // Rewritten even when nothing changed, so a store written by an older build (which kept
+        // both servers on) is left in the one-at-a-time shape from the next launch onwards.
+        persist(enabled)
+    }
+
+    /**
+     * One server at a time. A stored set that holds both (or two ids of an older build) keeps
+     * the first definition, which is the primary server; an explicitly empty set stays empty.
+     */
+    private fun normalize(stored: Set<String>): Set<String> {
+        val known = stored.filter { id -> definitions.any { it.id == id } }
+        return when {
+            known.isNotEmpty() -> setOf(definitions.first { it.id in known }.id)
+            stored.isEmpty() -> emptySet()
+            else -> defaultEnabledIds
         }
-        // Default policy for a first run (and for an upgrade from the old APK-based sources):
-        // every bundled source starts enabled, so an existing library keeps resolving and the
-        // user can turn individual sources off without losing anything.
-        persist(definitions.map { it.id }.toSet())
     }
 
     override fun setEnabled(sourceId: String, enabled: Boolean) {
         if (definitions.none { it.id == sourceId }) return
-        val next = _enabledIds.value.toMutableSet()
-        if (enabled) next += sourceId else next -= sourceId
+        // Enabling a server replaces the active one instead of adding to it, so the primary and
+        // the backup can never both answer at the same time.
+        val next = if (enabled) setOf(sourceId) else _enabledIds.value - sourceId
+        if (next == _enabledIds.value) return
         _enabledIds.value = next
-        if (!enabled) {
-            // Failures of a disabled source are irrelevant and would keep a stale error chip.
-            _failures.value = _failures.value - sourceId
-        }
+        // Failures of a server that is no longer active are irrelevant and would keep a stale
+        // error chip on its row.
+        _failures.value = _failures.value.filterKeys { it in next }
         scope.launch { persist(next) }
     }
 
