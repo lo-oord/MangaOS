@@ -1,5 +1,6 @@
 package com.mangaos.app.data.firebase
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -129,7 +130,10 @@ class CloudSync(
             ).awaitUnit()
             changed.keys.forEach { key -> stamps[key] = now }
             _status.value = Status.SYNCED
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            // A denied write (rules) and a lost connection look the same to the reader, so the
+            // reason is logged instead of being dropped.
+            Log.w(TAG, "Preference upload failed for ${current.take(6)}…", error)
             _status.value = Status.OFFLINE
         }
     }
@@ -196,6 +200,7 @@ class CloudSync(
     }
 
     private companion object {
+        const val TAG = "CloudSync"
         const val FIELD_FIELDS = "fields"
         const val FIELD_STAMPS = "stamps"
         const val DEBOUNCE_MILLIS = 700L
