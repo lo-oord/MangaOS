@@ -63,13 +63,34 @@ fun VerifyEmailScreen(modifier: Modifier = Modifier) {
     var sending by mutableStateOf(false)
     var checking by mutableStateOf(false)
     var sent by mutableStateOf(false)
+    var sendFailed by mutableStateOf(false)
     var notYet by mutableStateOf(false)
     var canResend by mutableStateOf(true)
 
-    LaunchedEffect(Unit) {
-        runCatching { FirebaseAuthManager.sendVerificationEmail() }
-            .onSuccess { sent = true }
+    fun send() {
+        if (sending) return
+        sending = true
+        sendFailed = false
+        canResend = false
+        scope.launch {
+            // The result decides what the screen says. A silent failure used to leave a new
+            // account looking at a note about a mail that never left the server.
+            val delivered = runCatching { FirebaseAuthManager.sendVerificationEmail() }.isSuccess
+            sent = delivered
+            sendFailed = !delivered
+            sending = false
+            if (!delivered) {
+                // Nothing was sent, so the reader may retry right away.
+                canResend = true
+                return@launch
+            }
+            kotlinx.coroutines.delay(RESEND_COOLDOWN_MILLIS)
+            canResend = true
+        }
     }
+
+    // One send as the gate appears, so a freshly created account gets its link without a tap.
+    LaunchedEffect(Unit) { send() }
 
     fun check() {
         if (checking) return
@@ -91,15 +112,7 @@ fun VerifyEmailScreen(modifier: Modifier = Modifier) {
 
     fun resend() {
         if (!canResend) return
-        canResend = false
-        sending = true
-        scope.launch {
-            runCatching { FirebaseAuthManager.sendVerificationEmail() }
-                .onSuccess { sent = true }
-            sending = false
-            kotlinx.coroutines.delay(RESEND_COOLDOWN_MILLIS)
-            canResend = true
-        }
+        send()
     }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -129,9 +142,14 @@ fun VerifyEmailScreen(modifier: Modifier = Modifier) {
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
-                    text = stringResource(R.string.auth_verify_hint, state.email.orEmpty()),
+                    text = when {
+                        sent -> stringResource(R.string.auth_verify_hint, state.email.orEmpty())
+                        sendFailed -> stringResource(R.string.auth_verify_send_failed)
+                        else -> stringResource(R.string.auth_verify_sending)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (sendFailed) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.lg))
 
@@ -146,14 +164,6 @@ fun VerifyEmailScreen(modifier: Modifier = Modifier) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        AnimatedVisibility(visible = sent) {
-                            Text(
-                                text = stringResource(R.string.auth_verify_sent),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = Spacing.sm),
-                            )
-                        }
                         AnimatedVisibility(visible = notYet) {
                             Text(
                                 text = stringResource(R.string.auth_verify_not_yet),

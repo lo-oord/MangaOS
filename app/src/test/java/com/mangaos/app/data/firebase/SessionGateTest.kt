@@ -122,4 +122,18 @@ class SessionGateTest {
         // The old, free-form key must not be mistaken for the badge.
         assertFalse(plain.isVerified)
     }
+
+    @Test
+    fun `either the badge or the document field grants verification`() {
+        val plain = AccountDoc(uid = "uid")
+        val flagged = AccountDoc(uid = "uid", isVerified = true)
+        // The badge alone is enough.
+        assertTrue(AccountVerification.isGranted(badge = true, account = plain))
+        // So is the field an operator sets in the console, with no badge at all. This is the
+        // reported bug: the field used to be read but never consulted.
+        assertTrue(AccountVerification.isGranted(badge = false, account = flagged))
+        assertFalse(AccountVerification.isGranted(badge = false, account = plain))
+        // A missing document cannot be verified by anything.
+        assertFalse(AccountVerification.isGranted(badge = false, account = null))
+    }
 }

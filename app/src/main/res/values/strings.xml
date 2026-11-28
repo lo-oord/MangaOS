@@ -451,7 +451,7 @@
     <string name="auth_flow_reset_hint">Enter your email and a new password.</string>
     <string name="auth_flow_sign_in">Sign in</string>
     <string name="auth_flow_create">Create account</string>
-    <string name="auth_flow_reset">Reset password</string>
+    <string name="auth_flow_reset">Send reset link</string>
     <string name="auth_flow_to_sign_up">Create account</string>
     <string name="auth_flow_to_sign_in">Sign in instead</string>
     <string name="auth_flow_forgot">Forgot your password?</string>
@@ -483,12 +483,17 @@
     <string name="auth_verify_check">I have verified</string>
     <string name="auth_verify_resend">Resend</string>
     <string name="auth_verify_sent">Verification email sent.</string>
+    <string name="auth_verify_sending">Sending the verification link…</string>
+    <string name="auth_verify_send_failed">We could not send the verification email. Check your connection and try again.</string>
     <string name="auth_verify_gate_note">Verify your email to unlock your account. Everything stays saved until you do.</string>
     <string name="auth_verify_not_yet">Not verified yet. Open the link in the email, then try again.</string>
     <string name="auth_verify_other">Wrong address?</string>
     <string name="auth_verify_sign_out">Sign out</string>
     <string name="session_loading">Loading your account…</string>
     <string name="auth_reset_hint">Enter your email and we will send a reset link.</string>
+    <string name="auth_reset_sent_title">Check your email</string>
+    <string name="auth_reset_sent_body">If %1$s has an account, a password reset link is on its way and should arrive within a few minutes.</string>
+    <string name="auth_reset_sent_hint">Check the spam folder too, and make sure the address is the one you signed up with.</string>
     <string name="auth_error_email_invalid">That email is not valid.</string>
     <string name="auth_error_password_weak">Password is too short (8 characters minimum).</string>
     <string name="auth_error_too_many">Too many attempts. Try again shortly.</string>

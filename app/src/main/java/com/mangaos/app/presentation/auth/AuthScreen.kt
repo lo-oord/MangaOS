@@ -219,7 +219,12 @@ private fun StepActions(
             loading = viewModel.isSubmitting,
             icon = if (mode == AuthMode.SIGN_UP) MangaOsIcons.add else MangaOsIcons.login,
         )
-        AuthStage.RESET -> PrimaryButton(
+        AuthStage.RESET -> if (viewModel.resetSent) PrimaryButton(
+            text = stringResource(R.string.auth_flow_back_to_sign_in),
+            onClick = { viewModel.open(AuthStage.EMAIL, AuthMode.SIGN_IN) },
+            enabled = !viewModel.isSubmitting,
+            icon = MangaOsIcons.login,
+        ) else PrimaryButton(
             text = stringResource(R.string.auth_flow_reset),
             onClick = viewModel::resetPassword,
             loading = viewModel.isSubmitting,
@@ -403,6 +408,31 @@ private fun PasswordStep(viewModel: AuthViewModel) {
 
 @Composable
 private fun ResetStep(viewModel: AuthViewModel) {
+    // Once the request is out, the step says exactly what was done and what to expect, instead of
+    // leaving the reader on a form that looks like it never ran.
+    if (viewModel.resetSent) {
+        StepTitle(
+            title = stringResource(R.string.auth_reset_sent_title),
+            hint = stringResource(R.string.auth_reset_sent_body, viewModel.email),
+        )
+        Text(
+            text = stringResource(R.string.auth_reset_sent_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            TextButton(
+                onClick = { viewModel.open(AuthStage.RESET, AuthMode.SIGN_IN) },
+                enabled = !viewModel.isSubmitting,
+            ) {
+                Text(
+                    text = stringResource(R.string.action_change_email),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+        return
+    }
     StepTitle(
         title = stringResource(R.string.auth_flow_reset_title),
         hint = stringResource(R.string.auth_reset_hint),

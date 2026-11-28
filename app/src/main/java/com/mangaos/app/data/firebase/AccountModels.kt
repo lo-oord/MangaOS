@@ -16,9 +16,9 @@ data class AccountDoc(
     val photo: String? = null,
     val setupCompleted: Boolean = false,
     /**
-     * Mirror of `badges/{uid}`, written only while it agrees with that document (the rules
-     * enforce it). It exists so the flag is visible on `users/{uid}`; the badge document stays
-     * the only place a grant can come from.
+     * A verification grant on its own, as well as a mirror of `badges/{uid}`. An operator can
+     * set it in the console; the app only ever raises it to follow a badge and never clears it,
+     * because the rules already refuse a client write that would grant it on its own.
      */
     val isVerified: Boolean = false,
     val createdAt: Long = 0L,
@@ -42,6 +42,19 @@ data class AccountDoc(
             updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
         )
     }
+}
+
+/**
+ * Where verification comes from.
+ *
+ * An admin can grant it with `badges/{uid}`, or an operator can tick `users/{uid}.isVerified` in
+ * the Firebase console. Either one is a grant, so a console change survives. The app itself may
+ * only raise the field to follow a badge — never lower it — and the rules refuse a client write
+ * that would grant verification on its own.
+ */
+object AccountVerification {
+    fun isGranted(badge: Boolean, account: AccountDoc?): Boolean =
+        badge || account?.isVerified == true
 }
 
 /**

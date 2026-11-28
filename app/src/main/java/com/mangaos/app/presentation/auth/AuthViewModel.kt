@@ -46,6 +46,10 @@ class AuthViewModel : ViewModel() {
     var isSubmitting by mutableStateOf(false)
         private set
 
+    /** The reset request went out; the shell shows the confirmation instead of the form. */
+    var resetSent by mutableStateOf(false)
+        private set
+
     private var pendingGoogleToken: String? = null
 
     init {
@@ -68,6 +72,7 @@ class AuthViewModel : ViewModel() {
         passwordError = null
         confirmError = null
         failure = null
+        resetSent = false
         pendingGoogleToken = null
     }
 
@@ -76,6 +81,7 @@ class AuthViewModel : ViewModel() {
         stage = next
         mode = nextMode
         failure = null
+        resetSent = false
         confirmPassword = ""
         confirmError = null
         passwordError = null
@@ -92,6 +98,7 @@ class AuthViewModel : ViewModel() {
             AuthStage.LINK -> AuthStage.EMAIL
         }
         failure = null
+        resetSent = false
     }
 
     fun onEmailChange(value: String) {
@@ -241,8 +248,13 @@ class AuthViewModel : ViewModel() {
             try {
                 FirebaseAuthManager.sendPasswordReset(email)
                 failure = null
+                // The answer is deliberately the same whether or not the address has an account,
+                // so the shell confirms the request instead of promising a delivery it cannot
+                // see. Without this flag the step looked like it had done nothing at all.
+                resetSent = true
             } catch (error: AuthFailure) {
                 failure = error.reason
+                android.util.Log.w(LOG_TAG, "password reset failed for a request: ${error.reason}")
             } finally {
                 isSubmitting = false
             }
@@ -264,5 +276,9 @@ class AuthViewModel : ViewModel() {
 
     fun signOutSilently() {
         viewModelScope.launch { FirebaseAuthManager.signOut() }
+    }
+
+    private companion object {
+        const val LOG_TAG = "Auth"
     }
 }

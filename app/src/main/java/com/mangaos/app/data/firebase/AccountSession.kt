@@ -86,8 +86,8 @@ class AccountSession(
             combine(
                 accounts.account(user.uid),
                 accounts.badge(user.uid),
-            ) { account, verified -> account to verified }
-                .collect { (account, verified) ->
+            ) { account, badge -> account to badge }
+                .collect { (account, badgeVerified) ->
                     // The snapshot listener is the read the app needs anyway; the account is
                     // only created when that read says it is genuinely missing, which removes a
                     // second read on every sign-in. A transient failure is retried by the next
@@ -99,6 +99,9 @@ class AccountSession(
                         }
                         return@collect
                     }
+                    // A verification may come from the admin badge or from the field an
+                    // operator sets on the document; either one is a grant.
+                    val granted = AccountVerification.isGranted(badgeVerified, account)
                     _state.value = _state.value.copy(
                         loading = false,
                         uid = user.uid,
@@ -107,23 +110,23 @@ class AccountSession(
                         hasPassword = FirebaseAuthManager.hasPassword,
                         hasGoogle = FirebaseAuthManager.hasGoogle,
                         account = account,
-                        verified = verified,
+                        verified = granted,
                     )
-                    mirrorVerification(user.uid, account, verified)
-                    adoptProfile(user, account, verified)
+                    mirrorVerification(user.uid, account, badgeVerified)
+                    adoptProfile(user, account, granted)
                 }
         }
     }
 
     /**
-     * Writes the badge state into `users/{uid}.isVerified` when — and only when — it disagrees.
-     * The badge document remains the source of truth and the rules refuse any other value, so
-     * this can never grant verification; it only keeps the visible field in step.
+     * Raises `users/{uid}.isVerified` to match the badge when the badge is what grants it.
+     *
+     * It never writes `false`: the field is a grant of its own when an operator sets it in the
+     * console, and mirroring a missing badge over it used to undo that change seconds later.
      */
-    private suspend fun mirrorVerification(uid: String, account: AccountDoc?, verified: Boolean) {
-        if (account == null) return
-        if (account.isVerified == verified) return
-        runCatching { accounts.updateAccount(uid, mapOf(FIELD_VERIFIED to verified)) }
+    private suspend fun mirrorVerification(uid: String, account: AccountDoc?, badgeVerified: Boolean) {
+        if (account == null || !badgeVerified || account.isVerified) return
+        runCatching { accounts.updateAccount(uid, mapOf(FIELD_VERIFIED to true)) }
     }
 
     /** Keeps the drawer, cards and profile writing from one local profile row. */

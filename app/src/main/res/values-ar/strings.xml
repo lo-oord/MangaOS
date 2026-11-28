@@ -436,7 +436,7 @@
     <string name="auth_flow_reset_hint">أدخل بريدك وكلمة مرور جديدة.</string>
     <string name="auth_flow_sign_in">تسجيل الدخول</string>
     <string name="auth_flow_create">إنشاء حساب</string>
-    <string name="auth_flow_reset">تغيير كلمة المرور</string>
+    <string name="auth_flow_reset">إرسال رابط الاستعادة</string>
     <string name="auth_flow_to_sign_up">إنشاء حساب</string>
     <string name="auth_flow_to_sign_in">تسجيل الدخول بدلًا من ذلك</string>
     <string name="auth_flow_forgot">نسيت كلمة المرور؟</string>
@@ -468,12 +468,17 @@
     <string name="auth_verify_check">تحققت</string>
     <string name="auth_verify_resend">إعادة الإرسال</string>
     <string name="auth_verify_sent">تم إرسال رسالة التحقق.</string>
+    <string name="auth_verify_sending">جارٍ إرسال رابط التحقق…</string>
+    <string name="auth_verify_send_failed">تعذر إرسال رسالة التحقق. تحقق من الاتصال ثم أعد المحاولة.</string>
     <string name="auth_verify_gate_note">أكّد بريدك الإلكتروني لفتح حسابك. لا يُفقد أي شيء قبل ذلك.</string>
     <string name="auth_verify_not_yet">لم يتم التأكيد بعد. افتح الرابط في الرسالة ثم أعد المحاولة.</string>
     <string name="auth_verify_other">البريد غير صحيح؟</string>
     <string name="auth_verify_sign_out">تسجيل الخروج</string>
     <string name="session_loading">جارٍ تحميل حسابك…</string>
     <string name="auth_reset_hint">أدخل بريدك وسنرسل رابط إعادة التعيين.</string>
+    <string name="auth_reset_sent_title">تحقق من بريدك</string>
+    <string name="auth_reset_sent_body">إذا كان %1$s مسجلاً في التطبيق فسيصلك رابط إعادة تعيين كلمة المرور خلال دقائق.</string>
+    <string name="auth_reset_sent_hint">تحقق أيضًا من مجلد البريد المزعج، وتأكد أنه البريد نفسه الذي سجلت به.</string>
     <string name="auth_error_email_invalid">البريد غير صالح.</string>
     <string name="auth_error_password_weak">كلمة المرور قصيرة (٨ أحرف على الأقل).</string>
     <string name="auth_error_too_many">محاولات كثيرة. حاول بعد قليل.</string>

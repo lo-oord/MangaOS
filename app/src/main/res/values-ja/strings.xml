@@ -355,7 +355,7 @@
     <string name="auth_flow_reset_hint">メールと新しいパスワードを入力してください。</string>
     <string name="auth_flow_sign_in">サインイン</string>
     <string name="auth_flow_create">アカウント作成</string>
-    <string name="auth_flow_reset">パスワードを変更</string>
+    <string name="auth_flow_reset">再設定リンクを送信</string>
     <string name="auth_flow_to_sign_up">アカウント作成</string>
     <string name="auth_flow_to_sign_in">サインインへ</string>
     <string name="auth_flow_forgot">パスワードをお忘れですか？</string>
@@ -385,12 +385,17 @@
     <string name="auth_verify_check">確認しました</string>
     <string name="auth_verify_resend">再送信</string>
     <string name="auth_verify_sent">確認メールを送信しました。</string>
+    <string name="auth_verify_sending">確認リンクを送信中…</string>
+    <string name="auth_verify_send_failed">確認メールを送信できませんでした。通信状況を確認して再試行してください。</string>
     <string name="auth_verify_gate_note">メールアドレスを確認するとアカウントが使えます。それまでも内容は保存されます。</string>
     <string name="auth_verify_not_yet">まだ確認されていません。メールのリンクを開いてから再試行してください。</string>
     <string name="auth_verify_other">アドレスが違いますか？</string>
     <string name="auth_verify_sign_out">サインアウト</string>
     <string name="session_loading">アカウントを読み込み中…</string>
     <string name="auth_reset_hint">メールアドレスを入力すると再設定リンクを送信します。</string>
+    <string name="auth_reset_sent_title">メールをご確認ください</string>
+    <string name="auth_reset_sent_body">%1$s にアカウントがある場合、パスワード再設定リンクが数分以内に届きます。</string>
+    <string name="auth_reset_sent_hint">迷惑メールフォルダも確認し、登録したメールアドレスであることをご確認ください。</string>
     <string name="auth_error_email_invalid">メールアドレスが無効です。</string>
     <string name="auth_error_password_weak">パスワードが短すぎます（8文字以上）。</string>
     <string name="auth_error_too_many">試行回数が多すぎます。しばらく待ってください。</string>
