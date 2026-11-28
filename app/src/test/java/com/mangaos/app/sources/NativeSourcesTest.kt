@@ -69,9 +69,10 @@ class NativeSourcesTest {
     }
 
     @Test
-    fun `every bundled source is complete and carries its own icon`() {
+    fun `exactly one primary and one backup server ship in the app`() {
         val definitions = NativeSourceRegistry.definitions
-        assertEquals(11, definitions.size)
+        assertEquals(2, definitions.size)
+        assertEquals(listOf("mangatek", "teamx"), definitions.map { it.id })
         definitions.forEach { definition ->
             val source = definition.factory()
             assertEquals(definition.id, source.id)
@@ -82,12 +83,12 @@ class NativeSourcesTest {
                 "${definition.id} must declare at least search",
                 definition.capabilities.isNotEmpty(),
             )
-            assertTrue("${definition.id} needs an icon", definition.iconRes != 0)
+            assertNull("${definition.id} must not ship brand artwork", definition.iconRes)
         }
     }
 
     @Test
-    fun `the registry ships Arabic sources only and never two of the same id`() {
+    fun `the registry ships Arabic servers only and never two of the same id`() {
         val definitions = NativeSourceRegistry.definitions
         assertTrue(definitions.all { it.lang == "ar" })
         assertEquals(definitions.size, definitions.map { it.id }.distinct().size)
