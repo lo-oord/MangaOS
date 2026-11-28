@@ -34,6 +34,43 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Require release signing secrets
+        run: |
+          missing=0
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret $name. Run tools/setup-signing.sh to create the keystore and upload the secrets."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Restore release keystore
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mangaos-release.jks"
+          {
+            echo "MANGAOS_KEYSTORE_PATH=$RUNNER_TEMP/mangaos-release.jks"
+            echo "MANGAOS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "MANGAOS_KEY_ALIAS=$KEY_ALIAS"
+            echo "MANGAOS_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Keystore restored ($(stat -c%s "$RUNNER_TEMP/mangaos-release.jks") bytes)."
+          mkdir -p artifacts
+          {
+            echo "Package name: com.mangaos.app"
+            keytool -list -v -keystore "$RUNNER_TEMP/mangaos-release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep -E "SHA1:|SHA256:"
+          } > artifacts/signing-fingerprints.txt
+          cat artifacts/signing-fingerprints.txt
+          # Publish the fingerprints on the run page so they can be added to Firebase
+          # without downloading anything; they are public information anyway.
+          {
+            echo "### Release signing fingerprints"
+            echo '```'
+            cat artifacts/signing-fingerprints.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Configure Android SDK
         run: |
           set -euo pipefail
@@ -77,43 +114,6 @@ jobs:
             python3 tools/report-test-failures.py
             exit "$status"
           fi
-
-      - name: Require release signing secrets
-        run: |
-          missing=0
-          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            if [ -z "${!name:-}" ]; then
-              echo "::error::Missing repository secret $name. Run tools/setup-signing.sh to create the keystore and upload the secrets."
-              missing=1
-            fi
-          done
-          exit "$missing"
-
-      - name: Restore release keystore
-        run: |
-          umask 077
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mangaos-release.jks"
-          {
-            echo "MANGAOS_KEYSTORE_PATH=$RUNNER_TEMP/mangaos-release.jks"
-            echo "MANGAOS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
-            echo "MANGAOS_KEY_ALIAS=$KEY_ALIAS"
-            echo "MANGAOS_KEY_PASSWORD=$KEY_PASSWORD"
-          } >> "$GITHUB_ENV"
-          echo "Keystore restored ($(stat -c%s "$RUNNER_TEMP/mangaos-release.jks") bytes)."
-          mkdir -p artifacts
-          {
-            echo "Package name: com.mangaos.app"
-            keytool -list -v -keystore "$RUNNER_TEMP/mangaos-release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep -E "SHA1:|SHA256:"
-          } > artifacts/signing-fingerprints.txt
-          cat artifacts/signing-fingerprints.txt
-          # Publish the fingerprints on the run page so they can be added to Firebase
-          # without downloading anything; they are public information anyway.
-          {
-            echo "### Release signing fingerprints"
-            echo '```'
-            cat artifacts/signing-fingerprints.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build signed release APKs
         run: |
