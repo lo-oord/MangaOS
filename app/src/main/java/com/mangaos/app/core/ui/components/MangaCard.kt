@@ -85,6 +85,7 @@ import com.mangaos.app.core.util.appString
 import com.mangaos.app.core.util.displayGenres
 import com.mangaos.app.core.util.ratingLabel
 import com.mangaos.app.core.util.relativeTimeCompact
+import com.mangaos.app.sources.registry.NativeSourceRegistry
 import com.mangaos.app.domain.model.Manga
 import com.mangaos.app.domain.model.MangaStatus
 import com.mangaos.app.domain.model.MangaViewMode
@@ -387,10 +388,12 @@ private fun cardFacts(manga: Manga, context: MangaCardContext): List<CardFact> {
     ratingLabel(manga.rating)?.let { facts += CardFact.Rating(it) }
     if (manga.status != MangaStatus.UNKNOWN) facts += CardFact.Status(manga.status)
     displayGenres(manga.genres, 1).firstOrNull()?.let { facts += CardFact.Genre(it) }
-    // A source that sends neither a rating, a state nor a genre still has its own name, which
-    // keeps the fact row (and therefore the card height) present with real data instead of a gap.
+    // A work with neither a rating, a state nor a genre still fills the row with its server's
+    // current label, so the card keeps one line of real information instead of a gap. The label
+    // comes from the registry, never from the name stored with the entry: a library item saved
+    // under a server this build no longer ships shows nothing rather than an old brand name.
     if (facts.isEmpty()) {
-        manga.sourceName?.takeIf { it.isNotBlank() }?.let { facts += CardFact.Source(it) }
+        NativeSourceRegistry.definition(manga.sourceId)?.name?.let { facts += CardFact.Source(it) }
     }
     return facts.take(MaxCardFacts)
 }
